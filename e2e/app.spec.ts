@@ -3809,6 +3809,350 @@ test.describe("every career reads clearly", () => {
   }
 });
 
+
+
+
+
+test.describe("the engineer", () => {
+  const startEngineer = async (page: Page) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*engineer/i }).first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in Berlin$/ }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /Business/i }).first().click();
+  };
+
+  test("the fault count is shown as a range, never as a number", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startEngineer(page);
+    await page.getByRole("button", { name: /^Start it$/ }).first().click();
+
+    /* The career's whole contract: an estimate and a confidence, not a count. */
+    await expect(
+      page.getByText(/Faults in it, estimated/i).first(),
+      "the player is given an estimate",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/confident/i).first(),
+      "and told how much it is worth",
+    ).toBeVisible();
+
+    const text = await page.locator("main").innerText();
+    expect(
+      /\d+–\d+/.test(text),
+      "the estimate is rendered as a band",
+    ).toBe(true);
+
+    expect(
+      text.match(/patient|caseload|covers|larder|brigade|runway|polling/i)?.[0],
+      "no other career's vocabulary reaches the Engineer",
+    ).toBeUndefined();
+    expect(text).not.toContain("NaN");
+    expect(text).not.toContain("undefined");
+
+    expect(problems).toEqual([]);
+  });
+
+  test("craft gates what you are allowed to attempt", async ({ page }) => {
+    await startEngineer(page);
+    await expect(
+      page.getByText(/Needs craft \d+; yours is \d+/).first(),
+      "a product beyond you says so, with both numbers",
+    ).toBeVisible();
+  });
+
+  test("an engineer run survives a reload", async ({ page }) => {
+    await startEngineer(page);
+    await page.getByRole("button", { name: /^Start it$/ }).first().click();
+    await expect(page.getByText(/mounting bracket/i).first()).toBeVisible();
+
+    await page.reload();
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await page.getByRole("button", { name: /Business/i }).first().click();
+    await expect(
+      page.getByText(/Faults in it, estimated/i).first(),
+      "the product on the bench survives a reload",
+    ).toBeVisible();
+  });
+});
+
+test.describe("the architect", () => {
+  const startArchitect = async (page: Page) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page
+      .getByRole("button", { name: /^open\s*architect/i })
+      .first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in Amsterdam$/ }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /Business/i }).first().click();
+  };
+
+  test("a commission shows its stage, its fee and its risk", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startArchitect(page);
+
+    /* The practice opens with one job offered, and taking it puts it on the
+       boards — the career is unplayable without that first board. */
+    await page.getByRole("button", { name: /^Take it on$/ }).first().click();
+
+    await expect(
+      page.getByText(/banked/i).first(),
+      "the card says how much of the fee is already yours",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/chance they change the brief/i).first(),
+      "and how likely the client is to send it backwards",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Last seen/i).first(),
+      "and when they last saw anybody, which is what drives it",
+    ).toBeVisible();
+
+    const text = await page.locator("main").innerText();
+    expect(
+      text.match(/patient|caseload|covers|larder|brigade|runway|polling/i)?.[0],
+      "no other career's vocabulary reaches the Architect",
+    ).toBeUndefined();
+    expect(text).not.toContain("NaN");
+    expect(text).not.toContain("undefined");
+    expect(text).not.toContain("1 weeks");
+
+    expect(problems).toEqual([]);
+  });
+
+  test("seeing the client is a real defence", async ({ page }) => {
+    await startArchitect(page);
+    await page.getByRole("button", { name: /^Take it on$/ }).first().click();
+
+    /* An associate exists to make that call for you, and the risk on the
+       card has to move when one is hired. */
+    const riskOf = async () => {
+      const line = await page
+        .getByText(/chance they change the brief/i)
+        .first()
+        .innerText();
+      return Number((line.match(/(\d+)%/) ?? ["", "0"])[1]);
+    };
+
+    const before = await riskOf();
+    await page
+      .getByRole("button", { name: /^Take them on$/ })
+      .last()
+      .click();
+    const after = await riskOf();
+    expect(
+      after,
+      "an associate cuts the chance the brief is reinvented",
+    ).toBeLessThanOrEqual(before);
+  });
+
+  test("an architect run survives a reload", async ({ page }) => {
+    await startArchitect(page);
+    await page.getByRole("button", { name: /^Take it on$/ }).first().click();
+    await expect(page.getByText(/A house extension/).first()).toBeVisible();
+
+    await page.reload();
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await page.getByRole("button", { name: /Business/i }).first().click();
+    await expect(
+      page.getByText(/A house extension/).first(),
+      "the commission survives a reload",
+    ).toBeVisible();
+  });
+});
+
+test.describe("the politician", () => {
+  const startPolitician = async (page: Page) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page
+      .getByRole("button", { name: /^open\s*politician/i })
+      .first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in London$/ }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /Business/i }).first().click();
+  };
+
+  test("the seat says where support is heading, not just where it is", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startPolitician(page);
+
+    await expect(
+      page.getByText(/the only moment any of this is banked/i).first(),
+      "the career states its own constraint on the screen",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/drifts toward where your positions leave it/i).first(),
+      "and explains the drift rather than hiding it",
+    ).toBeVisible();
+
+    /* Every bloc is a real meter, so a screen reader gets the numbers too. */
+    expect(
+      await page.getByRole("meter").count(),
+      "every bloc is measurable",
+    ).toBeGreaterThanOrEqual(4);
+
+    const text = await page.locator("main").innerText();
+    expect(
+      text.match(/patient|caseload|covers|larder|brigade|runway|chambers/i)?.[0],
+      "no other career's vocabulary reaches the Politician",
+    ).toBeUndefined();
+    expect(text).not.toContain("NaN");
+    expect(text).not.toContain("undefined");
+
+    expect(problems).toEqual([]);
+  });
+
+  test("a position costs somebody, and reversing it costs everybody", async ({
+    page,
+  }) => {
+    await startPolitician(page);
+
+    /* Every stance shows who it loses as well as who it wins. */
+    const build = page.getByRole("button", { name: /Build the houses/ }).first();
+    await expect(build).toBeVisible();
+    await build.click();
+    await expect(
+      build,
+      "the position you took reports itself as taken",
+    ).toHaveAttribute("aria-pressed", "true");
+
+    /* Change your mind, and the seat is told about it. */
+    await page.getByRole("button", { name: /Protect the green belt/ }).first().click();
+    await expect(
+      page.getByText(/You changed your mind on this one in public/i).first(),
+      "a public reversal is recorded on the issue itself",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/You have reversed 1 position/i).first(),
+      "and priced across the whole electorate",
+    ).toBeVisible();
+  });
+
+  test("a politician run survives a reload", async ({ page }) => {
+    await startPolitician(page);
+    await page.getByRole("button", { name: /Fund it properly/ }).first().click();
+
+    await page.reload();
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await page.getByRole("button", { name: /Business/i }).first().click();
+    await expect(
+      page.getByRole("button", { name: /Fund it properly/ }).first(),
+      "the position survives a reload",
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+test.describe("the founder", () => {
+  const startFounder = async (page: Page) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*founder/i }).first();
+    await card.click();
+    await card.click();
+    /* New York, because it is the city the tagline is written about: eleven
+       weeks, which is the pressure the whole career is played under. */
+    await page.getByRole("button", { name: /^Begin in New York$/ }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+  };
+
+  test("the career is played in weeks, not pounds", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startFounder(page);
+    await page.getByRole("button", { name: /Business/i }).first().click();
+
+    /* The headline is a countdown. */
+    await expect(
+      page.getByText(/^11 weeks$/).first(),
+      "the opening runway is the eleven weeks the tagline promises",
+    ).toBeVisible();
+
+    /* And every hire is priced in the same currency. */
+    await expect(
+      page.getByText(/weeks of runway/i).first(),
+      "a hire is priced in weeks, not just money",
+    ).toBeVisible();
+
+    const text = await page.locator("main").innerText();
+    expect(
+      text.match(/patient|caseload|covers|larder|brigade|chambers|hearing/i)?.[0],
+      "no other career's vocabulary reaches the Founder",
+    ).toBeUndefined();
+    expect(text).not.toContain("NaN");
+    expect(text).not.toContain("undefined");
+
+    expect(problems).toEqual([]);
+  });
+
+  test("hiring shortens the runway that pays for it", async ({ page }) => {
+    await startFounder(page);
+    await page.getByRole("button", { name: /Business/i }).first().click();
+
+    const runway = page.locator("section", { hasText: "Runway" }).first();
+    const before = Number(
+      ((await runway.innerText()).match(/(\d+)\s*weeks/) ?? ["", "0"])[1],
+    );
+    expect(before, "a founder starts with weeks on the clock").toBeGreaterThan(0);
+
+    await page
+      .getByRole("button", { name: /^Take them on$/ })
+      .first()
+      .click();
+
+    const after = Number(
+      ((await runway.innerText()).match(/(\d+)\s*weeks/) ?? ["", "0"])[1],
+    );
+    expect(
+      after,
+      "taking somebody on costs weeks off the clock",
+    ).toBeLessThan(before);
+  });
+
+  test("a founder run survives a reload", async ({ page }) => {
+    await startFounder(page);
+    await page.getByRole("button", { name: /Business/i }).first().click();
+    await page
+      .getByRole("button", { name: /^Take them on$/ })
+      .first()
+      .click();
+    await expect(page.getByText(/on the payroll/i).first()).toBeVisible();
+
+    await page.reload();
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await page.getByRole("button", { name: /Business/i }).first().click();
+    await expect(
+      page.getByText(/on the payroll/i).first(),
+      "the team survives a reload",
+    ).toBeVisible();
+  });
+});
+
 test.describe("the chef", () => {
   /** Start a Chef run from a clean slate. Two presses: arm, then commit. */
   const startChef = async (page: Page) => {
@@ -5284,13 +5628,16 @@ test.describe("the solicitor", () => {
     await expect(
       phone.getByText(/Week \d+|Listed this week/).first(),
     ).toBeVisible();
+    /* Counsel is a ladder now — see "the solicitor's practice areas" for the
+       tiers themselves. What this journey cares about is that the doorway
+       lands on a screen where the call can be made at all. */
     await expect(
-      phone.getByRole("button", { name: /^Brief counsel · /i }).first(),
+      phone.getByRole("button", { name: /A senior junior · /i }).first(),
       "briefing counsel is a call you make",
     ).toBeVisible();
     const shown = await phone.innerText();
     expect(
-      /points on the odds|Costs .* and you have/i.test(shown),
+      /on the odds|Costs .* and you have/i.test(shown),
       "a brief states what it buys, or why it cannot be pressed",
     ).toBe(true);
 
@@ -5713,6 +6060,239 @@ test.describe("the solicitor's people", () => {
     await expect(
       page.getByText(/Margaret Ellory/).first(),
       "the person who messaged you is the person on the screen",
+    ).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+});
+
+/**
+ * WHAT THE FIRM TURNED OUT TO BE
+ *
+ * The engine suite proves finished hours make a practice faster, better and
+ * dearer at the work it does. This proves a player can see it happening, and
+ * that counsel is a choice of who rather than a yes-or-no.
+ */
+test.describe("the solicitor's practice areas", () => {
+  const openInstructions = async (page: Page) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: /Chambers/ })
+      .first()
+      .click();
+    await page.getByRole("tab", { name: /^Instructions$/ }).first().click();
+  };
+
+  test("a new practice has specialised in nothing, and says so", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*solicitor/i }).first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in London$/ }).click();
+
+    await openInstructions(page);
+    await expect(
+      page.getByRole("heading", { name: /What this firm is known for/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Nothing finished yet/i).first(),
+      "and it says what decides it",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/decides what this firm becomes/i).first(),
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("a firm with a history shows what it has done and what it is worth", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await preload(page, "solicitor-listed");
+    await page.goto("/");
+    await page.getByRole("button", { name: /continue your run/i }).click();
+
+    await openInstructions(page);
+
+    /* The fixture is a real run: a hundred-odd finished hours in each of two
+       areas, which is a practice that has started to become something. */
+    await expect(
+      page.getByText(/A house purchase/).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/\d+h · (Occasional|Regular work|Known for it|Specialists)/).first(),
+      "hours and what the profession would call them",
+    ).toBeVisible();
+    await expect(
+      page.getByRole("meter").first(),
+      "and it is a meter rather than a number in a sentence",
+    ).toBeVisible();
+
+    /* The effects are stated rather than hidden in the maths. */
+    await expect(
+      page.getByText(/% hours/).first(),
+      "the reward is stated in the career's own currency",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("counsel is a choice of who, not whether", async ({ page }) => {
+    const problems = watchConsole(page);
+    await preload(page, "solicitor-listed");
+    await page.goto("/");
+    await page.getByRole("button", { name: /continue your run/i }).click();
+
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: /Chambers/ })
+      .first()
+      .click();
+    await page.getByRole("tab", { name: /^Casework$/ }).first().click();
+    await page
+      .getByRole("button", { name: /call the listings office/i })
+      .click();
+
+    const phone = page.getByRole("dialog");
+    await expect(phone.getByText(/The cause list/i).first()).toBeVisible();
+
+    /* Three of them, and each says what it buys. */
+    await expect(
+      phone.getByRole("button", { name: /A junior · /i }).first(),
+    ).toBeVisible();
+    await expect(
+      phone.getByRole("button", { name: /A senior junior · /i }).first(),
+    ).toBeVisible();
+    await expect(
+      phone.getByRole("button", { name: /Leading counsel · /i }).first(),
+      "the fixture carries matters big enough for a silk",
+    ).toBeVisible();
+
+    const shown = await phone.innerText();
+    expect(
+      /on the odds|Costs .* and you have/i.test(shown),
+      "every tier states what it buys, or why it cannot be pressed",
+    ).toBe(true);
+
+    /* And they are a real spread rather than three names for one thing. */
+    const prices = [...shown.matchAll(/·\s*\$([\d,]+)/g)].map((m) =>
+      Number(m[1].replace(/,/g, "")),
+    );
+    expect(
+      new Set(prices).size,
+      "the tiers are priced differently",
+    ).toBeGreaterThan(1);
+
+    await page.keyboard.press("Escape");
+    await expect(phone).toBeHidden();
+    expect(problems).toEqual([]);
+  });
+});
+
+
+/**
+ * WHERE THE FIRM SITS
+ *
+ * Chambers were derived from headcount, so there was nothing to decide and
+ * nothing to see. The engine suite proves the ladder charges, caps and pays;
+ * this proves a player meets the wall and is told how to get past it.
+ */
+test.describe("the solicitor's chambers", () => {
+  const openFirm = async (page: Page) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: /Chambers/ })
+      .first()
+      .click();
+    await page.getByRole("tab", { name: /^The firm$/ }).first().click();
+  };
+
+  const startSolicitor = async (page: Page) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*solicitor/i }).first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in London$/ }).click();
+  };
+
+  test("a new practice is in a borrowed desk, and can see the next rung", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startSolicitor(page);
+    await openFirm(page);
+
+    await expect(
+      page.getByRole("heading", { name: /A borrowed desk/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/1 of 3/).first(),
+      "the rooms say how many they hold and how many are in them",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/A high-street office/).first(),
+      "and what the next set would be",
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Take it · /i }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/rent is due from the week you move|Costs .* and you have/i).first(),
+      "and what taking it commits you to",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("the rooms fill up, and the firm is told it has to move", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startSolicitor(page);
+
+    /* Two hires fill a borrowed desk. The Roll is where hiring happens. */
+    await page.getByRole("button", { name: /open phone/i }).click();
+    const phone = page.getByRole("dialog");
+    await phone.getByRole("button", { name: /^roll$/i }).click();
+    await expect(phone.getByText(/1\/3/).first()).toBeVisible();
+
+    const take = phone.getByRole("button", { name: /take them on/i }).first();
+    await take.click();
+    await take.click();
+    await expect(
+      phone.getByText(/3\/3/).first(),
+      "the seats fill as the firm hires",
+    ).toBeVisible();
+
+    await expect(
+      phone.getByText(/seats 3 and is full/i).first(),
+      "and the Roll says why nobody else can be taken on",
+    ).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(phone).toBeHidden();
+
+    /* And the Firm screen says the same thing, where the move is made. */
+    await openFirm(page);
+    await expect(
+      page.getByText(/These rooms are full/i).first(),
     ).toBeVisible();
 
     expect(problems).toEqual([]);

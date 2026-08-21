@@ -2,6 +2,10 @@ import type { CareerDef } from "../types";
 import { doctor } from "./doctor";
 import { chef } from "./chef";
 import { lawyer } from "./lawyer";
+import { founder } from "./founder";
+import { politician } from "./politician";
+import { architect } from "./architect";
+import { engineer } from "./engineer";
 
 /**
  * Careers are registered here. Adding one is a self-contained job: implement
@@ -17,11 +21,23 @@ import { lawyer } from "./lawyer";
  *   Physician   capability — you cannot treat what you have no department for
  *   Chef        spoilage   — stock decays, and is served oldest-first
  *   Solicitor   the pipeline — nothing pays until it settles, and it might not
+ *   Founder     runway     — the whole career is priced in weeks, not money
+ *   Politician  the cycle   — support decays always, and banks only on polling day
+ *   Architect   the revision — paid in stages, and sent back to redraw them
+ *   Engineer    hidden state — the fault count is never shown, only estimated
  *
  * A career whose constraint is really "have more money" does not belong here.
  * That test is what the previews below are held to.
  */
-export const CAREERS: CareerDef[] = [doctor, chef, lawyer];
+export const CAREERS: CareerDef[] = [
+  doctor,
+  chef,
+  lawyer,
+  founder,
+  politician,
+  architect,
+  engineer,
+];
 
 export interface CareerPreview {
   id: string;
@@ -92,6 +108,82 @@ export const CAREER_PREVIEWS: CareerPreview[] = [
     ],
   },
   {
+    id: founder.id,
+    label: founder.label,
+    icon: founder.icon,
+    tagline: founder.tagline,
+    distinctRule: founder.distinctRule,
+    available: true,
+    difficulty: "Punishing",
+    advantages: [
+      "Brand and word of mouth compound — nothing else in the game does",
+      "You can trade ownership for weeks whenever you are willing to",
+      "Reaching default alive stops the clock for good",
+    ],
+    risks: [
+      "Runway is measured in weeks, and every hire shortens it",
+      "Every raise takes a permanent share, and the terms are set by traction",
+      "Customers leave every week whether or not you win any",
+    ],
+  },
+  {
+    id: politician.id,
+    label: politician.label,
+    icon: politician.icon,
+    tagline: politician.tagline,
+    distinctRule: politician.distinctRule,
+    available: true,
+    difficulty: "Volatile",
+    advantages: [
+      "Casework sticks — the one thing here that decays slowly",
+      "Climbing the ladder buys longer terms to be unpopular in",
+      "Winning banks the support permanently, and nothing else does",
+    ],
+    risks: [
+      "Support drains toward your positions every single week",
+      "A campaign peak a month early is worth almost nothing on the day",
+      "Change a stated position and the whole electorate marks you down for it",
+    ],
+  },
+  {
+    id: architect.id,
+    label: architect.label,
+    icon: architect.icon,
+    tagline: architect.tagline,
+    distinctRule: architect.distinctRule,
+    available: true,
+    difficulty: "Punishing",
+    advantages: [
+      "Every stage you finish banks its fee for good",
+      "Seeing the client is a real defence against being redrawn",
+      "One landmark rewrites what you are allowed to be asked for",
+    ],
+    risks: [
+      "A client who has not seen you can send the building back a stage",
+      "The drawings for those stages are gone; the weeks must be spent again",
+      "Competitions cost real months and usually pay nothing",
+    ],
+  },
+  {
+    id: engineer.id,
+    label: engineer.label,
+    icon: engineer.icon,
+    tagline: engineer.tagline,
+    distinctRule: engineer.distinctRule,
+    available: true,
+    difficulty: "Demanding",
+    advantages: [
+      "A certified product earns every week without being touched",
+      "Testing both removes faults and tells you how many are left",
+      "Pulling a product yourself costs far less than letting it fail",
+    ],
+    risks: [
+      "You are never shown the fault count — only an estimate of it",
+      "Designing is what creates the defects, so a better product is a worse liability",
+      "Faults arrive weeks after you shipped, priced by how well it sold",
+    ],
+  },
+  {
     id: lawyer.id,
     label: lawyer.label,
     icon: lawyer.icon,
@@ -113,82 +205,10 @@ export const CAREER_PREVIEWS: CareerPreview[] = [
 
   /* ------------------------------------------------- designed, not built */
 
-  {
-    id: "architect",
-    label: "Architect",
-    icon: "compass",
-    tagline:
-      "A practice of one, a competition entry nobody asked for, and a fee scale set by people who have never drawn anything.",
-    distinctRule:
-      "Your constraint is the long commission. Buildings take years, payment is staged against milestones you do not control, and a client can change their mind in month eighteen and reset the work.",
-    available: false,
-    difficulty: "Punishing",
-    advantages: [
-      "One landmark rewrites what you are allowed to bid for",
-      "Staged fees give a floor the other lumpy careers lack",
-    ],
-    risks: [
-      "A commission can be redesigned around you at any stage",
-      "Competitions cost real months and usually pay nothing",
-    ],
-  },
-  {
-    id: "founder",
-    label: "Founder",
-    icon: "rocket",
-    tagline:
-      "An idea, eleven weeks of savings, and a market that has not asked for it yet.",
-    distinctRule:
-      "Your constraint is runway. Everything is priced in weeks of survival rather than money, and raising more buys time at the cost of owning less of what you are building.",
-    available: false,
-    difficulty: "Punishing",
-    advantages: [
-      "Growth compounds faster here than in any other career",
-      "You can trade ownership for time whenever you are willing to",
-    ],
-    risks: [
-      "Runway is measured in weeks and only ever shortens",
-      "Every raise takes a permanent share of the outcome",
-    ],
-  },
-  {
-    id: "politician",
-    label: "Politician",
-    icon: "podium",
-    tagline:
-      "A ward nobody wants, a party that has not decided about you, and an electorate that has.",
-    distinctRule:
-      "Your constraint is the electoral cycle. Support decays continuously and is only banked on polling day, so the whole run is spent spending capital you cannot keep.",
-    available: false,
-    difficulty: "Volatile",
-    advantages: [
-      "Office converts standing into things no amount of money buys",
-      "A crisis handled well moves support faster than years of work",
-    ],
-    risks: [
-      "Support decays every single week you do not defend it",
-      "One position taken badly follows you for the rest of the run",
-    ],
-  },
-  {
-    id: "engineer",
-    label: "Engineer",
-    icon: "gear",
-    tagline:
-      "A workshop, a prototype that nearly works, and a certification body with no interest in your timeline.",
-    distinctRule:
-      "Your constraint is defect risk. Everything you ship carries latent faults that surface weeks later, so shipping faster raises revenue now and liability you cannot see yet.",
-    available: false,
-    difficulty: "Demanding",
-    advantages: [
-      "A certified product earns while you sleep",
-      "Fixing a fault before it surfaces is far cheaper than after",
-    ],
-    risks: [
-      "Faults are invisible when you ship and expensive when they land",
-      "A recall can outlive the product that caused it",
-    ],
-  },
+
+
+
+
 ];
 
 export function getCareer(id: string): CareerDef | undefined {

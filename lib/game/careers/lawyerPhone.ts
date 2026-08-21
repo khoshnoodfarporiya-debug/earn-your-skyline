@@ -9,6 +9,7 @@ import { MAX_FEED, MAX_MESSAGES, MAX_NEWS } from "../medical/phone";
 import {
   CASE_BY_ID,
   MAX_PRESSURE,
+  hoursNeededFor,
   billsOwed,
   legalCityOf,
   settlementFor,
@@ -556,7 +557,7 @@ export function generateLawyerWeek(
   const ripe = p.cases.find((c) => {
     const k = CASE_BY_ID.get(c.kind);
     if (!k) return false;
-    if (c.hoursDone < k.hours * 0.6) return false;
+    if (c.hoursDone < hoursNeededFor(p, k) * 0.6) return false;
     return !phone.messages.some((m) => m.id.startsWith(`offer-${c.id}-`));
   });
 

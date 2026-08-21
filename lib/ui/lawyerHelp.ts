@@ -6,6 +6,7 @@ import {
   billsOwed,
   chambersRent,
   hasClerk,
+  hoursNeededFor,
   hoursOutstanding,
   legalWages,
   oddsFor,
@@ -56,14 +57,14 @@ export function lawyerAlerts(state: RunState): Alert[] {
     if (!k) continue;
     const away = c.dueWeek - state.week;
     if (away > 3) continue;
-    const ready = Math.min(1, c.hoursDone / k.hours);
+    const ready = Math.min(1, c.hoursDone / hoursNeededFor(p, k));
 
     if (ready < 1) {
       out.push({
         id: `hearing:unready:${c.id}`,
         severity: away <= 1 ? "critical" : "warning",
         title: `${k.label} is ${Math.round(ready * 100)}% prepared`,
-        detail: `Heard ${away <= 0 ? "this week" : `in ${away} week${away === 1 ? "" : "s"}`}, and ${Math.round(k.hours - c.hoursDone)} hours short. Arriving without the hours is close to conceding — and losing costs you their costs as well as your own.`,
+        detail: `Heard ${away <= 0 ? "this week" : `in ${away} week${away === 1 ? "" : "s"}`}, and ${Math.round(hoursNeededFor(p, k) - c.hoursDone)} hours short. Arriving without the hours is close to conceding — and losing costs you their costs as well as your own.`,
         destination: "casework",
         actionLabel: "See the file",
       });

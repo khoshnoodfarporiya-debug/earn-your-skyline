@@ -317,6 +317,46 @@ import {
   CHEF_PREMISES,
   CHEF_PRODUCE,
 } from "../lib/game/careers/chef";
+import { engineer, workshop } from "../lib/game/careers/engineer";
+import {
+  WORKSHOP_CITY_BY_ID,
+  buildableKinds,
+  confidenceOf,
+  estimateOf,
+  revenueOf as productRevenue,
+  surfaceChance,
+} from "../lib/game/careers/workshop";
+import { architect, studio } from "../lib/game/careers/architect";
+import {
+  KIND_BY_ID,
+  competitionOdds,
+  feeFor,
+  offerableKinds,
+  revisionDepth,
+  revisionRisk,
+  stageOf as buildStage,
+} from "../lib/game/careers/studio";
+import { politician, campaign } from "../lib/game/careers/politician";
+import {
+  BLOCS,
+  ISSUES,
+  blocWeight,
+  leanOf,
+  projectedShare,
+  selectionBlocker,
+  survivesToPoll,
+} from "../lib/game/careers/constituency";
+import { founder, venture } from "../lib/game/careers/founder";
+import {
+  ROUND_BY_ID,
+  burnOf,
+  churnRate as ventureChurn,
+  defaultAlive,
+  revenueOf,
+  roundBlocker,
+  runwayLabel,
+  runwayOf,
+} from "../lib/game/careers/startup";
 import {
   INGREDIENT_BY_ID,
   RECIPES,
@@ -439,8 +479,25 @@ import {
   CASE_BY_ID,
   CASE_KINDS,
   LEGAL_CITY_BY_ID,
+  COUNSEL,
+  COUNSEL_ODDS,
+  LEGAL_PREMISES,
+  PREMISES_BY_ID,
+  chambersOf,
+  chambersPrice,
+  chambersSeats,
+  seatsFree,
+  seatsUsed,
   MAX_ADJOURNMENTS,
   MAX_PRESSURE,
+  SPECIALIST_HOURS,
+  areaBand,
+  areaHours,
+  areaSkill,
+  counselAvailable,
+  counselOf,
+  creditArea,
+  type PracticeState,
   PAYERS,
   type PayerId,
   billsOwed,
@@ -7020,6 +7077,1168 @@ console.log("\nThe agency\n" + "────────────────
   }
 }
 
+
+console.log("\nThe Founder\n" + "────────────────────────────────────────────────────");
+{
+  const startF = (seed = 71) => startRun(founder, seed);
+
+  /* The career is priced in weeks, and the scoreboard says so. */
+  {
+    const f = startF();
+    const v = venture(f);
+    check(
+      "a founder starts owning all of it and none of it is worth much",
+      v.equity === 100 && v.users === 0 && v.roundsClosed.length === 0,
+    );
+    check(
+      "the headline is the runway, in weeks",
+      founder.scoreboard(f).sub.includes("week"),
+      founder.scoreboard(f).sub,
+    );
+    check(
+      "and a fresh venture is not default alive",
+      !defaultAlive(v) && Number.isFinite(runwayOf(f.r.cash, v)),
+    );
+  }
+
+  /*
+   * THE BINDING CONSTRAINT.
+   *
+   * A hire has to cost weeks, not just money. If this ever stops being
+   * true the career is just an income statement with extra steps.
+   */
+  {
+    const f = startF();
+    const before = runwayOf(f.r.cash, venture(f));
+    const after = runCommand(founder, f, "hireVenture", "engineer");
+    const now = runwayOf(after.r.cash, venture(after));
+    check(
+      "taking somebody on shortens the runway that pays them",
+      now < before,
+      `${Math.floor(before)} weeks -> ${Math.floor(now)}`,
+    );
+    check(
+      "and the burn is higher than it was",
+      burnOf(venture(after)) > burnOf(venture(f)),
+    );
+  }
+
+  /* Building keeps people; selling only wins them. */
+  {
+    const f = startF();
+    const churnBefore = ventureChurn(venture(f));
+    const built = advanceWeek(founder, f, { build: 4 });
+    check(
+      "building the product cuts the rate people leave at",
+      ventureChurn(venture(built.state)) < churnBefore,
+      `${(churnBefore * 100).toFixed(1)}% -> ${(ventureChurn(venture(built.state)) * 100).toFixed(1)}%`,
+    );
+
+    const sold = advanceWeek(founder, f, { sell: 4 });
+    check(
+      "selling puts customers on the board this week",
+      venture(sold.state).users > venture(f).users,
+    );
+  }
+
+  /*
+   * THE CENTRAL TRADE-OFF, MEASURED.
+   *
+   * Selling is supposed to be the tempting answer and the wrong one: it wins
+   * immediately, then plateaus, because churn is a percentage and eventually
+   * eats everything a fixed weekly intake brings in. Compounding starts
+   * slower and does not stop.
+   *
+   * The first version of this test asserted only that compounding wins over a
+   * year, which measured the crossover (about week 42) rather than the
+   * design. Asserting both halves is the stronger claim and the true one.
+   */
+  {
+    const run = (plan: Record<string, number>, weeks: number) => {
+      let f = startF();
+      /* Funded well past any runway question: this measures growth, not
+         survival, and a company that dies mid-experiment measures neither. */
+      f.r.cash = 4_000_000;
+      for (let i = 0; i < weeks; i++) f = advanceWeek(founder, f, plan).state;
+      return venture(f).users;
+    };
+    const grind = { sell: 5 };
+    const compound = { market: 3, build: 2 };
+
+    check(
+      "selling is genuinely the better answer early — that is the trap",
+      run(grind, 20) > run(compound, 20) * 2,
+      `week 20: selling ${Math.round(run(grind, 20))} vs compounding ${Math.round(run(compound, 20))}`,
+    );
+    check(
+      "and compounding has overtaken it well inside a run",
+      run(compound, 60) > run(grind, 60),
+      `week 60: selling ${Math.round(run(grind, 60))} vs compounding ${Math.round(run(compound, 60))}`,
+    );
+    check(
+      "selling plateaus, because churn is a percentage",
+      run(grind, 140) < run(grind, 60) * 1.15,
+      `${Math.round(run(grind, 60))} at week 60, ${Math.round(run(grind, 140))} at 140`,
+    );
+    check(
+      "compounding does not",
+      run(compound, 140) > run(compound, 60) * 5,
+      `${Math.round(run(compound, 60))} at week 60, ${Math.round(run(compound, 140))} at 140`,
+    );
+  }
+
+  /* Brand is a stock that leaks. Stop paying attention and it drains. */
+  {
+    let f = startF();
+    f = advanceWeek(founder, f, { market: 5 }).state;
+    const peak = venture(f).brand;
+    for (let i = 0; i < 6; i++) f = advanceWeek(founder, f, { rest: 5 }).state;
+    check(
+      "attention decays when you stop buying it",
+      venture(f).brand < peak,
+      `${peak.toFixed(1)} -> ${venture(f).brand.toFixed(1)}`,
+    );
+  }
+
+  /* Raising: gated on traction, costs ownership, buys weeks. */
+  {
+    const f = startF();
+    const seed = ROUND_BY_ID.get("seed")!;
+    check(
+      "you cannot raise a seed round on nothing",
+      roundBlocker(venture(f), seed) !== null,
+      roundBlocker(venture(f), seed) ?? "",
+    );
+
+    const pre = ROUND_BY_ID.get("preseed")!;
+    let g = startF();
+    g = advanceWeek(founder, g, { build: 5 }).state;
+    g = advanceWeek(founder, g, { build: 5 }).state;
+    check(
+      "a pre-seed opens once there is something to show",
+      roundBlocker(venture(g), pre) === null,
+      roundBlocker(venture(g), pre) ?? "open",
+    );
+
+    g = runCommand(founder, g, "startRaise", "preseed");
+    const equityBefore = venture(g).equity;
+    const cashBefore = g.r.cash;
+    for (let i = 0; i < 6; i++) g = advanceWeek(founder, g, { pitch: 5 }).state;
+    const v = venture(g);
+    check(
+      "pitching until it closes pays the money in",
+      v.roundsClosed.includes("preseed") && g.r.cash > cashBefore,
+      `${Math.round(cashBefore)} -> ${Math.round(g.r.cash)}`,
+    );
+    check(
+      "and takes a permanent piece of the company",
+      v.equity < equityBefore && v.equity > 0,
+      `${equityBefore}% -> ${v.equity.toFixed(1)}%`,
+    );
+  }
+
+  /* Default alive is reachable, and it stops the clock. */
+  {
+    const f = startF();
+    const v = venture(f);
+    v.users = 4_000;
+    v.product = 70;
+    check(
+      "revenue covering burn makes the runway infinite",
+      defaultAlive(v) && !Number.isFinite(runwayOf(f.r.cash, v)),
+      `${Math.round(revenueOf(v))} in vs ${Math.round(burnOf(v))} out`,
+    );
+    check(
+      "and the run says so rather than printing a huge number",
+      runwayLabel(f.r.cash, v) === "Default alive",
+    );
+  }
+
+  /* Putting the price up sheds the least committed immediately. */
+  {
+    const f = startF();
+    venture(f).users = 1_000;
+    const dearer = runCommand(founder, f, "setPrice", "48");
+    check(
+      "a price rise loses customers on the spot",
+      venture(dearer).users < 1_000 && venture(dearer).price === 48,
+      `${Math.round(venture(dearer).users)} left of 1,000`,
+    );
+    const silly = runCommand(founder, f, "setPrice", "-5");
+    check(
+      "and a nonsense price is refused",
+      venture(silly).price === venture(f).price,
+    );
+  }
+
+  /* Nothing ends the run: out of money is a setback, not a loss. */
+  {
+    const f = startF();
+    f.r.cash = -1;
+    check(
+      "running out of road is a recoverable setback",
+      (founder.checkSetbacks?.(f) ?? []).includes("insolvency"),
+    );
+  }
+
+  /* Replay safety and saves. */
+  {
+    const mk = () => {
+      let f = startF(9001);
+      for (let i = 0; i < 8; i++)
+        f = advanceWeek(founder, f, { build: 3, sell: 2 }).state;
+      return venture(f);
+    };
+    check(
+      "the same seed always produces the same company",
+      JSON.stringify(mk()) === JSON.stringify(mk()),
+    );
+    check(
+      "a fresh venture validates",
+      founder.validateData!(startF().data),
+    );
+    check(
+      "a save owning none of the company is rejected",
+      !founder.validateData!({
+        venture: { ...venture(startF()), equity: 0 },
+      }),
+    );
+    check(
+      "and one with a role that does not exist is rejected",
+      !founder.validateData!({
+        venture: {
+          ...venture(startF()),
+          team: [{ id: "x", name: "x", role: "wizard", salary: 1, since: 1 }],
+        },
+      }),
+    );
+  }
+
+  /* Cities are a real trade, not flavour. */
+  {
+    const weeksIn = (cityId: string) => {
+      const f = startRun(founder, 5, { city: cityId });
+      const g = runCommand(founder, f, "hireVenture", "engineer");
+      return runwayOf(g.r.cash, venture(g));
+    };
+    check(
+      "a cheap city buys more weeks per hire than an expensive one",
+      weeksIn("mumbai") > weeksIn("newyork"),
+      `mumbai ${Math.floor(weeksIn("mumbai"))} vs new york ${Math.floor(weeksIn("newyork"))}`,
+    );
+  }
+
+  /* The career says its own name in its own words. */
+  {
+    let f = startF();
+    for (let i = 0; i < 5; i++)
+      f = advanceWeek(founder, f, { build: 3, market: 2 }).state;
+    const text =
+      JSON.stringify(founder.briefing(f, { build: 3 })) +
+      founder.objective(f).text +
+      founder.scoreboard(f).sub;
+    check(
+      "no medical, kitchen or legal vocabulary reaches the Founder",
+      !/patient|clinic|covers|larder|brigade|hearing|counsel|chambers/i.test(text),
+    );
+  }
+}
+
+
+console.log("\nThe Politician\n" + "────────────────────────────────────────────────────");
+{
+  const startP = (seed = 33) => startRun(politician, seed);
+
+  /* Week one: a candidate, no allowance, a poll in the diary. */
+  {
+    const f = startP();
+    const c = campaign(f);
+    check(
+      "a politician starts as a candidate with a date in the diary",
+      c.office === "candidate" && c.electionWeek > f.week && c.results.length === 0,
+    );
+    check(
+      "and the scoreboard is a share of the vote, not money",
+      politician.scoreboard(f).value.includes("%"),
+      politician.scoreboard(f).value,
+    );
+  }
+
+  /*
+   * THE BINDING CONSTRAINT.
+   *
+   * Support has to drain when you stop. If a week of doing nothing ever
+   * preserves a campaign lift, the career has no clock in it.
+   */
+  {
+    let f = startP();
+    f = advanceWeek(politician, f, { canvass: 6 }).state;
+    const peak = projectedShare(campaign(f));
+    for (let i = 0; i < 6; i++)
+      f = advanceWeek(politician, f, { rest: 6 }).state;
+    check(
+      "support drains when you stop defending it",
+      projectedShare(campaign(f)) < peak,
+      `${(peak * 100).toFixed(1)}% -> ${(projectedShare(campaign(f)) * 100).toFixed(1)}%`,
+    );
+  }
+
+  /*
+   * And it drains TOWARD the positions, not toward zero. A politician who
+   * has taken popular positions settles higher than one who has not.
+   */
+  {
+    const settle = (positions: [string, string][]) => {
+      let f = startP();
+      for (const [issue, stance] of positions)
+        f = runCommand(politician, f, "takePosition", `${issue}:${stance}`);
+      for (let i = 0; i < 30; i++)
+        f = advanceWeek(politician, f, { rest: 6 }).state;
+      return projectedShare(campaign(f));
+    };
+    const nothing = settle([]);
+    /* Fund social care and hold the rates: the two big turnout blocs. */
+    const popular = settle([["care", "fund"], ["tax", "hold"]]);
+    const unpopular = settle([["care", "family"], ["climate", "close"]]);
+    check(
+      "support settles where your positions leave it, not at zero",
+      popular > nothing && nothing > unpopular,
+      `unpopular ${(unpopular * 100).toFixed(1)}% < none ${(nothing * 100).toFixed(1)}% < popular ${(popular * 100).toFixed(1)}%`,
+    );
+  }
+
+  /*
+   * TIMING IS THE GAME.
+   *
+   * The same six weeks of campaigning is worth far more spent just before
+   * the count than spent months out. Peaking early is a real mistake and
+   * this is the test that says so.
+   */
+  {
+    const shareAtPoll = (early: boolean) => {
+      let f = startP();
+      const poll = campaign(f).electionWeek;
+      while (f.week <= poll) {
+        const out = poll - f.week;
+        const push = early ? out > 20 : out <= 6;
+        f = advanceWeek(politician, f, push ? { canvass: 6 } : { rest: 6 })
+          .state;
+      }
+      const r = campaign(f).results[0];
+      return r ? r.share : 0;
+    };
+    const early = shareAtPoll(true);
+    const late = shareAtPoll(false);
+    check(
+      "the same campaign is worth more spent near the count",
+      late > early,
+      `early push ${(early * 100).toFixed(1)}% vs late push ${(late * 100).toFixed(1)}%`,
+    );
+  }
+
+  /* A lift decays predictably, and the career says so out loud. */
+  {
+    const f = startP();
+    const c = campaign(f);
+    const soon = survivesToPoll({ ...c, electionWeek: f.week + 1 }, f.week, 10);
+    const far = survivesToPoll({ ...c, electionWeek: f.week + 20 }, f.week, 10);
+    check(
+      "ten points a week out is worth more than ten points a year out",
+      soon > far && far < 3,
+      `1 week ${soon.toFixed(1)}, 20 weeks ${far.toFixed(1)}`,
+    );
+  }
+
+  /* Polling day banks it — and that is the only thing that does. */
+  {
+    let f = startP();
+    const poll = campaign(f).electionWeek;
+    /* Put them well over the bar and hold them there. */
+    for (const b of BLOCS) campaign(f).support[b.id] = 92;
+    f = runCommand(politician, f, "takePosition", "care:fund");
+    while (f.week <= poll) {
+      for (const b of BLOCS) campaign(f).support[b.id] = 92;
+      f = advanceWeek(politician, f, { canvass: 6 }).state;
+    }
+    const c = campaign(f);
+    check(
+      "polling day produces a result",
+      c.results.length === 1,
+    );
+    check(
+      "a comfortable lead holds the seat",
+      c.results[0].won && !c.outOfOffice,
+      `${(c.results[0].share * 100).toFixed(1)}% against ${(c.results[0].threshold * 100).toFixed(1)}%`,
+    );
+    check(
+      "and the next election is already in the diary",
+      c.electionWeek > f.week,
+    );
+  }
+
+  /* Losing is a setback with a route out, never an ending. */
+  {
+    let f = startP();
+    const poll = campaign(f).electionWeek;
+    while (f.week <= poll) {
+      for (const b of BLOCS) campaign(f).support[b.id] = 5;
+      f = advanceWeek(politician, f, { rest: 6 }).state;
+    }
+    const lost = campaign(f);
+    check(
+      "a bad result loses the seat",
+      lost.results.length === 1 &&
+        !lost.results[0].won &&
+        lost.outOfOffice === true,
+    );
+    check(
+      "losing does not end the run — you can stand again",
+      (() => {
+        const again = runCommand(politician, f, "standAgain", "");
+        return (
+          campaign(again).outOfOffice === false &&
+          campaign(again).electionWeek > again.week
+        );
+      })(),
+    );
+  }
+
+  /* Positions cost somebody. There is no free lunch in the table. */
+  {
+    check(
+      "no stance anywhere pleases every bloc",
+      ISSUES.every((issue) =>
+        issue.stances.every((st) =>
+          Object.values(st.effects).some((n) => n < 0),
+        ),
+      ),
+    );
+  }
+
+  /* Changing your mind in public is remembered, and it costs. */
+  {
+    let f = startP();
+    f = runCommand(politician, f, "takePosition", "housing:build");
+    f = runCommand(politician, f, "takePosition", "housing:protect");
+    const c = campaign(f);
+    check(
+      "reversing a position is recorded",
+      c.reversals.includes("housing"),
+    );
+    /*
+     * The honest comparison is not "before the switch versus after" — the new
+     * position has its own effects, so that measures the position rather than
+     * the reversal. It is against somebody who held the same view all along:
+     * identical politics, and the electorate marks down the one who moved.
+     */
+    let clean = startP();
+    clean = runCommand(politician, clean, "takePosition", "housing:protect");
+    const straight = leanOf(campaign(clean));
+    const reversed = leanOf(c);
+    check(
+      "and costs you across the whole electorate, not just the bloc",
+      BLOCS.every((b) => reversed[b.id] < straight[b.id]),
+      BLOCS.map(
+        (b) => `${b.id} ${Math.round(reversed[b.id])} vs ${Math.round(straight[b.id])}`,
+      ).join(", "),
+    );
+    /* Taking the same position twice is not a reversal. */
+    const same = runCommand(politician, f, "takePosition", "housing:protect");
+    check(
+      "restating the same position is not a reversal",
+      campaign(same).reversals.length === 1,
+    );
+  }
+
+  /* Turnout is what makes a bloc worth chasing. */
+  {
+    const older = BLOCS.find((b) => b.id === "older")!;
+    const green = BLOCS.find((b) => b.id === "green")!;
+    check(
+      "the bloc that turns out is worth more than the bloc that is larger",
+      blocWeight(older) > blocWeight(green),
+      `older ${blocWeight(older).toFixed(3)} vs green ${blocWeight(green).toFixed(3)}`,
+    );
+  }
+
+  /* The ladder is gated by the party, not the voters. */
+  {
+    const f = startP();
+    check(
+      "the party will not select a nobody",
+      selectionBlocker(campaign(f)) !== null,
+      selectionBlocker(campaign(f)) ?? "",
+    );
+    let g = startP();
+    campaign(g).party = 90;
+    g = runCommand(politician, g, "seekSelection", "");
+    check(
+      "a party that rates you puts you up for the next rung",
+      campaign(g).office === "councillor" &&
+        campaign(g).electionWeek > g.week,
+      campaign(g).office,
+    );
+  }
+
+  /* Replay safety and saves. */
+  {
+    const mk = () => {
+      let f = startP(4114);
+      for (let i = 0; i < 10; i++)
+        f = advanceWeek(politician, f, { canvass: 3, casework: 3 }).state;
+      return campaign(f);
+    };
+    check(
+      "the same seed always runs the same campaign",
+      JSON.stringify(mk()) === JSON.stringify(mk()),
+    );
+    check(
+      "a fresh campaign validates",
+      politician.validateData!(startP().data),
+    );
+    check(
+      "a save holding an office that does not exist is rejected",
+      !politician.validateData!({
+        campaign: { ...campaign(startP()), office: "emperor" },
+      }),
+    );
+    check(
+      "and one standing on a position that does not exist is rejected",
+      !politician.validateData!({
+        campaign: {
+          ...campaign(startP()),
+          positions: { housing: "nationalise" },
+        },
+      }),
+    );
+  }
+
+  /* Its own vocabulary, nobody else's. */
+  {
+    let f = startP();
+    for (let i = 0; i < 6; i++)
+      f = advanceWeek(politician, f, { canvass: 3, party: 3 }).state;
+    const text =
+      JSON.stringify(politician.briefing(f, { canvass: 3 })) +
+      politician.objective(f).text +
+      politician.scoreboard(f).sub;
+    check(
+      "no other career\u2019s language reaches the Politician",
+      !/patient|clinic|covers|larder|brigade|runway|churn|chambers/i.test(text),
+    );
+  }
+}
+
+
+console.log("\nThe Architect\n" + "────────────────────────────────────────────────────");
+{
+  const startA = (seed = 88) => startRun(architect, seed);
+  /* A practice with one job on the boards and money to run it. */
+  const withJob = (seed = 88) => {
+    let f = startA(seed);
+    f.r.cash = 250_000;
+    const offer = studio(f).offers[0];
+    f = runCommand(architect, f, "takeCommission", offer.id);
+    return f;
+  };
+
+  {
+    const f = startA();
+    check(
+      "an architect starts with one small job offered and none taken",
+      studio(f).offers.length === 1 && studio(f).commissions.length === 0,
+    );
+    check(
+      "taking it puts it on the boards at the first stage",
+      (() => {
+        const g = withJob();
+        const c = studio(g).commissions[0];
+        return c.stage === 0 && c.paid === 0 && !c.done;
+      })(),
+    );
+  }
+
+  /*
+   * THE FIRST HALF OF THE CONSTRAINT: you are paid along the way.
+   *
+   * Finishing a stage has to bank real money, or the career is just the
+   * Solicitor with a drawing board.
+   */
+  {
+    let f = withJob();
+    const before = f.r.cash;
+    /* Concept on an extension is a couple of weeks of drawing. */
+    for (let i = 0; i < 3; i++)
+      f = advanceWeek(architect, f, { draw: 6 }).state;
+    const c = studio(f).commissions[0];
+    check(
+      "finishing a stage banks its share of the fee",
+      c.paid > 0 && f.r.cash > before,
+      `banked ${Math.round(c.paid)}`,
+    );
+    check(
+      "and moves the job on to the next stage",
+      c.stage > 0,
+      buildStage(c).label,
+    );
+  }
+
+  /*
+   * THE SECOND HALF, AND THE CAREER'S OWN SENTENCE.
+   *
+   * A client can send you backwards — and the money already banked has to
+   * survive it. If a revision ever clawed back a fee this would be a
+   * different (and much worse) career.
+   */
+  {
+    let f = withJob();
+    const a = studio(f);
+    const c = a.commissions[0];
+    /* Put it deep into the job with fees banked. */
+    c.stage = 3;
+    c.paid = 40_000;
+    c.lastSeen = -50;
+    let saw = false;
+    for (let i = 0; i < 40 && !saw; i++) {
+      /* Measured across the single week the revision lands in. Comparing
+         against cash from before the whole loop measured accrued rent, not
+         the revision — which is how the first version of this failed. */
+      const cashBefore = f.r.cash;
+      const g = advanceWeek(architect, f, { rest: 6 }).state;
+      const after = studio(g).commissions[0];
+      if (after.revisions > 0) {
+        saw = true;
+        check(
+          "a neglected client sends the building back a stage",
+          after.stage < 3,
+          `stage 3 -> ${after.stage}`,
+        );
+        check(
+          "and the fees already banked survive it",
+          after.paid === 40_000 && g.r.cash >= cashBefore - 2_000,
+          `paid ${after.paid}, cash moved ${Math.round(g.r.cash - cashBefore)}`,
+        );
+        check(
+          "the drawings for those stages are gone",
+          after.progress === 0,
+        );
+      }
+      f = g;
+      if (studio(f).commissions[0].done) break;
+    }
+    check("a neglected client eventually does reinvent the brief", saw);
+  }
+
+  /*
+   * AND THE COUNTER-LEVER. Seeing the client is the defence, and it has to
+   * measurably work or the revision is just weather.
+   */
+  {
+    const f = withJob();
+    const a = studio(f);
+    const c = a.commissions[0];
+    c.stage = 2;
+    c.lastSeen = f.week - 12;
+    const neglected = revisionRisk(a, c, f.week);
+    const seen = revisionRisk(a, { ...c, lastSeen: f.week }, f.week);
+    check(
+      "a client who has just seen you is far less likely to redraw the brief",
+      seen < neglected * 0.75,
+      `${(neglected * 100).toFixed(1)}% neglected vs ${(seen * 100).toFixed(1)}% seen`,
+    );
+  }
+
+  /* An associate exists to make that call for you. */
+  {
+    const f = withJob();
+    const a = studio(f);
+    const c = a.commissions[0];
+    c.lastSeen = f.week - 8;
+    const alone = revisionRisk(a, c, f.week);
+    const g = runCommand(architect, f, "hireStudio", "associate");
+    const covered = revisionRisk(studio(g), studio(g).commissions[0], g.week);
+    check(
+      "an associate takes a slice off every brief-change risk",
+      covered < alone,
+      `${(alone * 100).toFixed(1)}% -> ${(covered * 100).toFixed(1)}%`,
+    );
+  }
+
+  /* A tower falls further than a kitchen extension. */
+  {
+    check(
+      "a bigger building is thrown further back than a small one",
+      revisionDepth({
+        id: "x", kind: "tower", client: "c", stage: 3, progress: 0,
+        paid: 0, revisions: 0, lastSeen: 0, startedWeek: 0,
+      }) >
+        revisionDepth({
+          id: "y", kind: "extension", client: "c", stage: 3, progress: 0,
+          paid: 0, revisions: 0, lastSeen: 0, startedWeek: 0,
+        }),
+    );
+  }
+
+  /* Finishing a building is what standing is made of. */
+  {
+    let f = withJob();
+    const repBefore = f.r.reputation;
+    /* Keep the client happy so nothing is redrawn, and draw it out. */
+    for (let i = 0; i < 40; i++) {
+      studio(f).commissions[0].lastSeen = f.week;
+      f = advanceWeek(architect, f, { draw: 6 }).state;
+      if (studio(f).commissions[0].done) break;
+    }
+    const c = studio(f).commissions[0];
+    check(
+      "a building that reaches the end is finished and paid in full",
+      c.done === true && c.paid > 0,
+      `${Math.round(c.paid)} banked`,
+    );
+    check(
+      "and finishing it raises your standing",
+      f.r.reputation > repBefore,
+      `${Math.round(repBefore)} -> ${Math.round(f.r.reputation)}`,
+    );
+    check(
+      "which is what decides the work you are offered next",
+      offerableKinds(studio(f), f.r.reputation).length >=
+        offerableKinds(studio(f), repBefore).length,
+    );
+  }
+
+  /* Competitions: unpaid, long odds, and the only route to a museum. */
+  {
+    const f = withJob();
+    check(
+      "a museum is never simply offered to you",
+      !offerableKinds(studio(f), 100).some((k) => k.id === "museum"),
+    );
+    const g = runCommand(architect, f, "enterCompetition", "museum");
+    check(
+      "entering one costs money and starts at no progress",
+      !!studio(g).competition &&
+        studio(g).competition!.effort === 0 &&
+        g.r.cash < f.r.cash,
+    );
+    const odds = competitionOdds(studio(g).competition!, g.r.reputation);
+    check(
+      "and the odds start poor, because that is what a competition is",
+      odds < 0.35,
+      `${(odds * 100).toFixed(0)}%`,
+    );
+    /* More drawing, better odds. */
+    const worked = {
+      ...studio(g).competition!,
+      effort: 10,
+    };
+    check(
+      "months of work move them",
+      competitionOdds(worked, g.r.reputation) > odds,
+    );
+  }
+
+  /* Cities are a real trade: fees against how settled the clients are. */
+  {
+    const riskIn = (cityId: string) => {
+      let f = startRun(architect, 3, { city: cityId });
+      f.r.cash = 250_000;
+      f = runCommand(architect, f, "takeCommission", studio(f).offers[0].id);
+      const c = studio(f).commissions[0];
+      c.lastSeen = f.week - 8;
+      return revisionRisk(studio(f), c, f.week);
+    };
+    const feeIn = (cityId: string) => {
+      const f = startRun(architect, 3, { city: cityId });
+      return feeFor(studio(f), KIND_BY_ID.get("tower")!);
+    };
+    check(
+      "the city with the biggest fees has the least settled clients",
+      feeIn("dubai") > feeIn("amsterdam") &&
+        riskIn("dubai") > riskIn("amsterdam"),
+      `dubai ${Math.round(feeIn("dubai"))} at ${(riskIn("dubai") * 100).toFixed(1)}% vs amsterdam ${Math.round(feeIn("amsterdam"))} at ${(riskIn("amsterdam") * 100).toFixed(1)}%`,
+    );
+  }
+
+  /* Resigning keeps the money and costs the standing. */
+  {
+    let f = withJob();
+    studio(f).commissions[0].paid = 12_000;
+    const rep = f.r.reputation;
+    const cash = f.r.cash;
+    f = runCommand(architect, f, "resignCommission", studio(f).commissions[0].id);
+    check(
+      "resigning a job keeps the banked fees and costs you standing",
+      studio(f).commissions[0].done === true &&
+        f.r.cash === cash &&
+        f.r.reputation < rep,
+    );
+  }
+
+  /* Replay safety and saves. */
+  {
+    const mk = () => {
+      let f = withJob(707);
+      for (let i = 0; i < 12; i++)
+        f = advanceWeek(architect, f, { draw: 4, client: 2 }).state;
+      return studio(f);
+    };
+    check(
+      "the same seed always draws the same practice",
+      JSON.stringify(mk()) === JSON.stringify(mk()),
+    );
+    check(
+      "a fresh studio validates",
+      architect.validateData!(startA().data),
+    );
+    check(
+      "a save with a stage that does not exist is rejected",
+      !architect.validateData!({
+        studio: {
+          ...studio(withJob()),
+          commissions: [
+            { ...studio(withJob()).commissions[0], stage: 99 },
+          ],
+        },
+      }),
+    );
+    check(
+      "and one commissioning a building that does not exist is rejected",
+      !architect.validateData!({
+        studio: {
+          ...studio(withJob()),
+          commissions: [
+            { ...studio(withJob()).commissions[0], kind: "cathedral" },
+          ],
+        },
+      }),
+    );
+  }
+
+  /* Its own words. */
+  {
+    let f = withJob();
+    for (let i = 0; i < 6; i++)
+      f = advanceWeek(architect, f, { draw: 4, client: 2 }).state;
+    const text =
+      JSON.stringify(architect.briefing(f, { draw: 4 })) +
+      architect.objective(f).text +
+      architect.scoreboard(f).sub;
+    check(
+      "no other career\u2019s language reaches the Architect",
+      !/patient|clinic|covers|larder|brigade|runway|churn|polling|bloc/i.test(text),
+    );
+  }
+}
+
+
+console.log("\nThe Engineer\n" + "────────────────────────────────────────────────────");
+{
+  const startE = (seed = 55) => {
+    const f = startRun(engineer, seed);
+    f.r.cash = 200_000;
+    return f;
+  };
+  /* A workshop with a sensor on the bench, fully designed. */
+  const designed = (seed = 55) => {
+    let f = startE(seed);
+    f = runCommand(engineer, f, "startProduct", "bracket");
+    for (let i = 0; i < 4; i++)
+      f = advanceWeek(engineer, f, { design: 6 }).state;
+    return f;
+  };
+
+  {
+    const f = startE();
+    check(
+      "an engineer starts with an empty bench",
+      workshop(f).products.length === 0,
+    );
+    check(
+      "and cannot attempt a surgical pump on day one",
+      !buildableKinds(startE().r.skill).some((k) => k.id === "pump"),
+    );
+  }
+
+  /*
+   * THE BINDING CONSTRAINT.
+   *
+   * Designing is what creates the defects. This is the rule that makes
+   * the career its own — nothing else in the game punishes you for doing
+   * the work — so if a week at the bench ever stops adding faults, the
+   * whole thing collapses into an income statement.
+   */
+  {
+    let f = startE();
+    f = runCommand(engineer, f, "startProduct", "sensor");
+    const before = workshop(f).products[0].latent;
+    f = advanceWeek(engineer, f, { design: 5 }).state;
+    const after = workshop(f).products[0].latent;
+    check(
+      "designing puts faults into the product",
+      after > before,
+      `${before.toFixed(1)} -> ${after.toFixed(1)} faults`,
+    );
+  }
+
+  /* Testing takes them out, and a complex product carries more. */
+  {
+    let f = designed();
+    const before = workshop(f).products[0].latent;
+    f = advanceWeek(engineer, f, { test: 5 }).state;
+    check(
+      "testing finds faults and takes them out",
+      workshop(f).products[0].latent < before,
+      `${before.toFixed(1)} -> ${workshop(f).products[0].latent.toFixed(1)}`,
+    );
+
+    const build = (kindId: string) => {
+      let g = startE();
+      /* Craft high enough to be allowed to attempt either of them — the gate
+         is real, and a fresh engineer cannot start a controller. */
+      g.r.skill = 60;
+      g = runCommand(engineer, g, "startProduct", kindId);
+      for (let i = 0; i < 3; i++)
+        g = advanceWeek(engineer, g, { design: 3 }).state;
+      return workshop(g).products[0].latent;
+    };
+    check(
+      "a more complicated product carries more of them",
+      build("controller") > build("bracket"),
+      `controller ${build("controller").toFixed(1)} vs bracket ${build("bracket").toFixed(1)}`,
+    );
+  }
+
+  /*
+   * THE HIDDEN STATE.
+   *
+   * The player is shown a range, never the number. Testing has to narrow
+   * that range as well as lower it — the knowing is half of what testing
+   * is bought for.
+   */
+  {
+    let f = designed();
+    const raw = estimateOf(workshop(f).products[0]);
+    const rawWidth = raw.high - raw.low;
+    for (let i = 0; i < 3; i++)
+      f = advanceWeek(engineer, f, { test: 5 }).state;
+    const tested = estimateOf(workshop(f).products[0]);
+    check(
+      "testing narrows what you know, not just what is in there",
+      tested.high - tested.low < rawWidth,
+      `band ${rawWidth.toFixed(1)} -> ${(tested.high - tested.low).toFixed(1)}`,
+    );
+    check(
+      "and raises how much the estimate is worth",
+      confidenceOf(workshop(f).products[0]) > 40,
+      `${confidenceOf(workshop(f).products[0])}% confident`,
+    );
+    check(
+      "the truth always sits inside the band it is shown as",
+      (() => {
+        const p = workshop(f).products[0];
+        const e = estimateOf(p);
+        return p.latent >= e.low && p.latent <= e.high;
+      })(),
+    );
+  }
+
+  /* The certifier checks the truth, not the estimate. */
+  {
+    let f = designed();
+    const w = workshop(f);
+    /* Far too many faults to pass anywhere. */
+    w.products[0].latent = 40;
+    f = runCommand(engineer, f, "submitForCertification", w.products[0].id);
+    for (let i = 0; i < 8; i++)
+      f = advanceWeek(engineer, f, { rest: 5 }).state;
+    check(
+      "a product full of faults is refused, whatever you believed",
+      workshop(f).products[0].stage === "testing",
+      workshop(f).products[0].stage,
+    );
+
+    let g = designed(91);
+    workshop(g).products[0].latent = 0;
+    g = runCommand(engineer, g, "submitForCertification", workshop(g).products[0].id);
+    for (let i = 0; i < 8; i++)
+      g = advanceWeek(engineer, g, { rest: 5 }).state;
+    check(
+      "a clean one passes and goes on sale",
+      workshop(g).products[0].stage === "shipped",
+      workshop(g).products[0].stage,
+    );
+    check(
+      "and starts earning",
+      productRevenue(workshop(g), workshop(g).products[0]) > 0,
+    );
+  }
+
+  /*
+   * THE SURFACING. Faults shipped weeks ago arrive as a bill, and the
+   * more the product sold the more they cost.
+   */
+  {
+    let f = designed(77);
+    const w = workshop(f);
+    w.products[0].latent = 0;
+    f = runCommand(engineer, f, "submitForCertification", w.products[0].id);
+    for (let i = 0; i < 8; i++)
+      f = advanceWeek(engineer, f, { rest: 5 }).state;
+    /* Now put faults back in and let it run in the field. */
+    workshop(f).products[0].latent = 8;
+    workshop(f).products[0].reach = 1;
+    const cashBefore = f.r.cash;
+    let surfaced = false;
+    for (let i = 0; i < 20 && !surfaced; i++) {
+      const before = workshop(f).faultsInField;
+      f = advanceWeek(engineer, f, { rest: 5 }).state;
+      if (workshop(f).faultsInField > before) surfaced = true;
+    }
+    check(
+      "faults in a shipped product reach customers",
+      surfaced && workshop(f).faultsInField > 0,
+      `${workshop(f).faultsInField} in the field`,
+    );
+    check(
+      "and each one costs money and standing",
+      f.r.cash < cashBefore,
+    );
+    check(
+      "a product that sold well is more dangerous than one that did not",
+      surfaceChance({ ...workshop(f).products[0], reach: 1 }) >
+        surfaceChance({ ...workshop(f).products[0], reach: 0.2 }),
+    );
+  }
+
+  /* Pulling it yourself: expensive, and it clears the problem. */
+  {
+    let f = designed(64);
+    const w = workshop(f);
+    w.products[0].latent = 0;
+    f = runCommand(engineer, f, "submitForCertification", w.products[0].id);
+    for (let i = 0; i < 8; i++)
+      f = advanceWeek(engineer, f, { rest: 5 }).state;
+    workshop(f).products[0].latent = 9;
+    const cash = f.r.cash;
+    const pulled = runCommand(engineer, f, "recallProduct", workshop(f).products[0].id);
+    const p = workshop(pulled).products[0];
+    check(
+      "a recall takes every fault out and stops the sales",
+      p.latent === 0 && p.stage === "testing" && p.recalls === 1,
+    );
+    check(
+      "and it costs real money",
+      pulled.r.cash < cash,
+      `${Math.round(cash - pulled.r.cash)} to pull it`,
+    );
+  }
+
+  /* Craft reduces the faults per week — it never removes them. */
+  {
+    const faultsAt = (skill: number) => {
+      let f = startE();
+      f.r.skill = skill;
+      /* A bracket, because it is the one thing craft 20 is allowed to build
+         — the point here is the fault rate, not the gate. */
+      f = runCommand(engineer, f, "startProduct", "bracket");
+      f = advanceWeek(engineer, f, { design: 4 }).state;
+      return workshop(f).products[0].latent;
+    };
+    const novice = faultsAt(20);
+    const master = faultsAt(95);
+    check(
+      "a better engineer builds in fewer faults",
+      master < novice,
+      `skill 20 -> ${novice.toFixed(1)}, skill 95 -> ${master.toFixed(1)}`,
+    );
+    check(
+      "but never none — there is no such thing as a clean design",
+      master > 0,
+      master.toFixed(2),
+    );
+  }
+
+  /* Cities trade speed to market against how strict the certifier is. */
+  {
+    const sg = WORKSHOP_CITY_BY_ID.get("singapore")!;
+    const be = WORKSHOP_CITY_BY_ID.get("berlin")!;
+    check(
+      "the fast market is the lax one, and the strict market is slow",
+      sg.certWeeks < be.certWeeks && sg.certTolerance > be.certTolerance,
+      `singapore ${sg.certWeeks}wk/${sg.certTolerance} vs berlin ${be.certWeeks}wk/${be.certTolerance}`,
+    );
+  }
+
+  /* Replay safety and saves. */
+  {
+    const mk = () => {
+      let f = designed(2024);
+      for (let i = 0; i < 8; i++)
+        f = advanceWeek(engineer, f, { design: 3, test: 3 }).state;
+      return workshop(f);
+    };
+    check(
+      "the same seed always builds the same product",
+      JSON.stringify(mk()) === JSON.stringify(mk()),
+    );
+    check(
+      "a fresh workshop validates",
+      engineer.validateData!(startE().data),
+    );
+    check(
+      "a save with a negative fault count is rejected",
+      !engineer.validateData!({
+        workshop: {
+          ...workshop(designed()),
+          products: [{ ...workshop(designed()).products[0], latent: -3 }],
+        },
+      }),
+    );
+    check(
+      "and one building something that does not exist is rejected",
+      !engineer.validateData!({
+        workshop: {
+          ...workshop(designed()),
+          products: [{ ...workshop(designed()).products[0], kind: "reactor" }],
+        },
+      }),
+    );
+  }
+
+  /*
+   * THE CONTRACT THE UI HAS TO KEEP.
+   *
+   * Nothing the career hands a screen may contain the true fault count.
+   * If this ever fails, some panel is printing the answer and the career
+   * has stopped being about uncertainty.
+   */
+  {
+    const f = designed();
+    workshop(f).products[0].latent = 7.5;
+    const shown =
+      JSON.stringify(engineer.briefing(f, { design: 2, test: 2 })) +
+      engineer.objective(f).text +
+      engineer.scoreboard(f).sub +
+      engineer.scoreboard(f).value;
+    check(
+      "no screen is ever handed the true fault count",
+      !shown.includes("7.5"),
+    );
+    check(
+      "what it is handed is a range instead",
+      /[0-9]+–[0-9]+/.test(shown),
+      shown.slice(0, 90),
+    );
+    check(
+      "no other career\u2019s language reaches the Engineer",
+      !/patient|clinic|covers|larder|brigade|runway|polling|chambers/i.test(
+        shown,
+      ),
+    );
+  }
+}
+
 console.log("\nThe Chef's artwork\n" + "─".repeat(52));
 {
   /*
@@ -8908,11 +10127,17 @@ console.log("\nThe Solicitor: the court\n" + "─".repeat(52));
 
   if (lostRun) {
     const line = lostRun.ledger.find((x) => /costs order/i.test(x.label));
-    const expected = costsOrder(practice(lostRun.state), kind, false);
+    /*
+     * Against the record rather than against a recomputation. Finishing the
+     * matter credits the practice area, so `costsOrder` on the *post*-week
+     * state is a different number from the one the week actually charged —
+     * which is the whole reason the ledger and the record read from one map.
+     */
+    const recorded = practice(lostRun.state).lastVerdicts.at(-1)?.costs ?? 0;
     check(
       "losing is not a blank week — the other side's costs follow the event",
-      Boolean(line) && line!.amount === -expected && expected > 0,
-      `${line?.amount} vs ${-expected}`,
+      Boolean(line) && recorded > 0 && line!.amount === -recorded,
+      `${line?.amount} vs ${-recorded}`,
     );
     check(
       "and the money actually leaves the client account",
@@ -9120,10 +10345,14 @@ console.log("\nThe Solicitor: the books\n" + "─".repeat(52));
   }
   if (slow) {
     const bills = practice(slow.state).bills ?? [];
+    /* Same again: the bill carries the fee the matter was worth when it was
+       decided, not the fee the firm can command now that it has decided it. */
+    const awarded = practice(slow.state).lastVerdicts.at(-1)?.fee ?? 0;
     check(
       "a slow payer's judgment is a bill, not money",
       bills.length === 1 &&
-        bills[0].amount === feeIn(practice(slow.state), kind) &&
+        awarded > 0 &&
+        bills[0].amount === awarded &&
         bills[0].dueWeek > slow.state.week,
     );
     check(
@@ -13716,6 +14945,496 @@ console.log("\nThe Solicitor: the people\n" + "─".repeat(52));
         (s.people ?? []).every(
           (x) => PERSON_ROLES.includes(x.role) && x.memory.length >= 0,
         )
+      );
+    })(),
+  );
+}
+
+
+
+/**
+ * WHAT KIND OF SOLICITOR YOU TURN OUT TO BE
+ *
+ * The career accumulated nothing: week 100 played like week 10 with more
+ * people in the room. These assert that finished work now compounds — better
+ * odds, better fees, and a market that sends you more of what you are known
+ * for — and that it is earned by finishing matters rather than by carrying
+ * them.
+ */
+console.log("\nThe Solicitor: practice areas\n" + "─".repeat(52));
+{
+  const fresh = () => practice(startRun(lawyer, 21));
+  const withArea = (kindId: string, hours: number) => ({
+    ...fresh(),
+    areas: { [kindId]: hours },
+  });
+  const injury = CASE_BY_ID.get("injury")!;
+
+  /* ------------------------------------------------------------ the curve */
+  check(
+    "a new practice has specialised in nothing",
+    CASE_KINDS.every((k) => areaSkill(fresh(), k.id) === 0),
+  );
+  check(
+    "and the hours it finishes are what make it a specialist",
+    areaSkill(withArea("injury", SPECIALIST_HOURS / 2), "injury") === 0.5 &&
+      areaSkill(withArea("injury", SPECIALIST_HOURS), "injury") === 1,
+  );
+  check(
+    "which never runs past a specialist, however many it does",
+    areaSkill(withArea("injury", SPECIALIST_HOURS * 40), "injury") === 1,
+  );
+  check(
+    "and the stored figure is bounded too, so a long run cannot grow forever",
+    (() => {
+      const p = fresh();
+      for (let i = 0; i < 200; i++) creditArea(p, "injury", 90);
+      return areaHours(p, "injury") <= SPECIALIST_HOURS * 2;
+    })(),
+  );
+  check(
+    "being good at one thing says nothing about the others",
+    areaSkill(withArea("injury", SPECIALIST_HOURS), "probate") === 0,
+  );
+  check(
+    "every level of it reads as words rather than a decimal",
+    [0, 0.1, 0.3, 0.6, 1].every((x) => areaBand(x).length > 4) &&
+      new Set([0, 0.1, 0.3, 0.6, 1].map(areaBand)).size === 5,
+  );
+
+  /* ----------------------------------------------------------- the effects */
+  check(
+    "a specialist charges more for the same instruction",
+    feeIn(withArea("injury", SPECIALIST_HOURS), injury) >
+      feeIn(fresh(), injury),
+    `${feeIn(withArea("injury", SPECIALIST_HOURS), injury)} vs ${feeIn(fresh(), injury)}`,
+  );
+  check(
+    "but where you practise still matters more than what you practise",
+    (() => {
+      const specialistHere = feeIn(withArea("injury", SPECIALIST_HOURS), injury);
+      const strangerInNewYork = feeIn(
+        { ...fresh(), city: "newyork" },
+        injury,
+      );
+      return strangerInNewYork > specialistHere;
+    })(),
+  );
+  {
+    const live = {
+      id: "c-1",
+      kind: "injury",
+      client: "Ms Baptiste",
+      openedWeek: 1,
+      dueWeek: 30,
+      hoursDone: injury.hours,
+      settlementOffer: 0,
+    };
+    check(
+      "and is better at it at the door",
+      oddsFor(live, withArea("injury", SPECIALIST_HOURS), 40) >
+        oddsFor(live, fresh(), 40),
+    );
+    check(
+      "though nothing makes a contested matter certain",
+      oddsFor(live, withArea("injury", SPECIALIST_HOURS * 2), 100) < 1,
+    );
+  }
+
+  /*
+   * The one that makes it compound: a firm known for something is sent more
+   * of it. Measured over two hundred streams rather than asserted, because
+   * the claim is about a distribution.
+   */
+  check(
+    "and the market sends a known firm more of its own work",
+    (() => {
+      const share = (p: PracticeState) => {
+        let mine = 0;
+        let all = 0;
+        for (let seed = 1; seed <= 300; seed++) {
+          for (const o of newOffers(p, 90, 10, 2, makeRng(seed))) {
+            all++;
+            if (o.kind === "injury") mine++;
+          }
+        }
+        return all === 0 ? 0 : mine / all;
+      };
+      const known = share(withArea("injury", SPECIALIST_HOURS));
+      const stranger = share(fresh());
+      return known > stranger * 1.5 && stranger > 0;
+    })(),
+  );
+  check(
+    "and still sends everything else, so specialising is not a cage",
+    (() => {
+      const p = withArea("injury", SPECIALIST_HOURS * 2);
+      const kinds = new Set<string>();
+      for (let seed = 1; seed <= 200; seed++) {
+        for (const o of newOffers(p, 90, 10, 2, makeRng(seed))) kinds.add(o.kind);
+      }
+      return kinds.size >= 4;
+    })(),
+  );
+
+  /* ------------------------------------------------- earned by finishing */
+  {
+    const s = startRun(lawyer, 31);
+    s.week = 12;
+    const p = practice(s);
+    const k = CASE_BY_ID.get("probate")!;
+    p.cases = [
+      {
+        id: "c-1",
+        kind: "probate",
+        client: "the Wren Trust",
+        openedWeek: 1,
+        dueWeek: s.week + 6,
+        hoursDone: k.hours,
+        settlementOffer: 0,
+        payer: "prompt",
+      },
+    ];
+
+    const settled = runCommand(lawyer, s, "settleCase", "c-1");
+    check(
+      "settling a matter teaches you the work",
+      areaHours(practice(settled), "probate") === k.hours,
+      `${areaHours(practice(settled), "probate")}`,
+    );
+
+    const dropped = runCommand(lawyer, s, "dropCase", "c-1");
+    check(
+      "and coming off the record teaches you nothing at all",
+      areaHours(practice(dropped), "probate") === 0,
+    );
+
+    const heard = advanceWeek(
+      lawyer,
+      {
+        ...JSON.parse(JSON.stringify(s)),
+        data: {
+          practice: {
+            ...p,
+            cases: [{ ...p.cases[0], dueWeek: s.week, adjournments: MAX_ADJOURNMENTS }],
+          },
+        },
+      },
+      { rest: 1 },
+    ).state;
+    check(
+      "so does reaching a hearing, whichever way it goes",
+      areaHours(practice(heard), "probate") > 0,
+    );
+  }
+
+  /* ------------------------------------------------------ counsel, a ladder */
+  check(
+    "there are three of them, and they are a real spread",
+    COUNSEL.length === 3 &&
+      COUNSEL.every((c) => c.blurb.length > 40) &&
+      COUNSEL[0].fee < COUNSEL[1].fee &&
+      COUNSEL[1].fee < COUNSEL[2].fee &&
+      COUNSEL[0].odds < COUNSEL[1].odds &&
+      COUNSEL[1].odds < COUNSEL[2].odds,
+  );
+  check(
+    "the middle of the ladder is priced exactly where the boolean was",
+    counselOf("senior").fee === 0.09 && counselOf("senior").odds === COUNSEL_ODDS,
+  );
+  check(
+    "an absent tier reads as that same middle, so an older matter is unchanged",
+    counselOf(undefined).id === "senior",
+  );
+  check(
+    "chambers will not put a silk on a house purchase",
+    !counselAvailable(counselOf("silk"), CASE_BY_ID.get("conveyance")!) &&
+      counselAvailable(counselOf("silk"), CASE_BY_ID.get("class")!),
+  );
+  check(
+    "a better one costs more and is worth more, in both directions",
+    counselFee(fresh(), injury, "silk") > counselFee(fresh(), injury, "junior") &&
+      costsOrder(fresh(), injury, true, "silk") <
+        costsOrder(fresh(), injury, true, "junior"),
+  );
+
+  {
+    const s = startRun(lawyer, 41);
+    s.week = 12;
+    s.r.cash = 400_000;
+    const p = practice(s);
+    p.cases = [
+      {
+        id: "c-1",
+        kind: "injury",
+        client: "Mr Ferreira",
+        openedWeek: 1,
+        dueWeek: s.week + 10,
+        hoursDone: injury.hours,
+        settlementOffer: 0,
+        payer: "prompt",
+      },
+    ];
+
+    const silk = runCommand(lawyer, s, "briefCounsel", "c-1:silk");
+    check(
+      "briefing a silk records which one you briefed",
+      practice(silk).cases[0].counselTier === "silk" &&
+        practice(silk).cases[0].counsel === true,
+    );
+    check(
+      "and the odds reflect that one rather than the middle",
+      oddsFor(practice(silk).cases[0], practice(silk), s.r.skill) >
+        oddsFor(
+          practice(runCommand(lawyer, s, "briefCounsel", "c-1:junior")).cases[0],
+          practice(s),
+          s.r.skill,
+        ),
+    );
+    check(
+      "the bare form still buys what it always bought",
+      practice(runCommand(lawyer, s, "briefCounsel", "c-1")).cases[0]
+        .counselTier === "senior",
+    );
+    check(
+      "a tier chambers would not arrange is refused",
+      (() => {
+        const small = JSON.parse(JSON.stringify(s)) as typeof s;
+        practice(small).cases[0].kind = "conveyance";
+        const tried = runCommand(lawyer, small, "briefCounsel", "c-1:silk");
+        return !practice(tried).cases[0].counsel;
+      })(),
+    );
+    check(
+      "and a tier that does not exist does nothing",
+      !practice(runCommand(lawyer, s, "briefCounsel", "c-1:kc")).cases[0].counsel,
+    );
+  }
+
+  /* ------------------------------------------------------------ old saves */
+  check(
+    "a save from before any of this reads as a firm that specialised in nothing",
+    (() => {
+      const p = fresh();
+      delete p.areas;
+      return (
+        lawyer.validateData!({ practice: p }) &&
+        areaHours(p, "injury") === 0 &&
+        feeIn(p, injury) === Math.round(injury.fee)
+      );
+    })(),
+  );
+  check(
+    "an area the catalogue does not have is refused",
+    !lawyer.validateData!({
+      practice: { ...fresh(), areas: { duelling: 200 } },
+    }),
+  );
+  check(
+    "and so are impossible hours",
+    !lawyer.validateData!({
+      practice: { ...fresh(), areas: { injury: -5 } },
+    }),
+  );
+  check(
+    "a counsel tier the catalogue does not have is refused",
+    !lawyer.validateData!({
+      practice: {
+        ...fresh(),
+        cases: [{ kind: "injury", counsel: true, counselTier: "attorney" }],
+      },
+    }),
+  );
+}
+
+
+
+/**
+ * WHERE THE FIRM SITS
+ *
+ * Chambers were derived — one room per three fee earners, rent equal to the
+ * headcount — which made them an expense rather than a decision, and left
+ * money in this career with nowhere to go but payroll. These assert that the
+ * ladder is a real commitment: rooms hold people, rent is due empty, and
+ * moving is a bet on filling the space.
+ */
+console.log("\nThe Solicitor: chambers\n" + "─".repeat(52));
+{
+  const fresh = (city = "london") => practice(startRun(lawyer, 61, { city }));
+
+  check(
+    "there is a ladder, and every rung is worse value and more room",
+    LEGAL_PREMISES.length === 4 &&
+      LEGAL_PREMISES.every(
+        (x, i, arr) =>
+          i === 0 ||
+          (x.seats > arr[i - 1].seats &&
+            x.rent > arr[i - 1].rent &&
+            x.cost > arr[i - 1].cost &&
+            x.draw > arr[i - 1].draw),
+      ),
+  );
+  check(
+    "every rung says what it is",
+    LEGAL_PREMISES.every((x) => x.blurb.length > 60 && x.label.length > 6),
+  );
+  check(
+    "a practice starts in the cheapest rooms this career has ever had",
+    chambersOf(fresh()).id === "desk" &&
+      chambersRent(fresh()) === 640 &&
+      chambersSeats(fresh()) === 3,
+  );
+  check(
+    "and it starts with only itself in them",
+    seatsUsed(fresh()) === 1 && seatsFree(fresh()) === 2,
+  );
+
+  /* Rent is a property of the rooms, not of the headcount. That is the whole
+     change: an empty floor costs what a full one costs. */
+  check(
+    "rent no longer follows the payroll around",
+    (() => {
+      const alone = fresh();
+      const crowded = {
+        ...fresh(),
+        staff: [
+          { id: "s-1", name: "A", role: "paralegal", salary: 900 },
+          { id: "s-2", name: "B", role: "paralegal", salary: 900 },
+        ],
+      };
+      return chambersRent(alone) === chambersRent(crowded);
+    })(),
+  );
+
+  /* ------------------------------------------------------------ old saves */
+  check(
+    "a save from before the ladder is put in rooms that hold it",
+    (() => {
+      const p = fresh();
+      delete p.premises;
+      p.staff = Array.from({ length: 5 }, (_, i) => ({
+        id: `s-${i}`,
+        name: "N",
+        role: "paralegal",
+        salary: 900,
+      }));
+      return chambersOf(p).id === "highstreet";
+    })(),
+  );
+  check(
+    "and one that never grew stays where it started",
+    (() => {
+      const p = fresh();
+      delete p.premises;
+      return chambersOf(p).id === "desk" && chambersRent(p) === 640;
+    })(),
+  );
+
+  /* -------------------------------------------------------------- moving */
+  {
+    const s = startRun(lawyer, 61);
+    s.r.cash = 400_000;
+    const price = chambersPrice(practice(s), PREMISES_BY_ID.get("highstreet")!);
+    const moved = runCommand(lawyer, s, "takeChambers", "highstreet");
+    check(
+      "moving is paid for the week you move",
+      moved.r.cash === s.r.cash - price && price > 0,
+      `${s.r.cash - moved.r.cash} vs ${price}`,
+    );
+    check(
+      "and the firm is in the new rooms",
+      chambersOf(practice(moved)).id === "highstreet" &&
+        chambersSeats(practice(moved)) === 7,
+    );
+    check(
+      "and paying their rent from now on",
+      chambersRent(practice(moved)) > chambersRent(practice(s)),
+    );
+    check(
+      "your fit-out is worth something against the next set",
+      chambersPrice(practice(moved), PREMISES_BY_ID.get("square")!) <
+        PREMISES_BY_ID.get("square")!.cost,
+    );
+    check(
+      "you cannot move backwards down the ladder",
+      chambersOf(practice(runCommand(lawyer, moved, "takeChambers", "desk"))).id ===
+        "highstreet",
+    );
+    check(
+      "nor into rooms that do not exist",
+      chambersOf(practice(runCommand(lawyer, s, "takeChambers", "penthouse"))).id ===
+        "desk",
+    );
+    const poor = startRun(lawyer, 62);
+    poor.r.cash = 500;
+    check(
+      "nor into rooms you cannot pay for",
+      chambersOf(practice(runCommand(lawyer, poor, "takeChambers", "highstreet")))
+        .id === "desk" &&
+        runCommand(lawyer, poor, "takeChambers", "highstreet").r.cash === 500,
+    );
+  }
+
+  check(
+    "rooms cost what property costs in this market",
+    chambersPrice(fresh("lagos"), PREMISES_BY_ID.get("highstreet")!) <
+      chambersPrice(fresh("london"), PREMISES_BY_ID.get("highstreet")!),
+  );
+
+  /* ---------------------------------------------------------- the seat cap */
+  {
+    let s = startRun(lawyer, 63);
+    s.r.cash = 400_000;
+    s = runCommand(lawyer, s, "hireLegal", "paralegal");
+    s = runCommand(lawyer, s, "hireLegal", "paralegal");
+    check(
+      "a borrowed desk holds you and two others",
+      practice(s).staff.length === 2 && seatsFree(practice(s)) === 0,
+    );
+    const overfull = runCommand(lawyer, s, "hireLegal", "paralegal");
+    check(
+      "and the third is refused rather than squeezed in",
+      practice(overfull).staff.length === 2 &&
+        overfull.r.cash === s.r.cash,
+    );
+    const bigger = runCommand(lawyer, s, "takeChambers", "highstreet");
+    const hired = runCommand(lawyer, bigger, "hireLegal", "paralegal");
+    check(
+      "moving is what lets the firm grow again",
+      practice(hired).staff.length === 3,
+    );
+  }
+
+  /* --------------------------------------------------------------- the draw */
+  check(
+    "a firm people can find gets more walking in",
+    (() => {
+      const count = (id: string) => {
+        const p = { ...fresh(), premises: id };
+        let n = 0;
+        for (let seed = 1; seed <= 300; seed++) {
+          n += newOffers(p, 40, 10, 0, makeRng(seed)).length;
+        }
+        return n;
+      };
+      return count("city") > count("desk") * 1.15;
+    })(),
+    "",
+  );
+
+  check(
+    "rooms the catalogue does not have are refused at the door",
+    !lawyer.validateData!({ practice: { ...fresh(), premises: "penthouse" } }),
+  );
+  check(
+    "and a run that has moved is still a valid save",
+    (() => {
+      const s = startRun(lawyer, 64);
+      s.r.cash = 400_000;
+      const moved = runCommand(lawyer, s, "takeChambers", "highstreet");
+      return (
+        lawyer.validateData!(moved.data) &&
+        validateRun(JSON.parse(JSON.stringify(moved)))
       );
     })(),
   );

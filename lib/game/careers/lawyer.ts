@@ -41,15 +41,26 @@ import {
   legalLabourIndex,
   type PracticeState,
   type Verdict,
+  COUNSEL_BY_ID,
+  type CounselId,
   billDoubt,
   billWeeks,
+  counselAvailable,
+  counselOf,
+  creditArea,
   billsOf,
   billsOwed,
+  LEGAL_PREMISES,
+  PREMISES_BY_ID,
   chambersRent,
+  chambersOf,
+  chambersPrice,
+  seatsFree,
   costsOrder,
   counselFee,
   factorValue,
   firmWeight,
+  hoursNeededFor,
   hoursOutstanding,
   initialPractice,
   legalWages,
@@ -172,6 +183,61 @@ import {
  *   afforded the terminal choice it declined. On a one-room practice it was
  *   most of a year's rent. It scales with the practice now, bounded at both
  *   ends, and there is a quiet spell after one ends — `CRISIS_CALM`.
+ *
+ * ------------------------------------------------------ and practice areas
+ *
+ * Finished hours in a kind of work make a firm faster, better and dearer at
+ * that work, and make the market send more of it — see `areaSkill`. The same
+ * scaling bot, 24 runs in each of six markets, with the system off and on:
+ *
+ *   London  101% → 112%   Madrid 77% → 104%   Amsterdam 73% → 94%
+ *   New York 85% → 103%   Singapore 92% → 115%   Lagos 75% → 95%
+ *
+ * A twenty-point lift, and it is a correction rather than a windfall: this
+ * career measured 110% before crises were added, 93% after, and 84% by the
+ * time the cast landed. It is back to reaching its goal around the horizon in
+ * every market, which is where a goal should sit.
+ *
+ * It took four passes to get there and the first three are worth knowing
+ * about. The reward began at 25% fewer hours, 15% on fees and 8 points of
+ * odds, which measured at +45 points — a well-run firm blowing past its
+ * target everywhere. Hours are the term that compounds, because fewer hours
+ * per matter means more matters, which means more hours banked, which means
+ * fewer hours per matter. It is 8% now, against 6 and 6, and full specialism
+ * takes 1,400 finished hours rather than 600 so that it is a late-run
+ * achievement instead of something reached by week forty.
+ *
+ * ------------------------------------------------------ and the chambers
+ *
+ * Rooms were derived from headcount, which made them an expense rather than a
+ * decision and left money in this career with nowhere to go but payroll. The
+ * ladder in `LEGAL_PREMISES` caps the payroll instead: rooms hold a fixed
+ * number of fee earners and charge a fixed rent whether or not anybody is in
+ * them, so moving up is a bet on filling the space.
+ *
+ * A scaling bot that moves when the rooms fill, against the same bot that
+ * never moves — 24 runs in each of six markets:
+ *
+ *                     never moves    moves
+ *   London               56%          83%
+ *   Madrid               92%          95%
+ *   Amsterdam            73%          95%
+ *   New York             56%          81%
+ *   Singapore            77%          98%
+ *   Lagos                90%          86%
+ *
+ * Sixteen points on average, and the shape is the point: expanding pays where
+ * there is work to fill the rooms and costs you where there is not. Lagos —
+ * cheap fees, low reach, always busy — is the one market where taking a
+ * bigger floor is overreach, which is a regional decision the career did not
+ * previously contain.
+ *
+ * The top two rungs were priced twice. At 4,600 and 11,000 a week the moving
+ * bot finished on 81% and had twenty-five people paying for a floor it could
+ * not keep busy; at 3,300 and 6,800 it finishes on 90% across the board. The
+ * cap is still a net tightening — a career that reached about 104% of goal
+ * with free hiring now reaches about 90% — which is the correct direction for
+ * a system whose whole purpose is that growth has to be paid for.
  *
  * See `casework.ts` for the model and `lawyerPhone.ts` for the handset.
  */
@@ -415,6 +481,7 @@ export const lawyer: CareerDef = {
             if (!c) return "There was nothing on the books to settle.";
             const paid = settlementFor(c, p, s.r.skill);
             s.r.cash += paid;
+            creditArea(p, c.kind, c.hoursDone);
             p.cases = p.cases.filter((x) => x.id !== c.id);
             return `Settled for ${money(paid)}. Nobody is delighted, which is what a settlement is.`;
           },
@@ -586,6 +653,10 @@ export const lawyer: CareerDef = {
         if (!c) return;
         const paid = settlementFor(c, p, s.r.skill);
         s.r.cash += paid;
+        /* A matter you finished is a matter you learned from, however it
+           finished. Settling teaches you as much about the work as a hearing
+           does — arguably more. */
+        creditArea(p, c.kind, c.hoursDone);
         p.cases = p.cases.filter((x) => x.id !== arg);
         p.lastVerdicts = [
           ...p.lastVerdicts,
@@ -645,20 +716,33 @@ export const lawyer: CareerDef = {
        * delay, which is why it is the Solicitor's own transaction.
        */
       case "briefCounsel": {
-        const c = p.cases.find((x) => x.id === arg);
+        /*
+         * arg is "caseId" or "caseId:tier". The bare form is what the command
+         * took before there was a ladder, and it still means the senior
+         * junior — so an older interface, or a replayed command from a save
+         * written then, buys exactly what it used to.
+         */
+        const [caseId, tierId] = arg.split(":");
+        const c = p.cases.find((x) => x.id === caseId);
         if (!c || c.counsel) return;
         const k = CASE_BY_ID.get(c.kind);
         if (!k) return;
+        const tier = counselOf(tierId as CounselId | undefined);
+        if (tierId && !COUNSEL_BY_ID.has(tierId as CounselId)) return;
+        /* Chambers will not put a silk on a house purchase, and the card does
+           not offer it — this is the rule behind the card. */
+        if (!counselAvailable(tier, k)) return;
         /* A clerk who rates you quotes better. Same function the Listings
            app shows the price through, so the card cannot promise a figure
            the command does not take. */
-        const fee = Math.round(counselFee(p, k) * briefDiscount(s));
+        const fee = Math.round(counselFee(p, k, tier.id) * briefDiscount(s));
         if (s.r.cash < fee) return;
         s.r.cash -= fee;
         c.counsel = true;
+        c.counselTier = tier.id;
         pushLog(
           s,
-          `Counsel briefed on ${c.client} — ${money(fee)} on the brief.`,
+          `${tier.label} briefed on ${c.client} — ${money(fee)} on the brief.`,
           "neutral",
         );
         touchPerson(
@@ -694,6 +778,10 @@ export const lawyer: CareerDef = {
       case "hireLegal": {
         const role = LEGAL_ROLE_BY_ID.get(arg);
         if (!role) return;
+        /* Rooms hold people. A firm that has run out of chambers cannot hire
+           its way past the walls — moving is the answer, and the Roll says so
+           rather than greying a button with no reason. */
+        if (seatsFree(p) <= 0) return;
         /* Local money: this market's salary goes on the payroll, and stays
            that person's from then on. */
         const labour = legalLabourIndex(p);
@@ -752,6 +840,45 @@ export const lawyer: CareerDef = {
         c.ignored = 0;
         if (choice.next !== undefined) c.stage = choice.next;
         pushLog(s, choice.result, choice.severity < 0 ? "good" : "bad");
+        break;
+      }
+      /*
+       * MOVING
+       *
+       * The one place in this career money can go that is not a salary. Rent
+       * is due whether or not the rooms are full, so taking a floor you cannot
+       * yet staff is a bet on filling it — the same bet the whole career is,
+       * in property.
+       *
+       * Up the ladder only. Downsizing is a real thing a struggling practice
+       * does and it is not built: it would need a rule for who loses their
+       * desk, and picking that for the player is worse than not offering it.
+       */
+      case "takeChambers": {
+        const to = PREMISES_BY_ID.get(arg);
+        if (!to) return;
+        const here = chambersOf(p);
+        if (
+          LEGAL_PREMISES.indexOf(to) <= LEGAL_PREMISES.indexOf(here)
+        ) {
+          return;
+        }
+        const price = chambersPrice(p, to);
+        if (s.r.cash < price) return;
+        s.r.cash -= price;
+        p.premises = to.id;
+        pushLog(
+          s,
+          `Moved into ${to.label.toLowerCase()} — ${money(price)}, and the rent from now on.`,
+          "good",
+        );
+        touchPerson(
+          s,
+          "ellory",
+          { respect: 3, warmth: 2 },
+          `You took ${to.label.toLowerCase()}.`,
+          "good",
+        );
         break;
       }
       case "payLoan": {
@@ -870,6 +997,7 @@ export const lawyer: CareerDef = {
           const c = p.cases.find((x) => x.id === caseId);
           if (c && Number.isFinite(amount) && amount > 0) {
             s.r.cash += amount;
+            creditArea(p, c.kind, c.hoursDone);
             p.cases = p.cases.filter((x) => x.id !== caseId);
             p.lastVerdicts = [
               ...p.lastVerdicts,
@@ -961,8 +1089,9 @@ export const lawyer: CareerDef = {
       if (!k) continue;
       /* Fill to the minimum first; anything past that is preparation and
          improves the odds rather than being wasted. */
-      const want = Math.max(0, k.hours - c.hoursDone);
-      const take = want > 0 ? Math.min(hours, want) : Math.min(hours, k.hours * 0.1);
+      const need = hoursNeededFor(p, k);
+      const want = Math.max(0, need - c.hoursDone);
+      const take = want > 0 ? Math.min(hours, want) : Math.min(hours, need * 0.1);
       c.hoursDone += take;
       hours -= take;
     }
@@ -1020,11 +1149,14 @@ export const lawyer: CareerDef = {
 
       /* Underprepared cases are not merely less likely to win — arriving at
          court without the hours is close to conceding. */
-      const ready = Math.min(1, c.hoursDone / k.hours);
+      const ready = Math.min(1, c.hoursDone / hoursNeededFor(p, k));
       const odds = ready < 1 ? oddsFor(c, p, s.r.skill) * ready * 0.6 : oddsFor(c, p, s.r.skill);
       const won = rng.chance(odds);
       /* What it bills here, not what the catalogue says — the catalogue is
-         London's rate card and the firm may not be in London. */
+         London's rate card and the firm may not be in London.
+         Read *before* the area is credited below, so a matter pays what the
+         firm was worth while it was doing it rather than what finishing it
+         turned the firm into. */
       const fee = feeIn(p, k);
 
       if (won) {
@@ -1085,7 +1217,7 @@ export const lawyer: CareerDef = {
          */
         /* Derek argues them down, if he trusts you enough to be asked. */
         const costs = Math.round(
-          costsOrder(p, k, Boolean(c.counsel)) * costsRelief(s),
+          costsOrder(p, k, Boolean(c.counsel), c.counselTier) * costsRelief(s),
         );
         costsPaid += costs;
         settled_costs.set(c.id, costs);
@@ -1135,6 +1267,10 @@ export const lawyer: CareerDef = {
           "bad",
         );
       }
+
+      /* Finished, either way, and the firm is a little more the kind of firm
+         that does this. */
+      creditArea(p, c.kind, c.hoursDone);
 
       verdicts.push({
         caseId: c.id,
@@ -1509,6 +1645,31 @@ export const lawyer: CareerDef = {
       }
     }
     if (p.actedFor !== undefined && !Array.isArray(p.actedFor)) return false;
+    if (p.premises !== undefined && !PREMISES_BY_ID.has(p.premises)) {
+      return false;
+    }
+    if (
+      p.cases.some(
+        (c) =>
+          c.counselTier !== undefined && !COUNSEL_BY_ID.has(c.counselTier),
+      )
+    ) {
+      return false;
+    }
+    if (p.areas !== undefined) {
+      if (typeof p.areas !== "object" || p.areas === null) return false;
+      if (
+        Object.entries(p.areas).some(
+          ([id, hours]) =>
+            !CASE_BY_ID.has(id) ||
+            typeof hours !== "number" ||
+            !Number.isFinite(hours) ||
+            hours < 0,
+        )
+      ) {
+        return false;
+      }
+    }
     if (
       p.echo !== undefined &&
       (typeof p.echo !== "number" || !Number.isFinite(p.echo) || p.echo < 0)

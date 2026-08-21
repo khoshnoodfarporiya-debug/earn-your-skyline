@@ -9,12 +9,24 @@ import {
   CASE_KINDS,
   LEGAL_ROLE_BY_ID,
   MAX_ADJOURNMENTS,
+  SPECIALIST_HOURS,
+  areaBand,
+  areaHours,
+  areaSkill,
   billsOf,
   billsOwed,
   chambersRent,
+  chambersSeats,
+  nextChambers,
+  chambersOf,
+  chambersPrice,
+  chambersRank,
+  seatsFree,
+  seatsUsed,
   factorValue,
   feeIn,
   hasClerk,
+  hoursNeededFor,
   hoursOutstanding,
   legalCityOf,
   legalWages,
@@ -69,7 +81,7 @@ export function LawyerScreens({
     ) : screen === "ledger" ? (
       <BooksScreen state={state} onCommand={onCommand} />
     ) : screen === "firm" ? (
-      <FirmScreen state={state} onCall={onCall} />
+      <FirmScreen state={state} onCommand={onCommand} onCall={onCall} />
     ) : null;
 
   if (!body) return null;
@@ -139,7 +151,7 @@ function solicitorScene(screen: ScreenId, state: RunState): SolicitorSceneId {
   if (screen === "ledger") return "case-files";
 
   if (p.staff.length >= 3) return "legal-team";
-  if (p.staff.length > 0 || p.rooms > 1) return "established-firm";
+  if (p.staff.length > 0 || chambersRank(p) > 0) return "established-firm";
   return "borrowed-desk";
 }
 
@@ -264,6 +276,81 @@ function InstructionsScreen({
         </p>
       </section>
 
+      {/*
+       * WHAT THIS FIRM TURNED OUT TO BE
+       *
+       * Only the work this market actually sends, because a bar showing zero
+       * hours of group claims to a practice in a city that has never had one
+       * is a reproach rather than information.
+       */}
+      <section
+        aria-labelledby="areas-h"
+        className="rounded-lg border border-rule bg-card p-4"
+      >
+        <h2 id="areas-h" className="text-sm font-semibold text-ink">
+          What this firm is known for
+        </h2>
+        <p className="mt-1 text-xs text-ink-faint">
+          Hours on matters you <em>finished</em>. Doing a lot of one thing makes
+          you faster at it, better at it when it is heard, and dearer — and
+          makes the market send you more of it. {SPECIALIST_HOURS} hours in one
+          area is a specialist practice.
+        </p>
+
+        {reachable.every((k) => areaHours(p, k.id) === 0) ? (
+          <Nothing>
+            Nothing finished yet. What you accept from here decides what this
+            firm becomes.
+          </Nothing>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {[...reachable]
+              .sort((a, b) => areaHours(p, b.id) - areaHours(p, a.id))
+              .map((k) => {
+                const skill = areaSkill(p, k.id);
+                const hours = Math.round(areaHours(p, k.id));
+                return (
+                  <li key={k.id} className="text-xs">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <span className="text-ink">{k.label}</span>
+                      <span className="num text-ink-faint">
+                        {hours}h · {areaBand(skill)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span
+                        role="meter"
+                        aria-valuenow={Math.round(skill * 100)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`Experience in ${k.label}`}
+                        className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-rule-soft"
+                      >
+                        <span
+                          className="block h-full rounded-full bg-clinical transition-[width] duration-500"
+                          style={{
+                            width:
+                              skill <= 0
+                                ? "0%"
+                                : `${Math.max(4, Math.min(100, skill * 100))}%`,
+                          }}
+                        />
+                      </span>
+                      {skill > 0 && (
+                        <span className="num shrink-0 text-[11px] text-ink-faint">
+                          −{Math.round(skill * 12)}% hours · +
+                          {Math.round(skill * 6)} odds · +
+                          {Math.round(skill * 6)}% fee
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+          </ul>
+        )}
+      </section>
+
       <section
         aria-labelledby="offers-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -306,7 +393,14 @@ function InstructionsScreen({
 
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-faint">
                     <span>
-                      Needs <span className="text-ink">{k.hours}h</span>
+                      Needs{" "}
+                      <span className="text-ink">{hoursNeededFor(p, k)}h</span>
+                      {hoursNeededFor(p, k) < k.hours && (
+                        <span className="text-good">
+                          {" "}
+                          (was {k.hours}h)
+                        </span>
+                      )}
                     </span>
                     <span>
                       Wins <span className="text-ink">{money(feeIn(p, k))}</span>
@@ -321,6 +415,14 @@ function InstructionsScreen({
                       </span>
                     </span>
                   </div>
+
+                  {areaSkill(p, k.id) > 0 && (
+                    <p className="mt-2 text-good">
+                      {areaBand(areaSkill(p, k.id))} — {Math.round(areaHours(p, k.id))}
+                      h finished in this area, and the odds and the fee above
+                      already say so.
+                    </p>
+                  )}
 
                   <div className="mt-2">
                     <PayerBadge payer={o.payer} />
@@ -404,7 +506,7 @@ function CaseworkScreen({
               if (!k) return null;
               const odds = oddsFor(c, p, state.r.skill);
               const offer = settlementFor(c, p, state.r.skill);
-              const ready = Math.min(1, c.hoursDone / k.hours);
+              const ready = Math.min(1, c.hoursDone / hoursNeededFor(p, k));
               const away = c.dueWeek - state.week;
               const putBack = c.adjournments ?? 0;
 
@@ -698,9 +800,11 @@ function BooksScreen({
 
 function FirmScreen({
   state,
+  onCommand,
   onCall,
 }: {
   state: RunState;
+  onCommand: (cmd: string, arg: string) => void;
   onCall: (app: "listings" | "roll") => void;
 }) {
   const p = practice(state);
@@ -714,6 +818,93 @@ function FirmScreen({
 
   return (
     <div className="space-y-6">
+      {/*
+       * WHERE THE FIRM SITS
+       *
+       * First on the screen, because it is the thing that caps everything
+       * below it: rooms hold people, and people are the only source of hours
+       * other than you.
+       */}
+      <section
+        aria-labelledby="chambers-h"
+        className="rounded-lg border border-rule bg-card p-4"
+      >
+        <h2 id="chambers-h" className="text-sm font-semibold text-ink">
+          {chambersOf(p).label}
+        </h2>
+        <p className="mt-1 text-xs text-ink-faint">{chambersOf(p).blurb}</p>
+
+        <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+          <Stat
+            label="Seats"
+            value={`${seatsUsed(p)} of ${chambersSeats(p)}`}
+            tone={seatsFree(p) === 0 ? "bad" : undefined}
+          />
+          <Stat label="Rent" value={`${money(chambersRent(p))}/wk`} />
+          <Stat
+            label="Walk-ins"
+            value={`${Math.round((chambersOf(p).draw - 1) * 100)}%`}
+          />
+          <Stat
+            label="Room to grow"
+            value={
+              seatsFree(p) === 0
+                ? "None"
+                : `${seatsFree(p)} more`
+            }
+            tone={seatsFree(p) === 0 ? "bad" : undefined}
+          />
+        </dl>
+
+        {seatsFree(p) === 0 && (
+          <p className="mt-3 rounded border border-caution/50 bg-caution-tint px-2.5 py-1.5 text-xs text-caution">
+            These rooms are full. Nobody else can be taken on until the firm
+            moves.
+          </p>
+        )}
+
+        {nextChambers(p) ? (
+          <div className="mt-3 border-t border-rule-soft pt-3">
+            <p className="text-xs font-medium text-ink">
+              {nextChambers(p)!.label}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-faint">
+              {nextChambers(p)!.blurb}
+            </p>
+            <p className="mt-1 text-xs text-ink-faint">
+              Seats {nextChambers(p)!.seats} ·{" "}
+              {money(
+                Math.round(
+                  nextChambers(p)!.rent * legalCityOf(p).rent,
+                ),
+              )}
+              /wk ·{" "}
+              {Math.round((nextChambers(p)!.draw - 1) * 100)}% more walking in
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <button
+                type="button"
+                disabled={state.r.cash < chambersPrice(p, nextChambers(p)!)}
+                onClick={() => onCommand("takeChambers", nextChambers(p)!.id)}
+                className="rounded border border-rule px-2.5 py-1 text-xs text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Take it · {money(chambersPrice(p, nextChambers(p)!))}
+              </button>
+              <span className="text-xs text-ink-faint">
+                {state.r.cash < chambersPrice(p, nextChambers(p)!)
+                  ? `Costs ${money(chambersPrice(p, nextChambers(p)!))} and you have ${money(state.r.cash)}.`
+                  : "The rent is due from the week you move, full or empty."}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 border-t border-rule-soft pt-3 text-xs text-ink-faint">
+            There is nowhere further up to go. Everything from here is people
+            and the work you put them on.
+          </p>
+        )}
+      </section>
+
       <section
         aria-labelledby="people-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -734,8 +925,8 @@ function FirmScreen({
           <Stat label="Their hours" value={`${hours}/wk`} />
           <Stat label="Salaries" value={`${money(legalWages(p))}/wk`} />
           <Stat
-            label="Rooms"
-            value={`${Math.max(1, p.rooms)} · ${money(chambersRent(p))}/wk`}
+            label="Chambers"
+            value={`${seatsUsed(p)}/${chambersSeats(p)} · ${money(chambersRent(p))}/wk`}
           />
         </dl>
 

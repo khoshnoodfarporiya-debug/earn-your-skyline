@@ -4,12 +4,17 @@ import type { RunState } from "@/lib/game/types";
 import { money } from "@/lib/game/format";
 import {
   CASE_BY_ID,
+  COUNSEL,
   MAX_ADJOURNMENTS,
+  counselAvailable,
   counselFee,
+  hoursNeededFor,
+  counselOf,
   hasClerk,
   oddsFor,
   relistChance,
 } from "@/lib/game/careers/casework";
+import { briefDiscount } from "@/lib/game/careers/lawyerCast";
 import { practice } from "@/lib/game/careers/lawyer";
 import { AppHeader } from "./AppHeader";
 
@@ -78,9 +83,7 @@ export function ListingsApp({
             if (!k) return null;
             const away = c.dueWeek - state.week;
             const odds = oddsFor(c, p, state.r.skill);
-            const ready = Math.min(1, c.hoursDone / k.hours);
-            const fee = counselFee(p, k);
-            const tooDear = state.r.cash < fee;
+            const ready = Math.min(1, c.hoursDone / hoursNeededFor(p, k));
             const putBack = c.adjournments ?? 0;
             const capped = putBack >= MAX_ADJOURNMENTS;
 
@@ -122,33 +125,54 @@ export function ListingsApp({
                   </p>
                 )}
 
-                <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  {c.counsel ? (
+                {c.counsel ? (
+                  <p className="mt-2.5">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-good-tint px-2.5 py-1 text-[12px] text-good">
-                      Counsel briefed
+                      {counselOf(c.counselTier).label} briefed
                     </span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={tooDear}
-                      onClick={() => dispatch("briefCounsel", c.id)}
-                      className="rounded-form border border-rule bg-card/60 px-3.5 py-2 text-[13px] font-medium text-ink transition enabled:hover:border-clinical enabled:hover:bg-card-high enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      Brief counsel · {money(fee)}
-                    </button>
-                  )}
-                  {!c.counsel && tooDear && (
-                    <span className="text-[12px] text-ink-faint">
-                      Costs {money(fee)} and you have {money(state.r.cash)}.
-                    </span>
-                  )}
-                  {!c.counsel && !tooDear && (
-                    <span className="text-[12px] text-ink-faint">
-                      +7 points on the odds, and their costs fall by nearly half
-                      if it goes against you.
-                    </span>
-                  )}
-                </div>
+                  </p>
+                ) : (
+                  /*
+                   * WHICH counsel, not whether.
+                   *
+                   * Chambers will not put a silk on a house purchase, so the
+                   * tier is not offered rather than offered and refused — the
+                   * command enforces the same rule, and this is the card that
+                   * states it.
+                   */
+                  <div className="mt-2.5 space-y-1.5">
+                    {COUNSEL.filter((tier) => counselAvailable(tier, k)).map(
+                      (tier) => {
+                        const fee = Math.round(
+                          counselFee(p, k, tier.id) * briefDiscount(state),
+                        );
+                        const tooDear = state.r.cash < fee;
+                        return (
+                          <div
+                            key={tier.id}
+                            className="flex flex-wrap items-center gap-x-2.5 gap-y-1"
+                          >
+                            <button
+                              type="button"
+                              disabled={tooDear}
+                              onClick={() =>
+                                dispatch("briefCounsel", `${c.id}:${tier.id}`)
+                              }
+                              className="rounded-form border border-rule bg-card/60 px-3.5 py-2 text-[13px] font-medium text-ink transition enabled:hover:border-clinical enabled:hover:bg-card-high enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                              {tier.label} · {money(fee)}
+                            </button>
+                            <span className="text-[12px] text-ink-faint">
+                              {tooDear
+                                ? `Costs ${money(fee)} and you have ${money(state.r.cash)}.`
+                                : `+${Math.round(tier.odds * 100)} on the odds, and their costs fall to ${Math.round(tier.relief * 100)}% if it still goes against you.`}
+                            </span>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}

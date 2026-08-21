@@ -4,8 +4,12 @@ import type { RunState } from "@/lib/game/types";
 import { money } from "@/lib/game/format";
 import {
   LEGAL_ROLES,
+  chambersSeats,
   legalLabourIndex,
   legalWages,
+  chambersOf,
+  seatsFree,
+  seatsUsed,
   staffHours,
 } from "@/lib/game/careers/casework";
 import { practice } from "@/lib/game/careers/lawyer";
@@ -59,6 +63,11 @@ export function RollApp({
             value: `${hours}/wk`,
             tone: hours > 0 ? "good" : undefined,
           },
+          {
+            label: "Seats",
+            value: `${seatsUsed(p)}/${chambersSeats(p)}`,
+            tone: seatsFree(p) === 0 ? ("bad" as const) : undefined,
+          },
         ]}
       />
 
@@ -67,6 +76,7 @@ export function RollApp({
           const salary = Math.round(r.salary * labour);
           const hireCost = Math.round(r.hireCost * labour);
           const tooDear = state.r.cash < hireCost;
+          const noRoom = seatsFree(p) <= 0;
           return (
             <li key={r.id} className="px-4 py-3.5">
               <div className="flex items-baseline justify-between gap-3">
@@ -105,16 +115,23 @@ export function RollApp({
               <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
                 <button
                   type="button"
-                  disabled={tooDear}
+                  disabled={tooDear || noRoom}
                   onClick={() => dispatch("hireLegal", r.id)}
                   className="rounded-form border border-rule bg-card/60 px-3.5 py-2 text-[13px] font-medium text-ink transition enabled:hover:border-clinical enabled:hover:bg-card-high enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   Take them on · {money(hireCost)}
                 </button>
-                {tooDear && (
+                {noRoom ? (
                   <span className="text-[12px] text-ink-faint">
-                    You have {money(state.r.cash)}.
+                    {chambersOf(p).label} seats {chambersSeats(p)} and is full.
+                    The firm has to move before it can grow.
                   </span>
+                ) : (
+                  tooDear && (
+                    <span className="text-[12px] text-ink-faint">
+                      You have {money(state.r.cash)}.
+                    </span>
+                  )
                 )}
               </div>
             </li>

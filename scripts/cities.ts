@@ -48,8 +48,12 @@ import {
 import {
   CASE_BY_ID,
   LEGAL_CITIES,
+  chambersRent,
   hoursOutstanding,
+  chambersPrice,
+  nextChambers,
   oddsFor,
+  seatsFree,
   staffHours,
 } from "../lib/game/careers/casework";
 import {
@@ -469,6 +473,26 @@ function playLawyer(cityId: string, seed: number): Result {
       const ready = c.hoursDone / kind.hours;
       if (near && ready < 0.85 && oddsFor(c, practice(s), s.r.skill) < 0.55) {
         s = runCommand(lawyer, s, "settleCase", c.id);
+      }
+    }
+
+    /*
+     * Move when the rooms are full and there is slack to pay the rent.
+     *
+     * Chambers cap the payroll now, so a bot that never moves is a bot that
+     * never has more than two people — which would make every figure in this
+     * table a measurement of the cap rather than of the city.
+     */
+    {
+      const q = practice(s);
+      const up = nextChambers(q);
+      const weekly = chambersRent(q) + q.staff.reduce((n, x) => n + x.salary, 0);
+      if (
+        up &&
+        seatsFree(q) === 0 &&
+        s.r.cash > chambersPrice(q, up) + weekly * 8
+      ) {
+        s = runCommand(lawyer, s, "takeChambers", up.id);
       }
     }
 

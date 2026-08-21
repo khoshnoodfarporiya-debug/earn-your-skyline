@@ -257,8 +257,162 @@ export const LEGAL_CITY_BY_ID = new Map(LEGAL_CITIES.map((c) => [c.id, c]));
 export const legalCityOf = (p: PracticeState): LegalCity =>
   LEGAL_CITY_BY_ID.get(p.city ?? "london") ?? LEGAL_CITIES[0];
 
-/** What an instruction of this kind bills here. */
+/* ---------------------------------------------------------- practice areas
+ *
+ * WHAT KIND OF SOLICITOR YOU TURN OUT TO BE
+ *
+ * The career had a rich week and no long game: taking forty house purchases
+ * taught you nothing about house purchases, so week 100 played exactly like
+ * week 10 with more people in the room. Every other career in this game
+ * accumulates something — the Physician opens departments, the Chef learns
+ * techniques — and a solicitor accumulates the only thing this trade actually
+ * accumulates, which is *having done this before*.
+ *
+ * Hours are credited when a matter **resolves**, not while it is carried.
+ * You learn from work you finished, which also means coming off the record
+ * teaches you nothing and wastes the hours you had put in — a second, quiet
+ * reason not to.
+ *
+ * Nothing decays. A firm that stops doing probate is still a firm that knows
+ * probate, and "what this practice became" is the whole point of the system.
+ *
+ * Four effects, each bounded, and the first is the one that matters:
+ *
+ *   hours  you do the work you know faster — see `hoursNeededFor`
+ *   odds   and you are better at it when it is heard
+ *   fees   and you can charge more for it
+ *   flow   and the market sends you more of it
+ *
+ * Hours is first because it is the only one denominated in this career's own
+ * constraint. The other three are a better rate on work you were doing
+ * anyway; that one is capacity, which is the thing everything else here is
+ * gated by.
+ *
+ * See `areaSkill` for what the simulation had to say about whether any of
+ * this makes specialising a *choice*. Briefly: it does not, breadth wins, and
+ * the version that would have made specialising win was a trap.
+ */
+
+/** Hours in one area before the profession would call you a specialist. */
+export const SPECIALIST_HOURS = 1_400;
+
+/** Hours this practice has finished in an area. Absent means none. */
+export const areaHours = (p: PracticeState, kindId: string): number =>
+  p.areas?.[kindId] ?? 0;
+
+/** Every finished hour this practice has, across every area. */
+export const totalAreaHours = (p: PracticeState): number =>
+  Object.values(p.areas ?? {}).reduce((n, h) => n + h, 0);
+
+/**
+ * How well known this firm is for one kind of work. 0..1.
+ *
+ * Depth alone, and that is a decision the simulation made rather than one
+ * that was designed.
+ *
+ * ------------------------------------------------------- what was tried
+ *
+ * The intention was that this would make `takeCase` a question about what the
+ * firm becomes — specialise, and turn other work away for it. Three bots over
+ * 24 runs in each of six markets said otherwise, every time:
+ *
+ *   takes whatever arrives           96% of goal
+ *   prefers its own area when choosing  96%
+ *   declines everything else            52%
+ *
+ * The reason is structural rather than a matter of tuning. Income here is
+ * gated by how many matters you can carry, so declining one costs a whole
+ * matter, and no per-matter bonus small enough to be sane can repay that. It
+ * survived being paid in hours rather than in money — `hoursNeededFor`, which
+ * is the right currency and did lift every strategy about three points — and
+ * breadth still won by nearly two to one.
+ *
+ * A `focus` term was written and then deleted: multiplying by this area's
+ * share of all finished hours *did* make narrow firms the only ones rewarded,
+ * which would have meant a system that pays out exclusively for the strategy
+ * that loses. That is a trap wearing a progress bar, and it is worse than
+ * having no system at all.
+ *
+ * So this is honest about what it is: not a choice, but a real accumulation.
+ * A firm gets measurably better, faster and dearer at the work it actually
+ * does, which is true of the trade and true of the numbers. `totalAreaHours`
+ * is kept because the Instructions screen shows the spread, and because the
+ * next person to reach for a share term should find this note first.
+ */
+export const areaSkill = (p: PracticeState, kindId: string): number =>
+  Math.min(1, areaHours(p, kindId) / SPECIALIST_HOURS);
+
+/**
+ * How many hours this matter actually takes *this* firm.
+ *
+ * The reward for specialising has to be paid in the same currency as the
+ * constraint, and it was not. A rate bonus — a better fee, better odds — can
+ * never justify carrying less work in a career where income is gated by how
+ * much work you carry: declining one instruction costs a whole instruction,
+ * and fifteen per cent on the rest does not come close. Measured, and it was
+ * not close: a bot that specialised on purpose finished on 48% of its target
+ * against 93% for one that took whatever arrived.
+ *
+ * A firm that has done four hundred house purchases does the next one faster.
+ * That is both what actually happens and the only bonus that can pay for
+ * turning work away, because the hours it frees can be spent on other work.
+ */
+export const hoursNeededFor = (p: PracticeState, k: CaseKind): number =>
+  Math.max(1, Math.round(k.hours * (1 - areaSkill(p, k.id) * 0.08)));
+
+/** What the interface calls it, so a bare 0.42 never reaches a player. */
+export function areaBand(skill: number): string {
+  if (skill <= 0) return "Never done one";
+  if (skill < 0.2) return "Occasional";
+  if (skill < 0.5) return "Regular work";
+  if (skill < 0.8) return "Known for it";
+  return "Specialists";
+}
+
+/** Credit a finished matter to the area it belonged to. */
+export function creditArea(
+  p: PracticeState,
+  kindId: string,
+  hours: number,
+): void {
+  if (!Number.isFinite(hours) || hours <= 0) return;
+  const areas = { ...(p.areas ?? {}) };
+  /* Bounded, because nothing else bounds it: a 156-week run doing one thing
+     would otherwise carry an ever-growing number into every save. */
+  areas[kindId] = Math.min(SPECIALIST_HOURS * 2, (areas[kindId] ?? 0) + hours);
+  p.areas = areas;
+}
+
+/** The area this firm has put the most finished hours into, if any. */
+export function strongestArea(p: PracticeState): CaseKind | null {
+  const ranked = CASE_KINDS.map((k) => [k, areaHours(p, k.id)] as const)
+    .filter(([, h]) => h > 0)
+    .sort((a, b) => b[1] - a[1]);
+  return ranked[0]?.[0] ?? null;
+}
+
+/**
+ * What an instruction of this kind bills here.
+ *
+ * Two multipliers: the market's rate card, and what a firm known for this kind
+ * of work can charge for it. The second is deliberately the smaller — where
+ * you practise still matters more than what you practise.
+ */
 export const feeIn = (p: PracticeState, k: CaseKind): number =>
+  Math.round(k.fee * legalCityOf(p).fee * (1 + areaSkill(p, k.id) * 0.06));
+
+/**
+ * What the matter is worth in this market, before you.
+ *
+ * The distinction matters and the first cut got it wrong. `feeIn` is what
+ * *you* bill, and a specialist bills more — but the other side's costs are
+ * their solicitors' bill, and counsel's brief fee is counsel's, and neither
+ * of those goes up because you have become good at this. Running them off
+ * `feeIn` made specialising raise the price of losing and the price of help,
+ * which measured as a *worse* practice the better it got: London fell from
+ * $18,000 to −$31,000 and eleven more weeks overdrawn.
+ */
+export const baseFeeIn = (p: PracticeState, k: CaseKind): number =>
   Math.round(k.fee * legalCityOf(p).fee);
 
 /**
@@ -432,6 +586,11 @@ export interface LiveCase {
   payer?: PayerId;
   /** Counsel is briefed on this one. Better odds, cheaper costs if it fails. */
   counsel?: boolean;
+  /**
+   * Which counsel. Absent on a matter briefed before the ladder existed,
+   * and reads as the senior junior — exactly what the boolean bought.
+   */
+  counselTier?: CounselId;
   /** Times the court has moved the date. Capped — see `MAX_ADJOURNMENTS`. */
   adjournments?: number;
   /** Taken against somebody you have acted for. The regulator may notice. */
@@ -481,8 +640,18 @@ export interface PracticeState {
   cases: LiveCase[];
   offers: CaseOffer[];
   staff: { id: string; name: string; role: string; salary: number }[];
-  /** Chambers rent, which scales with how much room the firm needs. */
+  /**
+   * Rooms the firm needed, under the formula the rent used to use.
+   *
+   * Superseded by `premises` and kept written because a save carries it and
+   * because the artwork selector reads it. Nothing charges against it.
+   */
   rooms: number;
+  /**
+   * Which set of chambers. Absent on a save from before the ladder, and
+   * `chambersOf` places one of those in the smallest rooms that hold it.
+   */
+  premises?: string;
   lastVerdicts: Verdict[];
   nextId: number;
 
@@ -498,6 +667,15 @@ export interface PracticeState {
   bills?: Bill[];
   /** Clients you have been instructed by. What a conflict is measured against. */
   actedFor?: string[];
+  /**
+   * Finished hours per kind of work — what this firm turned out to be.
+   *
+   * Keyed by `CaseKind.id`, absent on a save from before the practice had
+   * areas, and read only through `areaHours`, which treats absent as none.
+   * A firm from then is a firm that has specialised in nothing, which is
+   * exactly what it was.
+   */
+  areas?: Record<string, number>;
   /** Extra tries at an instruction next week, from something you published. */
   echo?: number;
   /**
@@ -528,9 +706,141 @@ export const firmWeight = (p: PracticeState): number =>
 export const legalWages = (p: PracticeState): number =>
   p.staff.reduce((n, s) => n + s.salary, 0);
 
-/** Chambers cost. One room per three fee earners, near enough. */
+/* --------------------------------------------------------------- chambers
+ *
+ * WHERE THE FIRM ACTUALLY SITS
+ *
+ * Chambers used to be derived: one room per three fee earners, rent equal to
+ * the headcount. That is an *expense*, not a decision — money had nowhere to
+ * go in this career except payroll, which is why a well-run practice's week
+ * 100 looked like its week 40 with more salaries in it.
+ *
+ * A ladder makes it a commitment. Each set of rooms holds a fixed number of
+ * fee earners and costs a fixed rent whether or not anybody is in them, so
+ * moving up is a bet that you will fill the space before the rent eats the
+ * difference — which is this career's own bet, in property form.
+ *
+ *   `seats`  fee earners the rooms hold, counting you. A hard cap on hiring.
+ *   `rent`   weekly, due whatever happens, and it does not scale with use.
+ *   `draw`   what walks in off the street. A high-street office is seen.
+ *
+ * The first rung's rent is exactly what the old formula charged a one-room
+ * practice, so a London run starts paying precisely what it always paid.
+ */
+export interface Chambers {
+  id: string;
+  label: string;
+  blurb: string;
+  /** Fee earners these rooms hold, including you. */
+  seats: number;
+  /** London money, weekly. Multiplied by the market's rent index. */
+  rent: number;
+  /** London money, one-off. Multiplied by the market's rent index. */
+  cost: number;
+  /** Multiplier on the chance an instruction arrives at all. */
+  draw: number;
+}
+
+export const LEGAL_PREMISES: Chambers[] = [
+  {
+    id: "desk",
+    label: "A borrowed desk",
+    blurb:
+      "A room above a shop with somebody else's name on the door. It holds you and two other people, and nobody has ever walked into it by accident.",
+    seats: 3,
+    rent: 640,
+    cost: 0,
+    draw: 1,
+  },
+  {
+    id: "highstreet",
+    label: "A high-street office",
+    blurb:
+      "A window, a waiting area, and your name on the glass. People who were not looking for a solicitor find one here.",
+    seats: 7,
+    rent: 1_900,
+    cost: 24_000,
+    draw: 1.12,
+  },
+  {
+    id: "square",
+    label: "Two floors on the square",
+    blurb:
+      "Proper rooms, a meeting room that impresses, and space for a practice that is no longer mostly you.",
+    seats: 14,
+    rent: 3_300,
+    cost: 78_000,
+    draw: 1.24,
+  },
+  {
+    id: "city",
+    label: "A floor in the City",
+    blurb:
+      "The address does half the work. It also costs more empty than your first year of chambers cost full.",
+    seats: 26,
+    rent: 6_800,
+    cost: 250_000,
+    draw: 1.35,
+  },
+];
+
+export const PREMISES_BY_ID = new Map(LEGAL_PREMISES.map((x) => [x.id, x]));
+
+/**
+ * Where this firm sits.
+ *
+ * Absent on a save written before the ladder, and those are placed in the
+ * smallest rooms that hold the people already on the payroll — so a firm of
+ * six does not arrive in a borrowed desk it has plainly outgrown, and its rent
+ * lands within a few pounds of what the old headcount formula charged.
+ */
+export function chambersOf(p: PracticeState): Chambers {
+  const named = p.premises ? PREMISES_BY_ID.get(p.premises) : undefined;
+  if (named) return named;
+  const need = p.staff.length + 1;
+  return (
+    LEGAL_PREMISES.find((x) => x.seats >= need) ??
+    LEGAL_PREMISES[LEGAL_PREMISES.length - 1]
+  );
+}
+
+/** How far up the ladder, for anything that wants a rank rather than an id. */
+export const chambersRank = (p: PracticeState): number =>
+  LEGAL_PREMISES.findIndex((x) => x.id === chambersOf(p).id);
+
+/** Fee earners these rooms hold, and how many are in them. */
+export const chambersSeats = (p: PracticeState): number => chambersOf(p).seats;
+export const seatsUsed = (p: PracticeState): number => p.staff.length + 1;
+export const seatsFree = (p: PracticeState): number =>
+  Math.max(0, chambersSeats(p) - seatsUsed(p));
+
+/** What walks in off the street because of where you are. */
+export const chambersDraw = (p: PracticeState): number => chambersOf(p).draw;
+
+/**
+ * What moving costs.
+ *
+ * A fit-out is not wholly lost — the desks, the shelving and the practice
+ * management system move with you — so the rooms you are leaving are worth
+ * something against the rooms you are taking. Property money, so it moves
+ * with the market's rent index rather than its fee index.
+ */
+export const chambersPrice = (
+  p: PracticeState,
+  to: Chambers,
+): number =>
+  Math.max(
+    0,
+    Math.round((to.cost - chambersOf(p).cost * 0.4) * legalCityOf(p).rent),
+  );
+
+/** The next rung up, or nothing if the firm is already at the top. */
+export const nextChambers = (p: PracticeState): Chambers | null =>
+  LEGAL_PREMISES[chambersRank(p) + 1] ?? null;
+
+/** Chambers cost, due whatever happens and whether or not the rooms are full. */
 export const chambersRent = (p: PracticeState): number =>
-  Math.round(Math.max(1, p.rooms) * 640 * legalCityOf(p).rent);
+  Math.round(chambersOf(p).rent * legalCityOf(p).rent);
 
 /**
  * Work in progress: hours already spent on cases that have not paid.
@@ -543,13 +853,13 @@ export const workInProgress = (p: PracticeState): number =>
   p.cases.reduce((n, c) => {
     const k = CASE_BY_ID.get(c.kind);
     if (!k) return n;
-    return n + Math.min(1, c.hoursDone / k.hours) * feeIn(p, k) * 0.35;
+    return n + Math.min(1, c.hoursDone / hoursNeededFor(p, k)) * feeIn(p, k) * 0.35;
   }, 0);
 
 export const hoursOutstanding = (p: PracticeState): number =>
   p.cases.reduce((n, c) => {
     const k = CASE_BY_ID.get(c.kind);
-    return k ? n + Math.max(0, k.hours - c.hoursDone) : n;
+    return k ? n + Math.max(0, hoursNeededFor(p, k) - c.hoursDone) : n;
   }, 0);
 
 /* ------------------------------------------------------- what a clerk is for
@@ -589,8 +899,83 @@ export const RELIST_WEEKS: [number, number] = [3, 6];
  * A player who is solvent can buy better odds; one who is financing four
  * files cannot, which is precisely when they would most like to.
  */
-export const counselFee = (p: PracticeState, k: CaseKind): number =>
-  Math.round(feeIn(p, k) * 0.09);
+export const counselFee = (
+  p: PracticeState,
+  k: CaseKind,
+  tier: CounselId = "senior",
+): number => Math.round(baseFeeIn(p, k) * counselOf(tier).fee);
+
+/**
+ * WHO YOU ACTUALLY BRIEF
+ *
+ * Briefing counsel was a boolean: one price, one effect, and no decision
+ * beyond whether you could afford it. A practice does not choose *whether* to
+ * instruct counsel so much as *which* counsel, and the three tiers are a real
+ * spread — a junior on a small matter is sensible, and a silk on a house
+ * purchase is a joke the clerk would refuse to arrange.
+ *
+ * `senior` is priced exactly where the boolean was, so the balance the
+ * simulation already settled sits in the middle of the ladder rather than
+ * being replaced by three numbers nobody has measured.
+ */
+export type CounselId = "junior" | "senior" | "silk";
+
+export interface Counsel {
+  id: CounselId;
+  label: string;
+  blurb: string;
+  /** Share of the fee, before the market and the clerk have their say. */
+  fee: number;
+  /** Added to the odds. */
+  odds: number;
+  /** What the other side's costs are multiplied by if it still goes wrong. */
+  relief: number;
+  /** Chambers will not put this one on anything smaller. */
+  minPrestige: number;
+}
+
+export const COUNSEL: Counsel[] = [
+  {
+    id: "junior",
+    label: "A junior",
+    blurb:
+      "Two years call, cheap, and perfectly capable of a matter you have already prepared properly.",
+    fee: 0.055,
+    odds: 0.06,
+    relief: 0.7,
+    minPrestige: 0,
+  },
+  {
+    id: "senior",
+    label: "A senior junior",
+    blurb:
+      "Does this every week and has read the authorities you have not. The ordinary answer on an ordinary matter.",
+    fee: 0.09,
+    odds: 0.1,
+    relief: 0.55,
+    minPrestige: 0,
+  },
+  {
+    id: "silk",
+    label: "Leading counsel",
+    blurb:
+      "Silk. Expensive enough to be a decision in itself, and the clerk will not put one on anything small.",
+    fee: 0.17,
+    odds: 0.16,
+    relief: 0.38,
+    minPrestige: 5,
+  },
+];
+
+export const COUNSEL_BY_ID = new Map(COUNSEL.map((c) => [c.id, c]));
+
+/** Absent or unknown reads as the senior junior — what the boolean used to be. */
+export const counselOf = (id: CounselId | undefined): Counsel =>
+  COUNSEL_BY_ID.get(id ?? "senior") ?? COUNSEL[1];
+
+/** Whether chambers would put this tier on this kind of matter at all. */
+export const counselAvailable = (tier: Counsel, k: CaseKind): boolean =>
+  k.prestige >= tier.minPrestige;
 
 /**
  * Added to the odds on a case counsel is briefed on.
@@ -607,6 +992,10 @@ export const counselFee = (p: PracticeState, k: CaseKind): number =>
  * a judgement rather than an upgrade, which is the point.
  */
 export const COUNSEL_ODDS = 0.1;
+
+/** What the tier briefed on this matter is worth, or nothing. */
+export const counselOdds = (c: LiveCase): number =>
+  c.counsel ? counselOf(c.counselTier).odds : 0;
 
 /**
  * What losing costs, over and above being paid nothing.
@@ -625,7 +1014,9 @@ export const costsOrder = (
   p: PracticeState,
   k: CaseKind,
   counsel: boolean,
-): number => Math.round(feeIn(p, k) * 0.16 * (counsel ? 0.55 : 1));
+  tier?: CounselId,
+): number =>
+  Math.round(baseFeeIn(p, k) * 0.16 * (counsel ? counselOf(tier).relief : 1));
 
 /* ------------------------------------------------------------------- bills */
 
@@ -688,12 +1079,18 @@ export function oddsFor(
 ): number {
   const k = CASE_BY_ID.get(c.kind);
   if (!k) return 0;
-  const over = Math.max(0, c.hoursDone - k.hours) / Math.max(1, k.hours);
+  const need = hoursNeededFor(p, k);
+  const over = Math.max(0, c.hoursDone - need) / Math.max(1, need);
   const prep = Math.min(0.22, over * 0.3);
-  const counsel = c.counsel ? COUNSEL_ODDS : 0;
+  const counsel = counselOdds(c);
+  /* Having done four hundred of these is worth something at the door. */
+  const specialism = areaSkill(p, k.id) * 0.06;
   return Math.max(
     0.05,
-    Math.min(0.93, k.baseOdds + prep + counsel + firmWeight(p) + skill / 900),
+    Math.min(
+      0.93,
+      k.baseOdds + prep + counsel + specialism + firmWeight(p) + skill / 900,
+    ),
   );
 }
 
@@ -773,7 +1170,9 @@ export function newOffers(
   for (let i = 0; i < tries; i++) {
     if (
       !rng.chance(
-        (0.35 + pitching * 0.16 + echo * 0.1 + reputation / 260) * city.flow,
+        (0.35 + pitching * 0.16 + echo * 0.1 + reputation / 260) *
+          city.flow *
+          chambersDraw(p),
       )
     ) {
       continue;
@@ -788,7 +1187,27 @@ export function newOffers(
       (k) => k.prestige <= 2 + reputation / 3.2 && k.prestige <= city.reach,
     );
     if (reachable.length === 0) continue;
-    const kind = rng.pick(reachable);
+    /*
+     * Weighted by what this firm is known for.
+     *
+     * The market does not send work at random to a practice with a
+     * reputation: a firm that has done four hundred hours of personal injury
+     * is the firm people ring about personal injury. A full specialist is
+     * three times as likely to be sent their own area as an unreachable one,
+     * which is enough to make specialising compound and not enough to stop
+     * anything else arriving.
+     */
+    const weights = reachable.map((x) => 1 + areaSkill(p, x.id) * 2);
+    const total = weights.reduce((a, b) => a + b, 0);
+    let roll = rng.next() * total;
+    let kind = reachable[reachable.length - 1];
+    for (let j = 0; j < reachable.length; j++) {
+      roll -= weights[j];
+      if (roll <= 0) {
+        kind = reachable[j];
+        break;
+      }
+    }
     /*
      * A conflict can only exist once there is a history to conflict with, so
      * this is quiet for the first weeks of a run and then starts happening —
@@ -816,6 +1235,7 @@ export function initialPractice(): PracticeState {
     offers: [],
     staff: [],
     rooms: 1,
+    premises: "desk",
     lastVerdicts: [],
     nextId: 1,
     bills: [],
