@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GLOSSARY } from "@/lib/ui/glossary";
+import { glossaryFor } from "@/lib/ui/glossary";
 import type { Lesson } from "@/lib/ui/onboarding";
 import type { ScreenId } from "@/lib/ui/navigation";
 import { MedIcon } from "../visuals/MedIcon";
@@ -23,12 +23,15 @@ import { MedIcon } from "../visuals/MedIcon";
  * here the run is waiting on.
  */
 export function Glossary({
+  careerId,
   lessons,
   onReopen,
   onClose,
   onNavigate,
   returnFocusTo,
 }: {
+  /** Whose vocabulary to show. The words are not shared between careers. */
+  careerId: string;
   /** Every lesson with whether the player has already got past it. */
   lessons: { lesson: Lesson; done: boolean }[];
   /** Un-dismiss a lesson so it shows again on its own screen. */
@@ -38,6 +41,7 @@ export function Glossary({
   returnFocusTo?: React.RefObject<HTMLElement | null>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const terms = glossaryFor(careerId);
   const [tab, setTab] = useState<"words" | "lessons">("words");
   const headingId = "glossary-title";
 
@@ -139,14 +143,15 @@ export function Glossary({
 
         {tab === "words" ? (
           <dl className="divide-y divide-rule-soft">
-            {GLOSSARY.map((t) => (
+            {terms.map((t) => (
               <div key={t.id} className="px-5 py-3">
                 <dt className="flex flex-wrap items-baseline gap-x-2">
                   <span className="text-[13.5px] font-semibold text-ink">
                     {t.plain}
                   </span>
-                  {/* The professional word is kept, never replaced — this is
-                      a medical practice, and the vocabulary is part of it. */}
+                  {/* The professional word is kept, never replaced — every
+                      one of these is a real trade with a real vocabulary, and
+                      the vocabulary is part of playing it. */}
                   <span className="num text-[12px] text-ink-faint">
                     the game calls this &ldquo;{t.term.toLowerCase()}&rdquo;
                   </span>

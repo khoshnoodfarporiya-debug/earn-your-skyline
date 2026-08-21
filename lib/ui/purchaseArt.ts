@@ -4,6 +4,7 @@ import {
   SPECIALTIES,
 } from "../game/medical/data";
 import { LIFESTYLE } from "../game/medical/lifestyle";
+import { FLEET } from "../game/medical/fleet";
 import { ART_SIZES } from "./purchaseArt.generated";
 
 /**
@@ -66,6 +67,7 @@ type Group =
   | "facilities"
   | "departments"
   | "equipment"
+  | "fleet"
   | "homes"
   | "lifestyle";
 
@@ -127,6 +129,26 @@ export const PURCHASE_ART: Record<string, PurchaseArt> = {
     "facility-regional-hospital",
     "center 60%",
     "A regional hospital with wards, theatres and an emergency entrance under a canopy.",
+  ),
+
+  // ---------------------------------------------------------------- fleet
+  patient_transport: art(
+    "fleet",
+    "fleet-patient-transport",
+    "center 58%",
+    "An unbadged patient transport vehicle waiting outside a clinic entrance.",
+  ),
+  emergency_ambulance: art(
+    "fleet",
+    "fleet-emergency-ambulance",
+    "center 56%",
+    "An unbadged emergency ambulance prepared in a hospital response bay.",
+  ),
+  mobile_icu: art(
+    "fleet",
+    "fleet-mobile-icu",
+    "center 55%",
+    "A large unbadged mobile intensive-care ambulance with its equipment bay open.",
   ),
 
   // ----------------------------------------------------------- departments
@@ -382,6 +404,72 @@ export const PURCHASE_ART: Record<string, PurchaseArt> = {
     "center center",
     "Framed paintings hung on a gallery wall under picture lights.",
   ),
+  estate_car: art(
+    "lifestyle",
+    "lifestyle-estate-car",
+    "center center",
+    "An unbadged practical estate car parked outside a professional office.",
+  ),
+  electric_saloon: art(
+    "lifestyle",
+    "lifestyle-electric-saloon",
+    "center center",
+    "An unbadged electric saloon charging beside a modern clinic.",
+  ),
+  classic_car: art(
+    "lifestyle",
+    "lifestyle-classic-car",
+    "center center",
+    "A carefully maintained unbadged classic car in a quiet courtyard.",
+  ),
+  supercar: art(
+    "lifestyle",
+    "lifestyle-supercar",
+    "center center",
+    "An unbadged modern supercar under restrained showroom lighting.",
+  ),
+  concierge: art(
+    "lifestyle",
+    "lifestyle-concierge",
+    "center 48%",
+    "A private concierge arranging travel and appointments at a discreet desk.",
+  ),
+  sabbatical_cabin: art(
+    "lifestyle",
+    "lifestyle-cabin",
+    "center 58%",
+    "A secluded timber cabin beside a lake and forest, prepared for a quiet sabbatical.",
+  ),
+  racehorse: art(
+    "lifestyle",
+    "lifestyle-racehorse",
+    "center 48%",
+    "A racehorse being walked through a calm training yard at dawn.",
+  ),
+  helicopter: art(
+    "lifestyle",
+    "lifestyle-helicopter",
+    "center 48%",
+    "An unbadged private helicopter on a city helipad at dusk.",
+  ),
+  wine_cellar: art(
+    "lifestyle",
+    "lifestyle-wine-cellar",
+    "center center",
+    "A climate-controlled wine cellar with neatly arranged unlabelled bottles.",
+  ),
+  rare_books: art(
+    "lifestyle",
+    "lifestyle-medical-library",
+    "center center",
+    "A private library of rare medical books in dark timber cases.",
+  ),
+  vineyard: art(
+    "lifestyle",
+    "lifestyle-vineyard",
+    "center 55%",
+    "Rows of vines surrounding a modest stone vineyard estate at golden hour.",
+  ),
 };
 
 /**
@@ -393,23 +481,55 @@ export const PURCHASE_ART: Record<string, PurchaseArt> = {
 export const purchaseArt = (id: string): PurchaseArt | null =>
   PURCHASE_ART[id] ?? null;
 
-/** Every id the game can sell you, across all four catalogues. */
-const catalogueIds = (): string[] => [
+/** Every id the game can sell you, across all five catalogues. */
+export const catalogueIds = (): string[] => [
   ...FACILITY_TYPES.map((f) => f.id),
   ...SPECIALTIES.map((s) => s.id),
   ...EQUIPMENT.map((e) => e.id),
+  ...FLEET.map((v) => v.id),
   ...LIFESTYLE.map((l) => l.id),
 ];
+
+/**
+ * ITEMS WHOSE ARTWORK HAS NOT BEEN SHOT YET
+ *
+ * The gameplay for these landed before the masters did. Rather than let the
+ * coverage test pass by loosening it — which would also stop it catching a
+ * *genuinely* forgotten item — the gap is written down here, by id.
+ *
+ * `missingArt` still fails for anything not on this list, so the guarantee is
+ * intact for every item anybody adds from now on. What changed is that the
+ * known gap is enumerated instead of invisible.
+ *
+ * These cards render the typographic fallback in the meantime, which is a
+ * supported state (see `purchaseArt`) rather than a broken one.
+ *
+ * **Delete an id from this list the moment its master lands in
+ * `art-source/visuals/`** — `npm run build:art` then makes the file and the
+ * registry entry below starts resolving. When the list is empty, delete it and
+ * the `AWAITING_ART` branch in `missingArt` with it.
+ */
+export const AWAITING_ART: ReadonlySet<string> = new Set();
 
 /**
  * Every catalogue item the registry cannot answer for.
  *
  * Computed from the game's own tables rather than maintained by hand, so
  * adding a thirteenth department without artwork shows up as a failing test
- * rather than as a hole in a screen.
+ * rather than as a hole in a screen. Items on `AWAITING_ART` are excluded —
+ * see the note there.
  */
 export function missingArt(): string[] {
-  return catalogueIds().filter((id) => !PURCHASE_ART[id]);
+  return catalogueIds().filter(
+    (id) => !PURCHASE_ART[id] && !AWAITING_ART.has(id),
+  );
+}
+
+/** The known gap, so a test can report it rather than assert it away. */
+export function awaitingArt(): string[] {
+  return catalogueIds().filter(
+    (id) => !PURCHASE_ART[id] && AWAITING_ART.has(id),
+  );
 }
 
 /** Registry entries that point at no catalogue item — the other direction. */

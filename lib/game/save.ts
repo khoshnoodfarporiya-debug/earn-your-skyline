@@ -575,6 +575,19 @@ export function validateRun(s: Record<string, unknown>): boolean {
   ) {
     return false;
   }
+  /*
+   * Where the run began. Optional — every save written before the choice
+   * existed has none — and checked against the career that wrote it, since a
+   * city id is only meaningful to one career. The career's own validator is
+   * what guards the copy the simulation reads; this guards the record.
+   */
+  if (s.startCity !== undefined) {
+    if (typeof s.startCity !== "string") return false;
+    const cities = getCareer(s.careerId)?.startCities ?? [];
+    if (cities.length > 0 && !cities.some((c) => c.id === s.startCity)) {
+      return false;
+    }
+  }
 
   /* ------------------------------------------------- the v10 subsystems */
 
@@ -702,7 +715,10 @@ export function validateRun(s: Record<string, unknown>): boolean {
         isInt(c.stage) &&
         isInt(c.ignored) &&
         numbers(c, ["severity"]) &&
-        every(c.taken, isStr),
+        every(c.taken, isStr) &&
+        /* Whose stage set. Absent is a crisis from before any career but the
+           Physician had one, and reads as the Physician's. */
+        (c.career === undefined || isStr(c.career)),
     )
   ) {
     return false;

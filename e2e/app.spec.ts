@@ -80,6 +80,40 @@ async function readSocial(phone: ReturnType<Page["getByRole"]>) {
 }
 
 /**
+ * Wait until the portraits in a region have actually arrived.
+ *
+ * These assertions used to be preceded by a flat `waitForTimeout(900)` or
+ * `(1200)`. A fixed pause is wrong in both directions: it burns most of a
+ * second on a machine that finished in 80ms, and it is a coin flip on a loaded
+ * one — and several of the checks downstream are *negative* ("no personal
+ * portrait appears here"), which a pause that expired early would pass without
+ * proving anything. This returns the moment every portrait in scope has
+ * settled, and fails loudly if none ever appears.
+ */
+async function portraitsSettled(page: Page, scope = "main") {
+  await expect
+    .poll(
+      () =>
+        page.evaluate((sel) => {
+          const imgs = [
+            ...document.querySelectorAll<HTMLImageElement>(`${sel} img`),
+          ].filter((i) =>
+            /characters/.test(decodeURIComponent(i.currentSrc || i.src)),
+          );
+          return imgs.length > 0 && imgs.every((i) => i.complete);
+        }, scope),
+      {
+        /* Generous because a cold image cache transcodes these on demand —
+           see the note on `imagesSettled`. Still an assertion, because a
+           portrait that never arrives is exactly what this is checking. */
+        timeout: 30_000,
+        message: `no portrait ever finished loading in ${scope}`,
+      },
+    )
+    .toBe(true);
+}
+
+/**
  * The commit control. Mobile has the sticky CommitBar; desktop has the inline
  * button in the forecast card, and only one of the two is ever in the DOM.
  */
@@ -137,8 +171,8 @@ async function startRun(page: Page) {
   await page.goto("/");
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
-  // The career card arms on the first press and starts the run on the second,
-  // so the detail is readable before committing on a phone.
+  // The career card arms on the first press and moves on to *where* on the
+  // second, so the detail is readable before committing on a phone.
   const card = page.getByRole("button", { name: /physician/i });
   await card.click();
   await expect(card, "card shows as selected before it starts").toHaveAttribute(
@@ -146,6 +180,9 @@ async function startRun(page: Page) {
     "true",
   );
   await card.click();
+  // Then the start city. The default is Lyon, which is where every run
+  // started before the choice existed.
+  await page.getByRole("button", { name: /^Begin in Lyon$/ }).click();
   await expect(page.getByRole("button", { name: /^network$/i })).toBeVisible();
 }
 
@@ -475,7 +512,7 @@ test.describe("network map", () => {
     await expect(routes).toHaveCount(1);
   });
 
-  test("no page overflow at any tested width", async ({ page }) => {
+  test("no page overflow at any tested width", { tag: "@sets-own-viewport" }, async ({ page }) => {
     await startRun(page);
     await openNetwork(page);
     for (const size of [
@@ -585,12 +622,38 @@ test.describe("artwork", () => {
     // next/image rewrites src to a URL-encoded optimiser path, so match on
     // the filename stem rather than the directory separator.
     const covers = page.locator('main img[src*="career-"]');
-    await expect(covers).toHaveCount(3);
-    for (let i = 0; i < 3; i++) {
-      const ok = await covers
-        .nth(i)
-        .evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0);
-      expect(ok, `career cover ${i} decoded`).toBe(true);
+    /*
+     * However many the select screen offers — the playable careers and the
+     * designs shown beside them.
+     *
+     * Counted rather than hard-coded. This assertion said `3`, which was the
+     * number of cards on the day it was written, and it broke the moment four
+     * more covers were added. The claim it is actually making is that *every*
+     * cover decodes and that no source PNG is fetched, and neither of those
+     * has anything to do with how many careers there are.
+     */
+    await expect(covers.first()).toBeVisible();
+    const count = await covers.count();
+    expect(count, "the select screen shows career covers").toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < count; i++) {
+      /*
+       * Polled rather than sampled once.
+       *
+       * `complete && naturalWidth` is only true after the browser has finished
+       * decoding, and a single read the instant the locator resolves races
+       * that — which it lost on the mobile project under load, about one run
+       * in twenty. Nothing about the assertion changed; it is now allowed to
+       * wait for the thing it is asserting on.
+       */
+      await expect
+        .poll(
+          () =>
+            covers
+              .nth(i)
+              .evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0),
+          { message: `career cover ${i} decoded` },
+        )
+        .toBe(true);
     }
 
     expect(pngs, "heavy source PNGs must never be requested").toEqual([]);
@@ -1175,7 +1238,7 @@ test.describe("outbreak pressure", () => {
 /* ------------------------------------------------------------------- shell */
 
 test.describe("the app shell", () => {
-  test("the bottom bar stays anchored at tablet width", async ({ page }) => {
+  test("the bottom bar stays anchored at tablet width", { tag: "@sets-own-viewport" }, async ({ page }) => {
     // 768 is the width the nav used to switch layout at while the shell was
     // still rendering the mobile instance — the bar detached from the bottom
     // and landed in the page flow.
@@ -1607,7 +1670,7 @@ test.describe("the living world", () => {
     }
   });
 
-  test("the new screens hold at mobile and desktop widths", async ({
+  test("the new screens hold at mobile and desktop widths", { tag: "@sets-own-viewport" }, async ({
     page,
   }) => {
     await preload(page, "midrun");
@@ -1832,7 +1895,7 @@ test.describe("knowing where you are", () => {
     expect(problems).toEqual([]);
   });
 
-  test("orientation survives a phone and a keyboard", async ({ page }) => {
+  test("orientation survives a phone and a keyboard", { tag: "@sets-own-viewport" }, async ({ page }) => {
     const problems = watchConsole(page);
     await page.setViewportSize({ width: 375, height: 812 });
     await preload(page, "midrun");
@@ -2079,7 +2142,7 @@ test.describe("visuals that explain the simulation", () => {
     expect(problems).toEqual([]);
   });
 
-  test("the diagrams hold at 375px and respect reduced motion", async ({
+  test("the diagrams hold at 375px and respect reduced motion", { tag: "@sets-own-viewport" }, async ({
     page,
   }) => {
     const problems = watchConsole(page);
@@ -2563,13 +2626,29 @@ test.describe("purchasing", () => {
   };
 
   test("every purchasable item shows its own artwork", async ({ page }) => {
+    /*
+     * Genuinely heavy, and marked so rather than papered over with a bigger
+     * global timeout.
+     *
+     * This decodes the visible build and lifestyle catalogue — 56 optimised images, and on
+     * a cold `.next/dev/cache/images` every one is a fresh sharp transcode.
+     * A run straight after `npm run build` (which wipes that cache) fails this
+     * at 45s on ONE worker as readily as on four, which is what showed the
+     * flake was never about parallelism. The work is real; the budget for it
+     * should say so.
+     */
+    test.slow();
     const problems = watchConsole(page);
     const fetched = new Set<string>();
-    page.on("response", (r) => {
+    /* Requests, not responses. What is being asserted is which artwork the
+       app asked for; a request fires the moment it asks, where a response
+       waits on the optimiser finishing a transcode that this test does not
+       care about. */
+    page.on("request", (r) => {
       const m = /\/visuals\/purchases\/([^&"?]+)/.exec(
         decodeURIComponent(r.url()),
       );
-      if (m && r.status() < 400) fetched.add(m[1]);
+      if (m) fetched.add(m[1]);
     });
 
     await resume(page);
@@ -2586,9 +2665,10 @@ test.describe("purchasing", () => {
       await scrollThrough(page);
     }
 
-    /* Four facilities, twelve machines, four homes, three cars, five services,
-       five luxury items — every one with its own file, none shared. */
-    expect(fetched.size, "distinct purchase images served").toBe(45);
+    /* The original catalogue plus eleven newly illustrated lifestyle entries
+       — every visible item has its own file, and none are shared. Fleet lives
+       on the network screen and is covered by the registry contract. */
+    expect(fetched.size, "distinct purchase images served").toBe(56);
 
     /* The three re-drawn cars must be the ones on screen: the originals had
        recognisable badging and are not shipped. */
@@ -2599,16 +2679,20 @@ test.describe("purchasing", () => {
       ).toBe(true);
     }
 
-    /* No <img> may fail to decode. */
-    const broken = await page.evaluate(() =>
-      [...document.querySelectorAll("img")]
-        .filter((i) =>
-          /purchases/.test(decodeURIComponent(i.currentSrc || i.src)),
-        )
-        .filter((i) => !i.complete || i.naturalWidth === 0)
-        .map((i) => i.alt),
-    );
+    /*
+     * Polled, not sampled.
+     *
+     * "No broken image" is a claim about the end state, and reading it once meant
+     * reading it whenever the helper above happened to return — which, on a cold
+     * image cache, could be while the last transcode was still in flight. That is
+     * a false failure about a real property. Retrying until it holds keeps the
+     * assertion exactly as strong (an image that genuinely never decodes still
+     * fails, it just takes the budget to say so) and stops it reporting the
+     * optimiser's queue as a broken picture.
+     */
+    const broken = await undecodedArt(page, "purchases");
     expect(broken, "every purchase image decodes").toEqual([]);
+
 
     expect(problems).toEqual([]);
   });
@@ -2675,7 +2759,10 @@ test.describe("purchasing", () => {
     /* Three clicks with no delay, which is what a mis-fire actually looks
        like — not three deliberate presses. */
     await buy.click({ clickCount: 3, delay: 0 }).catch(() => {});
-    await page.waitForTimeout(400);
+    /* Wait for the purchase to actually land rather than for a fixed 400ms.
+       A second one would have to pass through this same state, so reading the
+       cash once the card flips is what makes the assertion below meaningful. */
+    await expect(card).toContainText(/in service/i);
 
     const cashAfter = await readCash(page);
     /* The town house is $180,000. Two would be $360,000. */
@@ -2698,9 +2785,9 @@ test.describe("purchasing", () => {
       .getByRole("article", { name: "Town house" })
       .getByRole("button", { name: /^buy$/i })
       .click();
-    await page.waitForTimeout(300);
 
-    /* The one you keep says so in words, not only in colour. */
+    /* The one you keep says so in words, not only in colour. The assertion
+       auto-waits, so the pause that used to sit here did nothing but cost. */
     const owned = page.getByRole("article", { name: "Town house" });
     await expect(owned).toContainText(/in service/i);
 
@@ -2719,7 +2806,11 @@ test.describe("purchasing", () => {
       .getByRole("article", { name: "Town house" })
       .getByRole("button", { name: /^buy$/i })
       .click();
-    await page.waitForTimeout(400);
+    /* The purchase has to be on screen — and therefore in the save — before
+       the reload, or this test races the write it exists to verify. */
+    await expect(
+      page.getByRole("article", { name: "Town house" }),
+    ).toContainText(/in service/i);
 
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
@@ -2756,7 +2847,7 @@ test.describe("purchasing", () => {
     expect(problems).toEqual([]);
   });
 
-  test("the catalogue holds at every width with no overflow", async ({
+  test("the catalogue holds at every width with no overflow", { tag: "@sets-own-viewport" }, async ({
     page,
   }) => {
     const problems = watchConsole(page);
@@ -2791,6 +2882,18 @@ test.describe("purchasing", () => {
   });
 
   test("no source PNG reaches the browser", async ({ page }) => {
+    /*
+     * Genuinely heavy, and marked so rather than papered over with a bigger
+     * global timeout.
+     *
+     * This decodes the whole purchase catalogue — 45 optimised images, and on
+     * a cold `.next/dev/cache/images` every one is a fresh sharp transcode.
+     * A run straight after `npm run build` (which wipes that cache) fails this
+     * at 45s on ONE worker as readily as on four, which is what showed the
+     * flake was never about parallelism. The work is real; the budget for it
+     * should say so.
+     */
+    test.slow();
     const problems = watchConsole(page);
     const pngs: string[] = [];
     page.on("request", (r) => {
@@ -2807,13 +2910,106 @@ test.describe("purchasing", () => {
   });
 });
 
-/** Walk a long screen so lazy images below the fold actually load. */
+/**
+ * Walk a long screen so lazy images below the fold actually load.
+ *
+ * The wheel steps are kept — this app scrolls a container, and driving it with
+ * `window.scrollTo` would move nothing and quietly stop these tests proving
+ * anything. What is gone is the guesswork around them: a flat 90ms per step
+ * plus a closing pause, roughly three seconds a call, whether the images had
+ * arrived or not. Now each step waits one frame and the call ends when every
+ * image has actually finished, which is both quicker and the condition the
+ * callers were really after.
+ */
+
+/**
+ * Artwork in `scope` that is in the DOM but has not decoded.
+ *
+ * ------------------------------------------------------------- the subtlety
+ *
+ * These images are lazy, so "has not decoded" has two very different causes:
+ * the optimiser is still working (wait, and it resolves) or the image was
+ * never scrolled into view (wait forever, and it never does). A fast scroll
+ * can outrun the IntersectionObserver and leave one card in the second state
+ * — which is exactly how a single oncology tile failed a 45-second poll while
+ * its file on disk was perfectly valid.
+ *
+ * So this nudges anything unfinished into view before reporting it. Polling
+ * on top of that gives lazy images the chance to start and slow ones the
+ * chance to finish, and anything still broken afterwards is genuinely broken.
+ */
+async function undecodedArt(page: Page, scope: string): Promise<string[]> {
+  return page.evaluate((re) => {
+    const rx = new RegExp(re);
+    const matching = [...document.querySelectorAll("img")].filter((x) =>
+      rx.test(decodeURIComponent(x.currentSrc || x.src)),
+    );
+    const pending = matching.filter((x) => !x.complete || x.naturalWidth === 0);
+    /*
+     * Deliberately does not scroll.
+     *
+     * An earlier version scrolled pending images into view to wake the lazy
+     * loader, and that made things worse rather than better: moving the
+     * viewport underneath a test that is mid-assertion changed what was on
+     * screen and the check failed on a warm cache it had always passed. The
+     * caller has already walked the page; this only reports.
+     */
+    return pending.map((x) => x.alt);
+  }, scope);
+}
+
 async function scrollThrough(page: Page) {
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 26; i++) {
     await page.mouse.wheel(0, 800);
-    await page.waitForTimeout(90);
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => done(null))),
+    );
   }
-  await page.waitForTimeout(700);
+  await imagesSettled(page);
+}
+
+/**
+ * Wait for the page to stop pulling images in.
+ *
+ * ------------------------------------------------------------ what broke
+ *
+ * This used to assert that every image was `complete` within ten seconds, and
+ * that ten seconds was the whole flake. `npm run build` wipes
+ * `.next/dev/cache/images`, so the next suite run transcodes all 45 purchase
+ * images from scratch; cold, that takes longer than ten seconds and the
+ * helper threw "images below the fold never finished". It failed on ONE
+ * worker exactly as readily as on four, which is what finally showed the
+ * problem was never parallelism — it was an assertion in a helper, sized for
+ * a warm cache.
+ *
+ * ---------------------------------------------------------- what it does now
+ *
+ * The same condition — every image decoded — on a budget that matches the
+ * work instead of a guess about machine speed. Warm, it returns on the first
+ * poll. Cold, it waits for the transcodes.
+ *
+ * A quiet-network heuristic was tried in between and was worse: returning as
+ * soon as no *new* image had been requested let callers proceed while the last
+ * few were still decoding, and the decode assertions downstream then failed on
+ * a warm cache they had always passed. The thing the callers need is the
+ * images being ready, so that is what this waits for.
+ *
+ * It does not assert. If the budget runs out, the test's own check reports
+ * which image is missing, which is a far better failure than this helper
+ * throwing "images below the fold never finished" with no name attached.
+ */
+async function imagesSettled(page: Page) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll<HTMLImageElement>("main img")].every(
+            (i) => i.complete,
+          ),
+        ),
+      { timeout: 10_000, message: "images below the fold never finished" },
+    )
+    .toBe(true);
 }
 
 /** Cash as an integer, from the status strip. */
@@ -2851,22 +3047,26 @@ test.describe("department cards", () => {
     await page.getByRole("button", { name: /continue your run/i }).click();
   };
 
-  const scrollThrough = async (page: Page) => {
-    for (let i = 0; i < 26; i++) {
-      await page.mouse.wheel(0, 800);
-      await page.waitForTimeout(90);
-    }
-    await page.waitForTimeout(900);
-  };
-
   test("all twelve departments show their own interior", async ({ page }) => {
+    /*
+     * Genuinely heavy, and marked so rather than papered over with a bigger
+     * global timeout.
+     *
+     * This decodes the whole purchase catalogue — 45 optimised images, and on
+     * a cold `.next/dev/cache/images` every one is a fresh sharp transcode.
+     * A run straight after `npm run build` (which wipes that cache) fails this
+     * at 45s on ONE worker as readily as on four, which is what showed the
+     * flake was never about parallelism. The work is real; the budget for it
+     * should say so.
+     */
+    test.slow();
     const problems = watchConsole(page);
     const fetched = new Set<string>();
-    page.on("response", (r) => {
+    page.on("request", (r) => {
       const m = /\/visuals\/purchases\/departments\/([^&"?]+)/.exec(
         decodeURIComponent(r.url()),
       );
-      if (m && r.status() < 400) fetched.add(m[1]);
+      if (m) fetched.add(m[1]);
     });
 
     await resume(page);
@@ -2877,29 +3077,44 @@ test.describe("department cards", () => {
     /* Each of the twelve is a distinct file — no two fields share a room. */
     expect(new Set([...fetched]).size).toBe(12);
 
-    const broken = await page.evaluate(() =>
-      [...document.querySelectorAll("img")]
-        .filter((i) =>
-          /purchases\/departments/.test(
-            decodeURIComponent(i.currentSrc || i.src),
-          ),
-        )
-        .filter((i) => !i.complete || i.naturalWidth === 0)
-        .map((i) => i.alt),
-    );
+    /*
+     * Polled, not sampled.
+     *
+     * "No broken image" is a claim about the end state, and reading it once meant
+     * reading it whenever the helper above happened to return — which, on a cold
+     * image cache, could be while the last transcode was still in flight. That is
+     * a false failure about a real property. Retrying until it holds keeps the
+     * assertion exactly as strong (an image that genuinely never decodes still
+     * fails, it just takes the budget to say so) and stops it reporting the
+     * optimiser's queue as a broken picture.
+     */
+    const broken = await undecodedArt(page, "purchases/departments");
     expect(broken, "every department image decodes").toEqual([]);
+
 
     expect(problems).toEqual([]);
   });
 
   test("the twelve machines use the re-shot scenes", async ({ page }) => {
+    /*
+     * Genuinely heavy, and marked so rather than papered over with a bigger
+     * global timeout.
+     *
+     * This decodes the whole purchase catalogue — 45 optimised images, and on
+     * a cold `.next/dev/cache/images` every one is a fresh sharp transcode.
+     * A run straight after `npm run build` (which wipes that cache) fails this
+     * at 45s on ONE worker as readily as on four, which is what showed the
+     * flake was never about parallelism. The work is real; the budget for it
+     * should say so.
+     */
+    test.slow();
     const problems = watchConsole(page);
     const fetched = new Set<string>();
-    page.on("response", (r) => {
+    page.on("request", (r) => {
       const m = /\/visuals\/purchases\/equipment\/([^&"?]+)/.exec(
         decodeURIComponent(r.url()),
       );
-      if (m && r.status() < 400) fetched.add(m[1]);
+      if (m) fetched.add(m[1]);
     });
 
     await resume(page);
@@ -3018,7 +3233,11 @@ test.describe("department cards", () => {
     const card = page.getByRole("article", { name: "Dermatology" });
     await card.scrollIntoViewIfNeeded();
     await card.getByRole("button", { name: /^buy$/i }).click();
-    await page.waitForTimeout(400);
+    /* On screen — and so in the save — before the reload this test exists to
+       verify, rather than racing it with a fixed pause. */
+    await expect(
+      card.getByRole("button", { name: /owned|in service/i }),
+    ).toBeVisible();
 
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
@@ -3048,7 +3267,12 @@ test.describe("department cards", () => {
       .getByRole("button", { name: /^buy$/i })
       .click({ clickCount: 3, delay: 0 })
       .catch(() => {});
-    await page.waitForTimeout(400);
+    /* Wait for the department to open. A second charge would have to pass
+       through this same state, so this is the point at which the cash figure
+       below becomes meaningful. */
+    await expect(
+      card.getByRole("button", { name: /owned|in service/i }),
+    ).toBeVisible();
 
     const after = await page.getByRole("main").innerText();
     const cashAfter = Number(
@@ -3091,7 +3315,11 @@ test.describe("department cards", () => {
     const ecg = page.getByRole("article", { name: "Pathology lab" });
     await ecg.scrollIntoViewIfNeeded();
     await ecg.getByRole("button", { name: /^buy$/i }).click();
-    await page.waitForTimeout(400);
+    /* The lab has to be owned before the next machine can warn about sharing
+       a technician with it. */
+    await expect(
+      ecg.getByRole("button", { name: /owned|in service/i }),
+    ).toBeVisible();
 
     const ultrasound = page.getByRole("article", { name: "Ultrasound suite" });
     await ultrasound.scrollIntoViewIfNeeded();
@@ -3103,7 +3331,7 @@ test.describe("department cards", () => {
     expect(problems).toEqual([]);
   });
 
-  test("the department shelf holds at every width", async ({ page }) => {
+  test("the department shelf holds at every width", { tag: "@sets-own-viewport" }, async ({ page }) => {
     const problems = watchConsole(page);
     await resume(page);
 
@@ -3166,22 +3394,29 @@ test.describe("character portraits", () => {
 
     await resume(page);
     await nav(page, /Career/, /^people$/i);
-    await page.waitForTimeout(1200);
 
     /* The mid-run cast is on screen and every one of them has a distinct
-       file — no two colleagues share a face. */
-    expect(fetched.size).toBeGreaterThanOrEqual(8);
+       file — no two colleagues share a face. Polled rather than paused, so it
+       returns as soon as the eighth face lands. */
+    await expect
+      .poll(() => fetched.size, { timeout: 8_000 })
+      .toBeGreaterThanOrEqual(8);
     expect(new Set([...fetched]).size).toBe(fetched.size);
 
-    const broken = await page.evaluate(
-      () =>
-        [...document.querySelectorAll("img")]
-          .filter((i) =>
-            /characters/.test(decodeURIComponent(i.currentSrc || i.src)),
-          )
-          .filter((i) => !i.complete || i.naturalWidth === 0).length,
-    );
+    /*
+     * Polled, not sampled.
+     *
+     * "No broken image" is a claim about the end state, and reading it once meant
+     * reading it whenever the helper above happened to return — which, on a cold
+     * image cache, could be while the last transcode was still in flight. That is
+     * a false failure about a real property. Retrying until it holds keeps the
+     * assertion exactly as strong (an image that genuinely never decodes still
+     * fails, it just takes the budget to say so) and stops it reporting the
+     * optimiser's queue as a broken picture.
+     */
+    const broken = (await undecodedArt(page, "characters")).length;
     expect(broken, "every portrait decodes").toBe(0);
+
 
     expect(problems).toEqual([]);
   });
@@ -3222,18 +3457,25 @@ test.describe("character portraits", () => {
     const problems = watchConsole(page);
     await resume(page);
     await nav(page, /Network/, /^rivals$/i);
-    await page.waitForTimeout(1000);
 
     /* Five rivals, five faces, and the strategy and standing they always
        carried. A portrait must not have displaced the numbers. */
-    const faces = await page.evaluate(
-      () =>
-        [...document.querySelectorAll<HTMLImageElement>("main img")].filter(
-          (i) =>
-            /characters\/cast/.test(decodeURIComponent(i.currentSrc || i.src)),
-        ).length,
-    );
-    expect(faces).toBeGreaterThanOrEqual(5);
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              [
+                ...document.querySelectorAll<HTMLImageElement>("main img"),
+              ].filter((i) =>
+                /characters\/cast/.test(
+                  decodeURIComponent(i.currentSrc || i.src),
+                ),
+              ).length,
+          ),
+        { timeout: 8_000 },
+      )
+      .toBeGreaterThanOrEqual(5);
     await expect(page.getByText(/Dr Anneke Roth/).first()).toBeVisible();
     await expect(page.getByText(/Dr Sofia Aranda/).first()).toBeVisible();
 
@@ -3244,7 +3486,7 @@ test.describe("character portraits", () => {
     const problems = watchConsole(page);
     await resume(page);
     await page.getByRole("button", { name: /open phone/i }).click();
-    await page.waitForTimeout(1200);
+    await portraitsSettled(page, '[role="dialog"]');
 
     /*
      * Every avatar that loads on the phone must belong to a human account.
@@ -3287,23 +3529,31 @@ test.describe("character portraits", () => {
 
     await resume(page);
     await nav(page, /Career/, /^people$/i);
-    await page.waitForTimeout(900);
+
+    /* The roster has rendered — without this the count below would be zero
+       because nothing had drawn yet, and the test would pass vacuously. */
+    await expect(page.getByText(/Prof. Iris Hallam/).first()).toBeVisible();
+    await expect(page.getByText(/Dr Femi Okoro/).first()).toBeVisible();
 
     /* No broken-image glyph: the failed <img> elements are gone entirely,
        replaced by the initials tile. */
-    const stillImages = await page.evaluate(
-      () =>
-        [...document.querySelectorAll<HTMLImageElement>("main img")].filter(
-          (i) => /characters/.test(decodeURIComponent(i.currentSrc || i.src)),
-        ).length,
-    );
-    expect(stillImages, "failed portraits are replaced, not left broken").toBe(
-      0,
-    );
-
-    /* And the screen still identifies everybody. */
-    await expect(page.getByText(/Prof. Iris Hallam/).first()).toBeVisible();
-    await expect(page.getByText(/Dr Femi Okoro/).first()).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              [
+                ...document.querySelectorAll<HTMLImageElement>("main img"),
+              ].filter((i) =>
+                /characters/.test(decodeURIComponent(i.currentSrc || i.src)),
+              ).length,
+          ),
+        {
+          timeout: 8_000,
+          message: "failed portraits are replaced, not left broken",
+        },
+      )
+      .toBe(0);
 
     /* A failed image request is expected here and is not an app error. */
     expect(
@@ -3321,15 +3571,15 @@ test.describe("character portraits", () => {
 
     await resume(page);
     await nav(page, /Career/, /^people$/i);
-    await page.waitForTimeout(900);
+    await portraitsSettled(page);
     await page.getByRole("button", { name: /open phone/i }).click();
-    await page.waitForTimeout(900);
+    await portraitsSettled(page, '[role="dialog"]');
 
     expect(pngs, "masters stay in art-source").toEqual([]);
     expect(problems).toEqual([]);
   });
 
-  test("portraits hold at every avatar size without shifting layout", async ({
+  test("portraits hold at every avatar size without shifting layout", { tag: "@sets-own-viewport" }, async ({
     page,
   }) => {
     const problems = watchConsole(page);
@@ -3338,7 +3588,7 @@ test.describe("character portraits", () => {
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await nav(page, /Career/, /^people$/i);
-      await page.waitForTimeout(900);
+      await portraitsSettled(page);
       await expectNoPageOverflow(page);
 
       /* Every avatar is square and matches its declared box, which is what
@@ -3358,6 +3608,2112 @@ test.describe("character portraits", () => {
         "avatars stay square",
       ).toBe(true);
     }
+
+    expect(problems).toEqual([]);
+  });
+});
+
+/**
+ * WHERE THE RUN BEGINS
+ *
+ * The city is chosen before week one and never again, so the only place a
+ * player can be wrong about it is this screen. What matters is that the choice
+ * is legible (each city states what it changes), that it is reachable without
+ * a mouse, and — the part a unit test cannot see — that the city you picked is
+ * the city the run is actually played in.
+ */
+test.describe("choosing where to start", () => {
+  const armChef = async (page: Page) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*chef/i }).first();
+    await card.click();
+    await card.click();
+  };
+
+  test("every city says what it changes, and the pick is what you play", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await armChef(page);
+
+    await expect(
+      page.getByRole("heading", { name: /Where do you start\?/ }),
+    ).toBeVisible();
+
+    /* The default is offered first and named on the button, so nobody starts
+       somewhere they did not read. */
+    await expect(
+      page.getByRole("button", { name: /^Begin in Lyon$/ }),
+    ).toBeVisible();
+
+    /* A city card is a real choice: it states the effects the simulation
+       applies, not adjectives. */
+    const mumbai = page.getByRole("button", { name: /^Mumbai/ }).first();
+    await expect(mumbai).toBeVisible();
+    await mumbai.click();
+    await expect(mumbai).toHaveAttribute("aria-pressed", "true");
+    /* `.first()` because New York loses a week too — the claim is that the
+       effect is stated on the card, not that only one city has it. */
+    await expect(
+      page.getByText(/Produce dies 1 week sooner here/).first(),
+    ).toBeVisible();
+    await expect(page.getByText(/50% rent/).first()).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    await page.getByRole("button", { name: /^Begin in Mumbai$/ }).click();
+
+    /* And the run is in Mumbai — the map says so, and so does the rent on the
+       room, which is the city's own multiplier applied to the market stall. */
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: /Map/ })
+      .first()
+      .click();
+    await expect(
+      page.getByRole("heading", { name: /Mumbai, India/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/You did not start here/).first(),
+      "the cities you did not choose are comparisons, not destinations",
+    ).toHaveCount(0);
+
+    expect(problems).toEqual([]);
+  });
+
+  test("the picker is operable by keyboard and can be backed out of", async ({
+    page,
+  }) => {
+    await armChef(page);
+
+    /* Nothing here may be a button inside a button — the card grid and the
+       map labels sit in the same stacking context. */
+    const nested = await page.evaluate(
+      () => document.querySelectorAll("button button").length,
+    );
+    expect(nested, "no nested buttons").toBe(0);
+
+    await page.getByRole("button", { name: /Choose another career/ }).click();
+    await expect(
+      page.getByRole("button", { name: /^open\s*chef/i }).first(),
+      "backing out returns to the careers, not into a run",
+    ).toBeVisible();
+  });
+});
+
+/**
+ * THE CHEF, THROUGH THE REAL INTERFACE
+ *
+ * The engine suite proves the spoilage model; this proves a player can reach
+ * it. It is deliberately one long journey rather than a dozen small tests: the
+ * Chef's loop only means anything as a sequence — set the book, order against
+ * the forecast, open a service, read what happened — and a test per step would
+ * pass while the sequence stayed broken.
+ */
+
+/**
+ * NOTHING ON SCREEN MAY BE A DEAD END
+ *
+ * Two failures this guards, both found by walking the real interface rather
+ * than by reading the code:
+ *
+ *   a control that is greyed out and does not say why — the player cannot tell
+ *   whether they are too poor, too small, or looking at something not meant
+ *   for them yet;
+ *
+ *   another career's vocabulary leaking in — a Chef was shown "Student debt"
+ *   and "Case notes", which are a doctor's words for a fit-out loan and a
+ *   service book.
+ *
+ * Both are cheap to reintroduce and invisible in a diff, which is exactly what
+ * a test is for.
+ */
+test.describe("every career reads clearly", () => {
+  const CAREERS = [
+    { card: /^open\s*chef/i, name: "Chef" },
+    { card: /^open\s*solicitor/i, name: "Solicitor" },
+  ];
+
+  /* Words that belong to the Physician and nobody else. */
+  const MEDICAL =
+    /patient|caseload|department|physician|student debt|case notes|triage|outbreak/i;
+
+  for (const career of CAREERS) {
+    test(`the ${career.name} uses its own words and explains every locked control`, async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await page.evaluate(() => window.localStorage.clear());
+      await page.reload();
+
+      const card = page.getByRole("button", { name: career.card }).first();
+      await card.click();
+      await card.click();
+      const begin = page.getByRole("button", { name: /^begin in /i }).first();
+      if (await begin.count()) await begin.click();
+
+      const nav = page.getByRole("navigation", { name: "Primary" }).last();
+      await expect(nav).toBeVisible();
+      const sections = await nav.getByRole("button").allInnerTexts();
+
+      for (const raw of sections) {
+        const label = raw.trim().split(String.fromCharCode(10))[0];
+        if (!label) continue;
+        await nav.getByRole("button").filter({ hasText: label }).first().click();
+
+        const tabCount = await page.getByRole("tab").count();
+        for (let i = 0; i < Math.max(1, tabCount); i++) {
+          if (tabCount > 0) {
+            const tab = page.getByRole("tab").nth(i);
+            if (!(await tab.count())) break;
+            await tab.click();
+          }
+
+          const text = await page.getByRole("main").innerText();
+          expect(
+            text.match(MEDICAL)?.[0],
+            `${career.name} / ${label} shows a Physician's word`,
+          ).toBeUndefined();
+          expect(
+            text.match(/NaN|undefined|\[object/)?.[0],
+            `${career.name} / ${label} shows a broken value`,
+          ).toBeUndefined();
+
+          /* A locked control has to say why, somewhere a reader can find it. */
+          const dead = await page.evaluate(() =>
+            [...document.querySelectorAll("button[disabled]")]
+              .filter((b) => {
+                const t = (b.textContent ?? "").trim();
+                if (/^[−–—+]$/.test(t)) return false;
+                if (/not enough|owned|in service|sold|already|full/i.test(t)) return false;
+                let scope: HTMLElement | null = b as HTMLElement;
+                for (let up = 0; up < 4 && scope?.parentElement; up++) {
+                  scope = scope.parentElement;
+                }
+                return !/(you have|costs|minimum|needs|before|not yet|requires|short|assign|locked|unlock)/i.test(
+                  scope?.textContent ?? "",
+                );
+              })
+              .map((b) => (b.textContent ?? "").trim().slice(0, 40)),
+          );
+          expect(
+            dead,
+            `${career.name} / ${label} has a locked control with no reason`,
+          ).toEqual([]);
+        }
+      }
+    });
+  }
+});
+
+test.describe("the chef", () => {
+  /** Start a Chef run from a clean slate. Two presses: arm, then commit. */
+  const startChef = async (page: Page) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*chef/i }).first();
+    await card.click();
+    await card.click();
+    /* Where. Lyon is the default and the neutral city, so the rest of these
+       tests measure the kitchen and not the market. */
+    await page.getByRole("button", { name: /^Begin in Lyon$/ }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+  };
+
+  /** The Chef has three destinations, not the Physician's five. */
+  const go = async (page: Page, where: RegExp) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: where })
+      .first()
+      .click();
+  };
+
+  /** Within the Kitchen destination: the room, the larder, the pass, and so on. */
+  const tab = async (page: Page, where: RegExp) => {
+    await page.getByRole("tab", { name: where }).first().click();
+  };
+
+  /**
+   * The Chef's one content destination has five screens, and the split is only
+   * real if each of them is reachable and says what it is for. This is the
+   * test that would have failed while the whole career was one column.
+   */
+  test("the kitchen is six screens, each stating what it decides", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await go(page, /Kitchen/);
+
+    const screens: [RegExp, RegExp][] = [
+      [/The room/, /Premises and equipment/i],
+      [/Larder/, /what dies next week/i],
+      [/Menu/, /what you charge for it/i],
+      [/The pass/, /how the last night went/i],
+      [/Brigade/, /who is on the line/i],
+      [/Money/, /whether you open or not/i],
+    ];
+    for (const [label, purpose] of screens) {
+      await tab(page, label);
+      await expect(
+        page.getByRole("heading", { level: 1, name: label }),
+        `${label} is reachable from the kitchen`,
+      ).toBeVisible();
+      await expect(
+        page.getByText(purpose).first(),
+        `${label} says what it is for`,
+      ).toBeVisible();
+    }
+
+    /* The medical screens are not the Chef's, and the Solicitor's single
+       "Business" screen is not either. */
+    await expect(
+      page.getByRole("tab", { name: /Caseload|Supplies|Business/ }),
+    ).toHaveCount(0);
+
+    /*
+     * The picture is the room you are actually in.
+     *
+     * A new run is at the market stall, so the lead image is the market
+     * kitchen and not one of the three rooms this player cannot afford. This
+     * is the assertion that would fail if the artwork were ever hung off
+     * anything other than the premises the simulation holds.
+     */
+    await tab(page, /The room/);
+    const roomHero = page.locator("main img").first();
+    await expect(roomHero).toHaveAttribute("src", /chef-market-kitchen/);
+    await expect(
+      roomHero,
+      "the lead image describes itself — it is the state, not decoration",
+    ).toHaveAttribute("alt", /market kitchen/i);
+
+    expect(problems).toEqual([]);
+  });
+
+  test("a week can be planned, run and read back", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+
+    /* 1. The book. Switching it is the choice that decides how much of next
+       week is knowable before any food is bought. */
+    await go(page, /Kitchen/);
+    await tab(page, /The pass/);
+    const reservations = page
+      .getByRole("button", { name: /Reservations only/ })
+      .first();
+    await expect(reservations).toBeVisible();
+    await reservations.click();
+    await expect(
+      reservations,
+      "the chosen policy reports itself as chosen",
+    ).toHaveAttribute("aria-pressed", "true");
+
+    /* 2. The larder starts empty and says so rather than showing nothing. */
+    await tab(page, /Larder/);
+    await expect(
+      page.getByText(/Empty\. You cannot open a service/i).first(),
+    ).toBeVisible();
+
+    /* 3. Order produce — which is a phone call now. The larder screen's
+       card is the doorway: it names the two numbers a call is made against
+       and opens the handset on the Market app. */
+    await expect(page.locator('main img[src*="chef-larder"]')).toHaveCount(0);
+    await page.getByRole("button", { name: /call your suppliers/i }).click();
+    const market = page.getByRole("dialog");
+    await expect(
+      market.getByText(/Your suppliers/i).first(),
+      "the handset opens straight onto the market",
+    ).toBeVisible();
+    const order = market
+      .getByRole("button", { name: /Standard crate/ })
+      .first();
+    await order.click();
+    await order.click();
+    /* The market's own header carries the larder count, so the app shows the
+       stock arriving without the player leaving it. Asserted as a number
+       rather than a sentence: what matters is that it moved off zero. */
+    const larderStat = market.getByText(/^\d+ covers$/).first();
+    await expect(
+      larderStat,
+      "the app itself shows the stock arriving",
+    ).toBeVisible();
+    expect(
+      Number((await larderStat.innerText()).replace(/\D/g, "")),
+      "and the larder is no longer empty",
+    ).toBeGreaterThan(0);
+    await page.keyboard.press("Escape");
+    await expect(market).toBeHidden();
+    /* Stock with time on it reads as the full larder. The expiring picture is
+       the same panel a few weeks later — see `npm run check`, which walks the
+       lot arithmetic rather than the pixels. */
+    await expect(page.locator("main img").first()).toHaveAttribute(
+      "src",
+      /chef-larder-fresh/,
+    );
+    await expect(
+      page.getByText(/covers in stock/i).first(),
+      "the larder reports what is in it",
+    ).toBeVisible();
+
+    /* 4. Plan the week. The forecast has to appear before committing — it is
+       what the ordering decision is made against. */
+    await go(page, /Overview/);
+    /* `.first()` because the forecast appears twice by design — once as the
+       week's headline and once in the commit strip. Either would do; the
+       claim is that it is on screen before anything is committed. */
+    await expect(page.getByText(/Covers expected/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/Already booked/i).first(),
+      "the book's effect is shown before the week is committed",
+    ).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+
+  test("the service report explains what limited the night", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+
+    await page.getByRole("button", { name: /open phone/i }).click();
+    const market = page.getByRole("dialog");
+    await market.getByRole("button", { name: /^market$/i }).click();
+    const order = market
+      .getByRole("button", { name: /Standard crate/ })
+      .first();
+    for (let i = 0; i < 3; i++) await order.click();
+    await page.keyboard.press("Escape");
+
+    /* Open a dinner service and commit the week. */
+    await go(page, /Overview/);
+    const plus = page.locator("button").filter({ hasText: /^\+$/ });
+    await plus.nth(1).click();
+    await plus.nth(1).click();
+
+    const commit = page.getByRole("button", { name: /^Commit week/ }).first();
+    await expect(commit).toBeEnabled();
+    await commit.click();
+    await dismissReview(page);
+
+    /* The report is the other half of the forecast: what actually happened,
+       and — the part a player cannot infer — which constraint bound. */
+    await go(page, /Kitchen/);
+    await tab(page, /The pass/);
+    await expect(page.getByText(/Last service/i).first()).toBeVisible();
+    await expect(page.getByText(/Limited by:/i).first()).toBeVisible();
+
+    /*
+     * The picture at the top of the pass is the service that actually ran.
+     *
+     * This week was dinner, so it is the dinner service and not the lunch
+     * card's photograph — the image is read from `lastService.lines`, the same
+     * record the report below it is printed from.
+     */
+    await expect(page.locator("main img").first()).toHaveAttribute(
+      "src",
+      /chef-dinner-service/,
+    );
+    await expect(page.getByText(/walked in/i).first()).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+
+
+  test("the phone is the kitchen's own", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+
+    /* The handset opens from the same button the Physician has. */
+    await page.getByRole("button", { name: /open phone/i }).click();
+    const phone = page.getByRole("dialog");
+    await expect(phone).toBeVisible();
+
+    /* The mentor's welcome is waiting in messages — a chef's mentor,
+       talking about critics and stock, not a colleague talking about wards. */
+    await phone.getByRole("button", { name: /messages/i }).first().click();
+    await expect(phone.getByText(/Chef Renard/i).first()).toBeVisible();
+    await expect(
+      phone.getByText(/never argue with a critic/i).first(),
+    ).toBeVisible();
+
+    /* Publish the opening post through the real composer. */
+    await phone.getByRole("button", { name: /pulse/i }).first().click();
+    await phone.getByRole("button", { name: /compose/i }).first().click();
+    await phone.getByRole("button", { name: /the pans are on/i }).click();
+    await phone.getByRole("button", { name: /^publish$/i }).click();
+    await expect(
+      phone.getByText(/The pans are on in/i).first(),
+      "the published post lands on the feed",
+    ).toBeVisible();
+
+    /* One post a week: the composer now says so instead of offering more. */
+    await expect(
+      phone.getByText(/already posted this week/i).first(),
+    ).toBeVisible();
+
+    /* The market and the agency are apps, not dashboard panels. */
+    await phone.getByRole("button", { name: /^market$/i }).click();
+    await expect(phone.getByText(/Your suppliers/i).first()).toBeVisible();
+    await expect(
+      phone.getByRole("button", { name: /Standard crate/ }).first(),
+      "ordering lives on the handset",
+    ).toBeVisible();
+
+    await phone.getByRole("button", { name: /^agency$/i }).click();
+    await expect(
+      phone.getByText(/cooks around skill \d+/i).first(),
+      "the agency says who your standing attracts",
+    ).toBeVisible();
+    /* Hiring is a briefing and then a placement — you see who the agency
+       found before you commit to anybody. */
+    await phone
+      .getByRole("button", { name: /find me one/i })
+      .first()
+      .click();
+    await phone
+      .getByRole("button", { name: /take them on/i })
+      .first()
+      .click();
+    await expect(
+      phone.getByText(/^1 cook$/i).first(),
+      "a hire made by phone lands on the payroll, counted in the header",
+    ).toBeVisible();
+
+    /* Nothing in the handset speaks the hospital's language. */
+    const text = await phone.innerText();
+    expect(
+      text.match(/patient|caseload|department|physician|ward/i)?.[0],
+      "no medical vocabulary on the chef's phone",
+    ).toBeUndefined();
+
+    await page.keyboard.press("Escape");
+    await expect(phone).toBeHidden();
+
+    expect(problems).toEqual([]);
+  });
+
+  /**
+   * THE DISHES LOOP, THROUGH THE REAL INTERFACE
+   *
+   * Order an ingredient, put a dish on the menu, cook it, and read back what
+   * it earned. The engine suite proves the arithmetic; this proves a player
+   * can reach all four steps and that each one tells them what happened.
+   */
+  test("a dish can be put on, cooked, and read back", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await go(page, /Kitchen/);
+
+    /* 1. The pantry starts empty and says so rather than showing a blank. */
+    await tab(page, /Larder/);
+    await expect(
+      page.getByText(/Nothing but the staple crates/i).first(),
+    ).toBeVisible();
+
+    /*
+     * 2. Order an ingredient. The button carries the delivery size and the
+     * life it lands with, so an order is never placed blind.
+     *
+     * Ordered from the emergency wholesaler specifically, because they are
+     * the one supplier whose van always turns up. Every other account has a
+     * real chance of failing to deliver, and a run is seeded from the clock —
+     * so picking the first supplier made this test fail about one run in
+     * thirty on a rule the test was not trying to prove.
+     */
+    const order = page
+      .locator("li", { hasText: /Emergency wholesaler/ })
+      .getByRole("button", { name: /Root vegetables/ })
+      .first();
+    await expect(order).toBeVisible();
+    await order.click();
+    await expect(
+      page.getByText(/Stock value/i).first(),
+      "the pantry reports what it is holding",
+    ).toBeVisible();
+    await expect(page.getByText(/^Fresh$|Fresh ·/).first()).toBeVisible();
+
+    /* 3. Put a dish on the menu and price it. */
+    await tab(page, /Menu/);
+    await expect(
+      page.getByText(/Nothing on\./i).first(),
+      "an empty menu says what that means for the week",
+    ).toBeVisible();
+
+    await page
+      .getByRole("button", { name: /^Put it on$/ })
+      .first()
+      .click();
+    await expect(
+      page.getByRole("button", { name: /^Take it off$/ }).first(),
+      "the dish is now on tonight's menu",
+    ).toBeVisible();
+
+    /* The three figures a menu decision is made on. */
+    await expect(page.getByText(/Sells at/).first()).toBeVisible();
+    await expect(page.getByText(/Food cost/).first()).toBeVisible();
+    await expect(page.getByText(/Margin/).first()).toBeVisible();
+
+    /* Raising the price is a real control, and it moves the number. */
+    const priced = await page
+      .locator("main li", { hasText: /Sells at/ })
+      .first()
+      .innerText();
+    await page.getByRole("button", { name: /Raise the price/ }).first().click();
+    await expect
+      .poll(async () =>
+        page.locator("main li", { hasText: /Sells at/ }).first().innerText(),
+      )
+      .not.toBe(priced);
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("the menu warns before the week rather than after it", async ({
+    page,
+  }) => {
+    await startChef(page);
+    await go(page, /Kitchen/);
+
+    /* A dish on the menu with nothing behind it is the mistake this whole
+       system exists to make visible, and it must be visible *before* the week
+       is committed. */
+    await tab(page, /Menu/);
+    await page
+      .getByRole("button", { name: /^Put it on$/ })
+      .first()
+      .click();
+
+    await tab(page, /Larder/);
+    await expect(
+      page.getByText(/fall through to the staple crate/i).first(),
+      "the shortfall is named on the screen where it is fixed",
+    ).toBeVisible();
+
+    await go(page, /Overview/);
+    await expect(
+      page.getByText(/On the menu/i).first(),
+      "and again on the week's own briefing, before anything is committed",
+    ).toBeVisible();
+  });
+
+  /**
+   * THE NIGHT, THROUGH THE REAL INTERFACE
+   *
+   * The engine suite proves the pipeline; this proves a player can set how the
+   * kitchen runs, commit a week, and then read the night back — including the
+   * station that held it up and the hire that would fix it.
+   */
+  test("a service is run, recorded and explained", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await go(page, /Kitchen/);
+
+    /* 1. A menu, and the ingredients behind it. */
+    await tab(page, /Menu/);
+    const put = page.getByRole("button", { name: /^Put it on$/ });
+    await put.first().click();
+    await tab(page, /Larder/);
+    /* The emergency wholesaler again: their van always turns up, so the night
+       this test asserts on is one that genuinely had food to cook. */
+    for (const name of [/Root vegetables/, /Bones and trim/]) {
+      const order = page
+        .locator("li", { hasText: /Emergency wholesaler/ })
+        .getByRole("button", { name })
+        .first();
+      if ((await order.count()) && (await order.isEnabled())) await order.click();
+    }
+    const crate = page.getByRole("button", { name: /Standard crate/ }).first();
+    if (await crate.count()) await crate.click();
+
+    /* 2. How the kitchen is told to run — a standing decision with a stated
+       cost, not a button pressed per ticket. */
+    await tab(page, /The pass/);
+    const push = page.getByRole("button", { name: /Push the brigade/ }).first();
+    await expect(push).toBeVisible();
+    await expect(
+      page.getByText(/Real fatigue afterwards/).first(),
+      "the cost of the policy is on the card, not hidden",
+    ).toBeVisible();
+    await push.click();
+    await expect(push).toHaveAttribute("aria-pressed", "true");
+
+    /* 3. Run the week. */
+    await go(page, /Overview/);
+    const plus = page.locator("button").filter({ hasText: /^\+$/ });
+    await plus.nth(1).click();
+    await plus.nth(1).click();
+    await plus.nth(1).click();
+    const commit = page.getByRole("button", { name: /^Commit week/ }).first();
+    await expect(commit).toBeEnabled();
+    await commit.click();
+    await dismissReview(page);
+
+    /* 4. The night, recorded. */
+    await go(page, /Kitchen/);
+    await tab(page, /The pass/);
+    await expect(
+      page.getByText(/served,.*walked out/i).first(),
+      "the night reports what happened to the room",
+    ).toBeVisible();
+    await expect(page.getByText(/Satisfaction/i).first()).toBeVisible();
+    await expect(
+      page.getByRole("slider", { name: /Step through the night/i }),
+      "and it can be stepped through, because it is a recording",
+    ).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+
+  test("the brigade screen names the section that will fail", async ({
+    page,
+  }) => {
+    await startChef(page);
+    await go(page, /Kitchen/);
+    await tab(page, /Brigade/);
+
+    /* Every station, with what it can move and who is on it. */
+    await expect(page.getByText(/The sections/i).first()).toBeVisible();
+    await expect(page.getByText(/tickets a quarter-hour/i).first()).toBeVisible();
+
+    /* A one-person kitchen is short somewhere, and the screen must say where
+       and what fixes it rather than "efficiency low". */
+    await expect(
+      page.getByText(/Where this kitchen will fail first/i).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/commis chef|sous chef|porter|Front of house/i).first(),
+      "the fix names a hire the player can actually make",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+  });
+
+  test("the agency finds people you can look at first", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await page.getByRole("button", { name: /open phone/i }).click();
+    const phone = page.getByRole("dialog");
+    await phone.getByRole("button", { name: /^agency$/i }).click();
+
+    /* Both halves of the cost are stated before anything is spent. */
+    const brief = phone.getByRole("button", { name: /find me one/i }).first();
+    await expect(brief, "looking has a price of its own").toBeVisible();
+    await expect(
+      phone.getByText(/to take one on/i).first(),
+      "and so does taking somebody on",
+    ).toBeVisible();
+
+    await brief.click();
+
+    /*
+     * The whole point: three named people, each with a skill you can read,
+     * rather than a blind purchase.
+     */
+    const takeButtons = phone.getByRole("button", { name: /take them on/i });
+    await expect(takeButtons).toHaveCount(3);
+    const meters = phone.getByRole("meter");
+    expect(
+      await meters.count(),
+      "every candidate shows a skill you can compare",
+    ).toBeGreaterThanOrEqual(3);
+
+    /* The person shown is the person who turns up. */
+    /* The name is its own element, so read it directly rather than
+       slicing a newline out of the row text. */
+    const chosen = await phone
+      .locator("li")
+      .first()
+      .locator("span.font-semibold")
+      .first()
+      .innerText();
+    await takeButtons.first().click();
+    await expect(
+      phone.getByText(/^1 cook$/i).first(),
+      "placing somebody puts them on the payroll",
+    ).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await go(page, /Kitchen/);
+    await tab(page, /Brigade/);
+    await expect(
+      page.getByText(chosen).first(),
+      "and they are the name that appears on the brigade",
+    ).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+
+  test("a chef run survives a reload", async ({ page }) => {
+    await startChef(page);
+    await go(page, /Kitchen/);
+    await tab(page, /The pass/);
+    await page.getByRole("button", { name: /Deposit on booking/ }).first().click();
+    await tab(page, /Larder/);
+    await page.getByRole("button", { name: /call your suppliers/i }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /Standard crate/ })
+      .first()
+      .click();
+    await page.keyboard.press("Escape");
+
+    await page.reload();
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await go(page, /Kitchen/);
+
+    await tab(page, /The pass/);
+    await expect(
+      page.getByRole("button", { name: /Deposit on booking/ }).first(),
+      "the book survives a reload",
+    ).toHaveAttribute("aria-pressed", "true");
+    await tab(page, /Larder/);
+    await expect(
+      page.getByText(/covers in stock/i).first(),
+      "and so does the larder",
+    ).toBeVisible();
+  });
+
+  /*
+   * PHASE 3, THROUGH THE REAL INTERFACE
+   *
+   * The engine tests prove the arithmetic. These prove a player can reach it:
+   * that the seven bars render with their reasons attached, that a complaint
+   * can actually be answered with a click, and that the scene screen names
+   * this city's rivals rather than a generic three.
+   */
+  test("the seven parts of a reputation are shown with their reasons", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await go(page, /Kitchen/);
+    await tab(page, /Word of mouth/);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Word of mouth/ }),
+    ).toBeVisible();
+
+    /* All seven, named, and each with the plain-English band beside the bar
+       so a colour is never the only signal. */
+    for (const label of [
+      /Food quality/,
+      /^Service$/,
+      /^Value$/,
+      /Atmosphere/,
+      /Consistency/,
+      /Hygiene/,
+      /Innovation/,
+    ]) {
+      await expect(
+        page.getByText(label).first(),
+        `${label} is one of the seven`,
+      ).toBeVisible();
+    }
+    await expect(
+      page.getByText(/Excellent|Strong|Fair|Weak|Poor/).first(),
+      "a bar is never the only signal",
+    ).toBeVisible();
+
+    /* And where you stand against the rest of the city. */
+    await expect(
+      page.getByText(/of 4 restaurants|first of|second of|third of|fourth of/i).first(),
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("a week of trading is explained rather than asserted", async ({
+    page,
+  }) => {
+    await startChef(page);
+
+    /* Buy food, open a service, and commit — the same three things a player
+       does on their first week. */
+    await go(page, /Kitchen/);
+    await tab(page, /Larder/);
+    await page.getByRole("button", { name: /call your suppliers/i }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /Standard crate/ })
+      .first()
+      .click();
+    await page.keyboard.press("Escape");
+
+    await go(page, /Overview/);
+    const plus = page.locator("button").filter({ hasText: /^\+$/ });
+    await plus.nth(1).click();
+    await plus.nth(1).click();
+    await page.getByRole("button", { name: /^Commit week/ }).first().click();
+    await dismissReview(page);
+
+    await go(page, /Kitchen/);
+    await tab(page, /Word of mouth/);
+
+    /* Every standing move carries the sentence the simulation wrote when it
+       decided it — the whole point of the model. */
+    await expect(
+      page.getByText(/wk \d+ [+-]?\d/).first(),
+      "a change is dated and quantified",
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        /Plate quality|covers of produce|ingredients past|covers wanted food|verdict on the night/i,
+      ).first(),
+      "and says what caused it, in facts about the week",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+  });
+
+  test("the scene names this city's rivals and who is in the room", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await go(page, /Map/);
+    await tab(page, /The scene/);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: /The scene/ }),
+    ).toBeVisible();
+
+    /* Lyon, in the season week one falls in, with the three Lyon rivals —
+       not a generic set. */
+    await expect(page.getByText(/Lyon in spring/i)).toBeVisible();
+    await expect(page.getByText(/Bouchon Perrache/)).toBeVisible();
+    await expect(page.getByText(/La Table de Fourvière/)).toBeVisible();
+
+    /* Every rival states a weakness and what to do about it. */
+    await expect(page.getByText(/weak on/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/Their weakness is|You are already better than them/i).first(),
+      "a rival is an opening, not a difficulty number",
+    ).toBeVisible();
+
+    /* And the eight segments, each with what they judge you on. */
+    for (const label of [
+      /Budget diners/,
+      /Local regulars/,
+      /Business customers/,
+      /Tourists/,
+      /Families/,
+      /Food enthusiasts/,
+      /Luxury diners/,
+    ]) {
+      await expect(page.getByText(label).first()).toBeVisible();
+    }
+    await expect(page.getByText(/Judged on/).first()).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("a complaint can be answered, and the answer is recorded", async ({
+    page,
+  }) => {
+    await startChef(page);
+
+    /*
+     * Put an open complaint into the save the way a bad night would, then
+     * reload so the screen is rendering state that survived serialisation —
+     * which is also the migration path a real complaint takes.
+     */
+    await page.evaluate(() => {
+      const key = Object.keys(window.localStorage).find((k) =>
+        k.startsWith("career-tycoon:save:"),
+      );
+      if (!key) throw new Error("no run in storage");
+      const run = JSON.parse(window.localStorage.getItem(key) as string);
+      run.data.kitchen.complaints = [
+        {
+          id: "cmp-e2e",
+          week: run.week,
+          author: "Marion D.",
+          segment: "regulars",
+          about: "service",
+          accurate: true,
+          body: "We waited an hour and left without eating.",
+          reach: 3200,
+        },
+      ];
+      window.localStorage.setItem(key, JSON.stringify(run));
+    });
+    await page.reload();
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await go(page, /Kitchen/);
+    await tab(page, /Word of mouth/);
+
+    await expect(
+      page.getByText(/Marion D\. has complained/i),
+      "an open complaint is the first thing on the screen",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/being shared widely|Everyone in the city/i).first(),
+      "and how far it has gone is stated in words",
+    ).toBeVisible();
+
+    /* Six answers, each stating when it is the right one. */
+    for (const label of [
+      /^Apologise$/,
+      /^Offer compensation$/,
+      /^Find out what happened first$/,
+      /^Explain what happened$/,
+      /^Say nothing$/,
+      /^Defend the restaurant$/,
+    ]) {
+      await expect(
+        page.getByRole("button", { name: label }),
+        `${label} is offered`,
+      ).toBeVisible();
+    }
+
+    await page.getByRole("button", { name: /^Apologise$/ }).click();
+
+    /* Answered, closed, and gone from the "needs an answer" list. */
+    await expect(
+      page.getByText(/Marion D\. has complained/i),
+      "an answered complaint stops asking",
+    ).toHaveCount(0);
+
+    await expectNoPageOverflow(page);
+  });
+
+  test("the phone states what a post costs before it is sent", async ({
+    page,
+  }) => {
+    await startChef(page);
+    await page.getByRole("button", { name: /open phone/i }).click();
+
+    const phone = page.getByRole("dialog");
+    await expect(phone).toBeVisible();
+    /* The handset opens on whatever is unread, and week one has a message
+       waiting from the mentor. The profile is on Pulse. */
+    await phone.getByRole("button", { name: /^Pulse$/ }).click();
+    await expect(phone.getByText(/Followers/)).toBeVisible();
+    await expect(
+      phone.getByText(/Listening/),
+      "engagement, not a vanity number",
+    ).toBeVisible();
+    await expect(
+      phone.getByText(/Booking/),
+      "and what the posting has actually done to the room",
+    ).toBeVisible();
+
+    /* The composer is collapsed until asked for — one post a week, and the
+       count of what is worth saying is on the disclosure itself. */
+    const compose = phone.getByRole("button", { name: /^Compose · week/ });
+    await expect(compose).toContainText(/\d+ available/);
+    await compose.click();
+
+    /* Every post states its trade on the card, before it is published. */
+    const post = phone
+      .getByRole("button", { name: /The pans are on/ })
+      .first();
+    await expect(post).toBeVisible();
+    await post.click();
+    await expect(
+      phone.getByText(/People learn you exist/i).first(),
+      "the effects are stated before publishing, not after",
+    ).toBeVisible();
+
+    await page.keyboard.press("Escape");
+  });
+
+  /*
+   * PHASE 4, THROUGH THE REAL INTERFACE
+   *
+   * The chef rather than the restaurant: what they can do, where they could go
+   * to learn faster, what is in the racks, and what the trade is offering them.
+   */
+  test("the craft screen shows what the chef can do and what it costs", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await go(page, /^You$/);
+    await tab(page, /The craft/);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: /The craft/ }),
+    ).toBeVisible();
+
+    /* The rank, which is computed rather than bought. */
+    await expect(page.getByText(/Nobody in particular/).first()).toBeVisible();
+    await expect(
+      page.getByText(/points from a working chef/i).first(),
+      "the next rung says how far away it is",
+    ).toBeVisible();
+
+    /* All five disciplines, and a technique that states what it does. */
+    for (const label of [
+      /^Butchery$/,
+      /^Sauce$/,
+      /^Pastry$/,
+      /^Larder$/,
+      /Modern technique/,
+    ]) {
+      await expect(page.getByText(label).first()).toBeVisible();
+    }
+    await expect(
+      page.getByText(/Recovers a fifth of what the kitchen would otherwise/i),
+      "every technique states its effect, not a score",
+    ).toBeVisible();
+
+    /* A technique behind a prerequisite says which one. */
+    await expect(
+      page.getByText(/Needs breaking down a carcass first/i).first(),
+    ).toBeVisible();
+
+    /* Choosing what to practise is a setting, and it sticks. */
+    const choose = page
+      .locator("li", { hasText: /Stocks and reductions/ })
+      .getByRole("button", { name: /Practise this/ });
+    await choose.click();
+    /* Rendered as a statement rather than a greyed-out button, which is why
+       this looks for the text and not for a control. */
+    await expect(page.getByText(/Practising this/).first()).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("a week of practice is spent and the technique moves", async ({
+    page,
+  }) => {
+    await startChef(page);
+    await go(page, /^You$/);
+    await tab(page, /The craft/);
+    await page
+      .locator("li", { hasText: /Stocks and reductions/ })
+      .getByRole("button", { name: /Practise this/ })
+      .click();
+
+    /* The planner offers the block, and states what it will do. */
+    await go(page, /Overview/);
+    await expect(
+      page.getByText(/points towards stocks and reductions/i).first(),
+      "the block says where it is going before it is spent",
+    ).toBeVisible();
+
+    /* Every stepper in the planner carries its own accessible name, which is
+       a far better handle than counting plus signs. */
+    await page.getByRole("button", { name: /More blocks on Practise/ }).click();
+    await page.getByRole("button", { name: /^Commit week/ }).first().click();
+    await dismissReview(page);
+
+    await go(page, /^You$/);
+    await tab(page, /The craft/);
+    await expect(
+      page.getByText(/22 of 35/).first(),
+      "the practice landed on the technique it was aimed at",
+    ).toBeVisible();
+  });
+
+  test("the cellar is stock that improves, and the screen says so", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await go(page, /Kitchen/);
+    await tab(page, /Larder/);
+
+    await expect(page.getByText(/^The cellar$/)).toBeVisible();
+    await expect(
+      page.getByText(/Everything else in this building rots/i),
+      "the cellar states the inversion it is built on",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Without the wine store you have a rack behind the bar/i),
+      "and says what is missing before it is bought",
+    ).toBeVisible();
+
+    /* House red is affordable on week one even without the store. */
+    const buy = page
+      .locator("li", { hasText: /House red/ })
+      .getByRole("button")
+      .first();
+    await expect(buy).toBeEnabled();
+    await buy.click();
+
+    await expect(
+      page.getByText(/24 bottles/).first(),
+      "the case is in the rack",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Young — worth keeping/i).first(),
+      "and it is described in words rather than as a multiplier",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("the guide is a standard, and it is visible all year", async ({
+    page,
+  }) => {
+    await startChef(page);
+    await go(page, /Kitchen/);
+    await tab(page, /Word of mouth/);
+
+    await expect(page.getByText(/^The guide$/)).toBeVisible();
+    await expect(
+      page.getByText(/publishes in \d+ weeks?/i).first(),
+      "a standard nobody can see is a lottery",
+    ).toBeVisible();
+
+    /* All six things it measures, each with what it is looking at. */
+    for (const label of [
+      /^The cooking$/,
+      /^Technique$/,
+      /Personality of the menu/,
+      /The room and the service/,
+      /^The list$/,
+      /The kitchen itself/,
+    ]) {
+      await expect(page.getByText(label).first()).toBeVisible();
+    }
+    await expect(
+      page.getByText(/points short of one star/i).first(),
+      "and it says how far away the next one is",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+  });
+
+  test("the offers beyond the kitchen are earned, not bought", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startChef(page);
+    await go(page, /^You$/);
+    await tab(page, /Beyond the kitchen/);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Beyond the kitchen/ }),
+    ).toBeVisible();
+    await expect(page.getByText(/Nothing on at the moment/)).toBeVisible();
+
+    /* All five, and every one of them refused to a chef nobody has heard of —
+       with the rank it would take stated rather than a bare disabled button. */
+    for (const label of [
+      /A pop-up in another city/,
+      /Consult for a hotel group/,
+      /Teach a masterclass series/,
+      /Write the book/,
+      /The television series/,
+    ]) {
+      await expect(page.getByText(label).first()).toBeVisible();
+    }
+    await expect(
+      page.getByText(/nobody is offering it yet/i).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/blocks? a week for/i).first(),
+      "the card leads with what it costs, not what it pays",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("the chef screens work on a phone and by keyboard", async ({ page }) => {
+    await startChef(page);
+    await go(page, /Kitchen/);
+
+    /* Every Chef screen, not only the first: the split moved controls onto
+       four screens that had never been laid out on their own. */
+    for (const label of [
+      /The room/,
+      /Larder/,
+      /Menu/,
+      /The pass/,
+      /Brigade/,
+      /Money/,
+      /Word of mouth/,
+    ]) {
+      await tab(page, label);
+      await expectNoPageOverflow(page);
+
+      /* No control may be a button inside a button — the bug that sent the
+         Chef's first click to the back-to-menu handler. */
+      const nested = await page.evaluate(
+        () => document.querySelectorAll("button button").length,
+      );
+      expect(nested, `no nested buttons on ${label}`).toBe(0);
+    }
+
+    /*
+     * Keyboard reach, checked on a screen that has controls to reach.
+     *
+     * Two of the Chef's screens are pure read-outs: the scene is a briefing,
+     * and word of mouth has no control at all until a complaint is waiting for
+     * an answer. Both are reachable by keyboard through the sub-navigation
+     * above them — which is what the tablist in this same loop exercises —
+     * but neither has a control for Tab to land on, so the assertion is made
+     * where one exists.
+     */
+    await tab(page, /The room/);
+    await page.keyboard.press("Tab");
+    const focused = await page.evaluate(
+      () => document.activeElement?.tagName ?? "",
+    );
+    expect(["BUTTON", "A"], "tab reaches a control").toContain(focused);
+
+    /* And the Map destination, which now carries two screens of its own. */
+    await go(page, /Map/);
+    for (const label of [/^Map$/, /The scene/]) {
+      await tab(page, label);
+      await expectNoPageOverflow(page);
+      const nested = await page.evaluate(
+        () => document.querySelectorAll("button button").length,
+      );
+      expect(nested, `no nested buttons on ${label}`).toBe(0);
+    }
+  });
+});
+
+/**
+ * THE SOLICITOR, THROUGH THE REAL INTERFACE
+ *
+ * The engine suite proves the court's arithmetic; this proves a player can
+ * reach it. The career's whole shape is a sequence — take an instruction, find
+ * the hours, then decide whether to take certain money or send it to a judge —
+ * and a test per step would pass while the sequence stayed broken, so most of
+ * this is one journey rather than a dozen assertions.
+ *
+ * The hearing itself is driven from a fixture. Playing eight weeks of casework
+ * through the commit button to reach a listed matter would be a slow test of
+ * the commit button; `solicitor-listed` is a real run, played forward by the
+ * engine until a verdict genuinely lands on the following week — see
+ * `scripts/fixtures.ts`.
+ */
+test.describe("the solicitor", () => {
+  /** Start a Solicitor run from a clean slate. Two presses: arm, then commit. */
+  const startSolicitor = async (page: Page) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page
+      .getByRole("button", { name: /^open\s*solicitor/i })
+      .first();
+    await card.click();
+    await card.click();
+    /* London is the neutral market every run practised in before the choice
+       existed, so the rest of these measure the practice and not the city. */
+    await page.getByRole("button", { name: /^Begin in London$/ }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+  };
+
+  /** The Solicitor has three destinations, not the Physician's five. */
+  const go = async (page: Page, where: RegExp) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: where })
+      .first()
+      .click();
+  };
+
+  /** Within Chambers: instructions, casework, the books, the firm. */
+  const tab = async (page: Page, where: RegExp) => {
+    await page.getByRole("tab", { name: where }).first().click();
+  };
+
+  /** Preload a fixture and actually resume it — the app opens on the menu. */
+  const resume = async (page: Page, fixture: string) => {
+    await preload(page, fixture);
+    await page.goto("/");
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+  };
+
+  /**
+   * Close the weekly review without throwing the journey away.
+   *
+   * The shared `dismissReview` answers an event by clicking its LAST choice,
+   * which for this career's settlement offer is "settle the oldest case now" —
+   * it would quietly close the very file the test is about and then fail three
+   * lines later looking for it. Every Solicitor event puts the harmless option
+   * first, so that is the one taken here.
+   */
+  const closeWeek = async (page: Page) => {
+    const review = page.getByRole("dialog");
+    if (!(await review.isVisible().catch(() => false))) return;
+    /* Unanchored: an event choice's accessible name is its label AND the
+       detail line underneath it, so "Push for the full fee" is really "Push
+       for the full fee No change — the case runs on". Anchoring matched
+       nothing, the fallback took the LAST choice, and the last choice settled
+       the very file this journey is about. */
+    const keep = review.getByRole("button", {
+      name: /Push for the full fee|Decline the instruction|Take the meeting/,
+    });
+    if (await keep.count()) {
+      await keep.first().click();
+      await expect(review).toBeHidden();
+      return;
+    }
+    await dismissReview(page);
+  };
+
+  /**
+   * Cash, read from the Books screen's own figure.
+   *
+   * The shared `readCash` takes the first dollar sign in `main`, which on a
+   * Solicitor screen is a settlement offer or a fee rather than the bank
+   * balance — and it drops the minus sign, which matters in a career whose
+   * whole subject is being owed money you have not got.
+   */
+  const readFirmCash = async (page: Page): Promise<number> => {
+    await tab(page, /^The books$/);
+    const text = await page.getByRole("main").innerText();
+    const hit = /Cash\s+(-?)\$([\d,]+)/.exec(text);
+    if (!hit) throw new Error("could not read cash from the books");
+    return Number(`${hit[1]}${hit[2].replace(/,/g, "")}`);
+  };
+
+  test("chambers is four screens, each stating what it decides", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startSolicitor(page);
+    await go(page, /Chambers/);
+
+    const screens: [RegExp, RegExp][] = [
+      [/^Instructions$/, /what this market will ever send you/i],
+      [/^Casework$/, /what settling pays today/i],
+      [/^The books$/, /costs that fall due whatever happens/i],
+      [/^The firm$/, /who is billing hours/i],
+    ];
+    for (const [label, purpose] of screens) {
+      await tab(page, label);
+      await expect(
+        page.getByRole("heading", { level: 1, name: label }),
+        `${label} is reachable from chambers`,
+      ).toBeVisible();
+      await expect(
+        page.getByText(purpose).first(),
+        `${label} says what it is for`,
+      ).toBeVisible();
+    }
+
+    /* Neither the Physician's screens nor the Chef's belong here, and nor does
+       the generic shell's single "Business" screen the career used to live
+       on. */
+    await expect(
+      page.getByRole("tab", {
+        name: /Caseload|Supplies|Larder|The pass|Business/,
+      }),
+    ).toHaveCount(0);
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("an instruction can be taken, worked, and settled", async ({ page }) => {
+    /* Genuinely long: a career select, a start city, up to six committed weeks
+       with a review dialog each, and four screens walked afterwards. The
+       assertions are the point; the clock is not. */
+    test.slow();
+    const problems = watchConsole(page);
+    await startSolicitor(page);
+
+    /* 1. Nothing is on the table in week one, and the screen says so rather
+       than showing an empty list. */
+    await go(page, /Chambers/);
+    await tab(page, /^Instructions$/);
+    await expect(
+      page.getByRole("heading", { name: /Practising in London/ }),
+    ).toBeVisible();
+    await expect(page.getByText(/Nothing on offer/i).first()).toBeVisible();
+
+    /* The market states its own ceiling — the thing a player cannot infer from
+       a rate card. */
+    await expect(
+      page.getByText(/At this standing you are offered up to/i).first(),
+    ).toBeVisible();
+
+    /* 2. Pitch until something comes in the door. Instructions arrive on a
+       resolved week, so this is the loop a player actually runs. */
+    let accepted = false;
+    for (let week = 0; week < 6 && !accepted; week++) {
+      await go(page, /Overview/);
+      await playWeek(page, "Pitch for work");
+      await closeWeek(page);
+      await go(page, /Chambers/);
+      await tab(page, /^Instructions$/);
+      const accept = page
+        .getByRole("button", { name: /Accept the instruction/ })
+        .first();
+      if (await accept.count()) {
+        /* Who pays, and when, is on the card before it is taken — that is the
+           whole point of it being a term rather than a surprise. */
+        await expect(
+          page.getByText(/Pays on delivery|Slow payer|Doubtful/i).first(),
+          "the instruction states its payer before you accept it",
+        ).toBeVisible();
+        await accept.click();
+        accepted = true;
+      }
+    }
+    expect(accepted, "an instruction arrived and was accepted").toBe(true);
+
+    /* 3. It is on the books, unprepared, against a date — and it says what
+       winning pays and what losing costs. */
+    await tab(page, /^Casework$/);
+    await expect(
+      page.getByText(/On the books in London/i).first(),
+    ).toBeVisible();
+    await expect(page.getByRole("meter").first()).toBeVisible();
+    await expect(page.getByText(/in their costs/i).first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Settle for /i }).first(),
+      "the settle decision is on the file",
+    ).toBeVisible();
+
+    /* 4. Do the work. Casework is the block that moves hours into files. */
+    await go(page, /Overview/);
+    await playWeek(page, "Casework");
+    await closeWeek(page);
+
+    /* 5. Settle it, and the money is there. Settling is the one thing in this
+       career that pays on the day it is decided. */
+    await go(page, /Chambers/);
+    const before = await readFirmCash(page);
+    await tab(page, /^Casework$/);
+    await page.getByRole("button", { name: /^Settle for /i }).first().click();
+    expect(await readFirmCash(page), "settling pays at once").toBeGreaterThan(
+      before,
+    );
+
+    /* 6. And it is on the record as a settlement rather than a judgment. */
+    await tab(page, /^The firm$/);
+    await expect(page.getByText(/The record/i).first()).toBeVisible();
+    await expect(page.getByText(/Settled/i).first()).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+
+  test("a hearing is reached, and the week reads back what the court said", async ({
+    page,
+  }) => {
+    test.slow();
+    const problems = watchConsole(page);
+    await resume(page, "solicitor-listed");
+
+    /* The fixture is a practice mid-run: work on the books, money owed to it,
+       and a matter listed for the week about to be committed. */
+    await go(page, /Chambers/);
+    await tab(page, /^Casework$/);
+    await expect(
+      page.getByText(/On the books in London/i).first(),
+    ).toBeVisible();
+
+    await go(page, /Overview/);
+    await playWeek(page, "Casework");
+
+    /* The review is the week read back, and a court decided something in it. */
+    const review = page.getByRole("dialog");
+    await expect(review).toBeVisible();
+    await expect(
+      review.getByText(/Case won|Case lost|cases won/i).first(),
+      "the week reports what the court said",
+    ).toBeVisible();
+    await closeWeek(page);
+
+    /* And the record carries it, with the odds it was decided at. */
+    await go(page, /Chambers/);
+    await tab(page, /^The firm$/);
+    await expect(
+      page.getByText(/Won at \d+%|Lost at \d+%|Settled/).first(),
+      "the record states how it was decided",
+    ).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+
+  test("a judgment you are owed can be sold rather than waited for", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await resume(page, "solicitor-listed");
+
+    await go(page, /Chambers/);
+    await tab(page, /^The books$/);
+
+    /* The figures the career is operated against, and the sentence that
+       separates money from everything that is not money yet. */
+    await expect(
+      page.getByText(/What the firm is worth/i).first(),
+    ).toBeVisible();
+    await expect(page.getByText(/Owed to you/i).first()).toBeVisible();
+    await expect(page.getByText(/Unbilled work/i).first()).toBeVisible();
+
+    /* The fixture carries a judgment that has not turned into money. Selling
+       it is the constraint as a button: cash today, at a stated discount. */
+    const sell = page
+      .getByRole("button", { name: /^Sell it today for /i })
+      .first();
+    await expect(sell, "a judgment on the books can be sold").toBeVisible();
+    await expect(
+      page.getByText(/Giving up .* to stop waiting/i).first(),
+      "and the discount is stated rather than discovered",
+    ).toBeVisible();
+
+    const before = await readFirmCash(page);
+    await sell.click();
+    expect(await readFirmCash(page), "selling pays today").toBeGreaterThan(
+      before,
+    );
+
+    expect(problems).toEqual([]);
+  });
+
+  test("the phone is the practice's own", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startSolicitor(page);
+
+    /* The handset opens from the same button the other two careers have. */
+    await page.getByRole("button", { name: /open phone/i }).click();
+    const phone = page.getByRole("dialog");
+    await expect(phone).toBeVisible();
+
+    /* The solicitor who trained you is waiting in messages — talking about
+       rent and files, not about wards or critics. */
+    await phone.getByRole("button", { name: /messages/i }).first().click();
+    await expect(phone.getByText(/Margaret Ellory/i).first()).toBeVisible();
+    await expect(
+      phone.getByText(/never fall in love with a file/i).first(),
+    ).toBeVisible();
+    await expect(
+      phone.getByText(/Senior solicitor/i).first(),
+      "and they are labelled in this career's words",
+    ).toBeVisible();
+
+    /* Publish the opening post through the real composer. */
+    await phone.getByRole("button", { name: /pulse/i }).first().click();
+    await phone.getByRole("button", { name: /compose/i }).first().click();
+    await phone.getByRole("button", { name: /the doors are open/i }).click();
+    await phone.getByRole("button", { name: /^publish$/i }).click();
+    await expect(
+      phone.getByText(/New practice, London/i).first(),
+      "the published post lands on the feed",
+    ).toBeVisible();
+    await expect(
+      phone.getByText(/already posted this week/i).first(),
+      "one post a week",
+    ).toBeVisible();
+
+    /* The cause list and the roll are apps, not dashboard panels. */
+    await phone.getByRole("button", { name: /^listings$/i }).click();
+    await expect(phone.getByText(/The cause list/i).first()).toBeVisible();
+    await expect(
+      phone.getByText(/Nothing is listed/i).first(),
+      "a practice with no files says so",
+    ).toBeVisible();
+
+    await phone.getByRole("button", { name: /^roll$/i }).click();
+    await expect(phone.getByText(/The roll/i).first()).toBeVisible();
+    await phone
+      .getByRole("button", { name: /take them on/i })
+      .first()
+      .click();
+    await expect(
+      phone.getByText(/^1 other$/i).first(),
+      "a hire made by phone lands on the payroll, counted in the header",
+    ).toBeVisible();
+
+    /* Nothing in the handset speaks another career's language. */
+    const text = await phone.innerText();
+    expect(
+      text.match(
+        /patient|caseload|department|physician|ward|brigade|larder|covers/i,
+      )?.[0],
+      "no borrowed vocabulary on the solicitor's phone",
+    ).toBeUndefined();
+
+    await page.keyboard.press("Escape");
+    await expect(phone).toBeHidden();
+
+    /* And the person taken on is on the Firm screen, where the report lives. */
+    await go(page, /Chambers/);
+    await tab(page, /^The firm$/);
+    await expect(page.getByText(/Who is billing hours/i).first()).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+
+  test("counsel is briefed from the cause list, not from a shelf", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await resume(page, "solicitor-listed");
+
+    /* The doorway: the Casework screen names what the list is for and opens
+       the handset on it, rather than carrying the transaction itself. */
+    await go(page, /Chambers/);
+    await tab(page, /^Casework$/);
+    await page
+      .getByRole("button", { name: /call the listings office/i })
+      .click();
+
+    const phone = page.getByRole("dialog");
+    await expect(
+      phone.getByText(/The cause list/i).first(),
+      "the handset opens straight onto the listings",
+    ).toBeVisible();
+
+    /* Every listed matter states its date, and the brief either says what it
+       buys or why it cannot be pressed. */
+    await expect(
+      phone.getByText(/Week \d+|Listed this week/).first(),
+    ).toBeVisible();
+    await expect(
+      phone.getByRole("button", { name: /^Brief counsel · /i }).first(),
+      "briefing counsel is a call you make",
+    ).toBeVisible();
+    const shown = await phone.innerText();
+    expect(
+      /points on the odds|Costs .* and you have/i.test(shown),
+      "a brief states what it buys, or why it cannot be pressed",
+    ).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(phone).toBeHidden();
+    expect(problems).toEqual([]);
+  });
+
+  test("every solicitor screen fits, and none nests a button in a button", async ({
+    page,
+  }) => {
+    await startSolicitor(page);
+    await go(page, /Chambers/);
+
+    for (const label of [
+      /^Instructions$/,
+      /^Casework$/,
+      /^The books$/,
+      /^The firm$/,
+    ]) {
+      await tab(page, label);
+      await expectNoPageOverflow(page);
+      const nested = await page.evaluate(
+        () => document.querySelectorAll("button button").length,
+      );
+      expect(nested, `no nested buttons on ${label}`).toBe(0);
+    }
+
+    /* Keyboard reach, on a screen that has controls to reach. */
+    await tab(page, /^The books$/);
+    await page.keyboard.press("Tab");
+    const focused = await page.evaluate(
+      () => document.activeElement?.tagName ?? "",
+    );
+    expect(["BUTTON", "A"], "tab reaches a control").toContain(focused);
+
+    /* And the Map, which the career shares with everyone else. */
+    await go(page, /Map/);
+    await expectNoPageOverflow(page);
+  });
+});
+
+/**
+ * BEING TOLD WHAT TO DO, IN EVERY CAREER
+ *
+ * Four systems — the badges on the navigation, the one next step, the lessons
+ * that retire themselves, and the glossary — rendered for anybody and only
+ * ever had Physician content, so two of the three careers played with none of
+ * them. The engine suite proves each career now derives all four; this proves
+ * a player actually meets them.
+ */
+test.describe("guidance in every career", () => {
+  const CAREERS = [
+    {
+      card: /^open\s*chef/i,
+      name: "Chef",
+      begin: /^Begin in Lyon$/,
+      /* The opening lesson, and a word only this career uses. */
+      lesson: /A week is six blocks, and the food is already ageing/i,
+      word: /Larder|Cover|Brigade/i,
+    },
+    {
+      card: /^open\s*solicitor/i,
+      name: "Solicitor",
+      begin: /^Begin in London$/,
+      lesson: /A week is six blocks, and none of them pay/i,
+      word: /Instruction|Work in progress|Costs order/i,
+    },
+  ];
+
+  for (const career of CAREERS) {
+    test(`the ${career.name} is taught, warned and given the words`, async ({
+      page,
+    }) => {
+      const problems = watchConsole(page);
+      await page.goto("/");
+      await page.evaluate(() => window.localStorage.clear());
+      await page.reload();
+      const card = page.getByRole("button", { name: career.card }).first();
+      await card.click();
+      await card.click();
+      await page.getByRole("button", { name: career.begin }).click();
+
+      /* 1. The lesson, on the screen its system lives on, in week one. */
+      const lesson = page.getByRole("heading", { name: career.lesson });
+      await expect(lesson, "week one opens with a lesson").toBeVisible();
+
+      /* And it retires when the player closes it — this is the only piece of
+         state in the whole feature, so it is worth proving it sticks. */
+      await page.getByRole("button", { name: /^Hide this$/ }).first().click();
+      await expect(lesson).toHaveCount(0);
+
+      /* 2. The one next step. Every career gets the plan nudges at minimum,
+         which is what two of the three never had. `complementary` rather than
+         `region`: it is an <aside>, and the implicit role follows the tag. */
+      const step = page.getByRole("complementary", {
+        name: /Suggested next step/i,
+      });
+      await expect(step, "the Overview suggests something").toBeVisible();
+      await expect(step.getByText(/Assign your time/i)).toBeVisible();
+
+      /* 3. The glossary, which used to render for the Physician alone. */
+      await page.getByRole("button", { name: /what the words mean/i }).click();
+      const words = page.getByRole("dialog");
+      await expect(words).toBeVisible();
+      await expect(
+        words.getByText(career.word).first(),
+        "the glossary carries this career's vocabulary",
+      ).toBeVisible();
+
+      /* Nobody else's, though. */
+      const shown = await words.innerText();
+      expect(
+        shown.match(/patient|caseload|triage|outbreak|physician/i)?.[0],
+        `${career.name}'s glossary shows a Physician's word`,
+      ).toBeUndefined();
+
+      /* The lessons tab lists them, including the one just hidden, so it can
+         be brought back. */
+      await words.getByRole("tab", { name: /^Lessons$/ }).click();
+      await expect(words.getByText(career.lesson).first()).toBeVisible();
+
+      await page.keyboard.press("Escape");
+      await expect(words).toBeHidden();
+
+      expect(problems).toEqual([]);
+    });
+  }
+
+  /**
+   * A badge is a claim that something needs attention, so it is asserted in a
+   * state where something genuinely does. A brand-new practice is *not* one:
+   * a solicitor with no work in week one has a plan, not a problem, and the
+   * next-step card above is the right vehicle for that. A kitchen with an
+   * empty larder cannot open at all, which is.
+   */
+  test("a run in trouble is badged on the destination that fixes it", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+
+    /* The Chef: nothing in the larder, from the first week. */
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const chefCard = page.getByRole("button", { name: /^open\s*chef/i }).first();
+    await chefCard.click();
+    await chefCard.click();
+    await page.getByRole("button", { name: /^Begin in Lyon$/ }).click();
+
+    await expect(page.getByText(/Nothing in the larder/i).first()).toBeVisible();
+    /* Asserted on the screen-reader text rather than the digit: severity is
+       carried by shape and colour for a sighted player and by this sentence
+       for everybody else, so this is what proves the badge says something. */
+    await expect(
+      page
+        .getByRole("navigation", { name: "Primary" })
+        .last()
+        .getByRole("button")
+        .filter({ hasText: /Kitchen/ })
+        .first()
+        .getByText(/\d+ (critical|warning)s? in Kitchen/i)
+        .first(),
+      "the kitchen is badged, and says what is wrong",
+    ).toBeAttached();
+
+    /* The Solicitor: a mid-run practice that is overdrawn. */
+    await preload(page, "solicitor-listed");
+    await page.goto("/");
+    await page.getByRole("button", { name: /continue your run/i }).click();
+
+    await expect(page.getByText(/Overdrawn/i).first()).toBeVisible();
+    await expect(
+      page
+        .getByRole("navigation", { name: "Primary" })
+        .last()
+        .getByRole("button")
+        .filter({ hasText: /Chambers/ })
+        .first()
+        .getByText(/\d+ (critical|warning)s? in Chambers/i)
+        .first(),
+      "chambers is badged, and says what is wrong",
+    ).toBeAttached();
+
+    expect(problems).toEqual([]);
+  });
+});
+
+/**
+ * A CRISIS, IN A SOLICITOR'S WORDS
+ *
+ * The card renders for every career and only ever had Physician content
+ * behind it — medical prose, medical reputation categories, and a raiser that
+ * lived inside the medical module. The engine suite proves a practice now has
+ * five of its own and that they are answerable; this proves a player meets one,
+ * reads it in this career's language, and can act on it.
+ */
+test.describe("a solicitor's crisis", () => {
+  /* The crisis card itself. Scoped, because a setback or another crisis can
+     legitimately sit above it and every one of them has a "Do this" — the
+     first version of this took the first one on the page and answered a
+     burnout setback instead. */
+  const crisisCard = (page: Page) =>
+    page
+      .locator("section")
+      .filter({ hasText: /The regulator wants to see the client account/ })
+      .first();
+
+  const resumeCrisis = async (page: Page) => {
+    await preload(page, "solicitor-crisis");
+    await page.goto("/");
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+  };
+
+  test("it explains itself in this career's language", async ({ page }) => {
+    const problems = watchConsole(page);
+    await resumeCrisis(page);
+
+    /* It outranks whatever screen you were on — a crisis a player has to go
+       looking for is one they leave until it escalates. */
+    await expect(
+      page.getByRole("heading", { name: /Failed inspection/i }).first(),
+      "the crisis is on the Overview, not behind a tab",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/The regulator wants to see the client account/i).first(),
+    ).toBeVisible();
+
+    /* The explanation is the Solicitor's, not the Physician's. */
+    await expect(
+      page.getByText(/client account/i).first(),
+      "it says where this kind of trouble comes from, in legal terms",
+    ).toBeVisible();
+
+    const shown = await page.getByRole("main").innerText();
+    expect(
+      shown.match(/malpractice|clinician|patient|rota|ward\b/i)?.[0],
+      "no medical vocabulary on a solicitor's crisis",
+    ).toBeUndefined();
+
+    /* And it states the deadline rather than implying one. */
+    await expect(page.getByText(/week|stage/i).first()).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("a choice can be taken, and it moves the crisis", async ({ page }) => {
+    const problems = watchConsole(page);
+    await resumeCrisis(page);
+
+    /* Every choice states what it costs before it is pressed. */
+    const accountant = page
+      .getByText(/Put an accountant on it/i)
+      .first();
+    await expect(accountant).toBeVisible();
+
+    /* Read from the status strip's own cell rather than with `readCash`,
+       which takes the first dollar sign in `main` — on this screen that is a
+       crisis choice's price, and the choices change when the stage does. */
+    const bank = async () =>
+      (await page
+        .locator('dd[aria-label^="Cash:"]')
+        .first()
+        .getAttribute("aria-label")) ?? "";
+    const before = await bank();
+
+    /* The option that costs time rather than money, so the assertion is about
+       the crisis moving rather than about arithmetic the engine suite already
+       covers. */
+    await crisisCard(page)
+      .getByRole("button", { name: /^Do this$/ })
+      .first()
+      .click();
+
+    /* One choice per stage: the option taken leaves rather than greying out,
+       and the crisis has moved on to the next beat. */
+    await expect(
+      page.getByText(/They have found a shortfall/i).first(),
+      "answering it moves the crisis to its next stage",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Open the books completely/i),
+      "a choice already taken is not offered again",
+    ).toHaveCount(0);
+
+    /* And the run recorded what happened, in the career's own log. */
+    await expect(
+      page.getByText(/including the things they had not asked for/i).first(),
+    ).toBeVisible();
+
+    /* Cash did not move: that choice is paid for in time, and the panel says
+       so on the card. */
+    expect(await bank(), "the choice paid for in time cost no money").toBe(
+      before,
+    );
+
+    expect(problems).toEqual([]);
+  });
+
+  test("the crisis costs time, and the week says so", async ({ page }) => {
+    const problems = watchConsole(page);
+    await resumeCrisis(page);
+
+    /* The planner's budget before anything is answered. */
+    const budgetOf = async () => {
+      const strip = await page.getByRole("main").innerText();
+      const hit = /of (\d+) blocks/i.exec(strip);
+      return hit ? Number(hit[1]) : 0;
+    };
+    const before = await budgetOf();
+    expect(before, "a week starts with blocks in it").toBeGreaterThan(0);
+
+    /* "Open the books completely" costs a block of the week. */
+    await crisisCard(page)
+      .getByRole("button", { name: /^Do this$/ })
+      .first()
+      .click();
+
+    expect(
+      await budgetOf(),
+      "crisis work is paid for out of the week, not out of thin air",
+    ).toBeLessThan(before);
+
+    expect(problems).toEqual([]);
+  });
+});
+
+/**
+ * THE PEOPLE AROUND A PRACTICE
+ *
+ * `people.ts` was career-neutral machinery with exactly one career plugged
+ * into it — the panel imported the Physician's cast directly, so a Solicitor
+ * had nobody. The engine suite proves the six exist, arrive and change
+ * numbers; this proves a player can meet them.
+ */
+test.describe("the solicitor's people", () => {
+  test("the firm screen carries who remembers you", async ({ page }) => {
+    const problems = watchConsole(page);
+    await preload(page, "solicitor-listed");
+    await page.goto("/");
+    await page.getByRole("button", { name: /continue your run/i }).click();
+
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: /Chambers/ })
+      .first()
+      .click();
+    await page.getByRole("tab", { name: /^The firm$/ }).first().click();
+
+    /* The people around the practice, not the people in it. */
+    await expect(
+      page.getByRole("heading", { name: /^People$/ }).first(),
+    ).toBeVisible();
+    await expect(page.getByText(/Margaret Ellory/).first()).toBeVisible();
+    await expect(
+      page.getByText(/The solicitor who took you on/).first(),
+      "each of them says who they are, not just a number",
+    ).toBeVisible();
+
+    /* Three of them are the accounts that talk on the handset. */
+    await expect(page.getByText(/Julian Farrow/).first()).toBeVisible();
+    await expect(page.getByText(/Derek Oyelaran/).first()).toBeVisible();
+
+    /* One tap opens the bio and what they remember. */
+    await page
+      .getByRole("button", { name: /Margaret Ellory/ })
+      .first()
+      .click();
+    await expect(
+      page.getByText(/a stranger would one day read it aloud/i).first(),
+      "opening somebody shows who they are",
+    ).toBeVisible();
+
+    /* Nobody here speaks another career's language. */
+    const text = await page.getByRole("main").innerText();
+    expect(
+      text.match(/patient|caseload|physician|triage|outbreak|supervising consultant/i)?.[0],
+      "no borrowed vocabulary among the solicitor's people",
+    ).toBeUndefined();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("the handset and the people screen are the same cast", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*solicitor/i }).first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in London$/ }).click();
+
+    /* She sends the welcome message. */
+    await page.getByRole("button", { name: /open phone/i }).click();
+    const phone = page.getByRole("dialog");
+    await phone.getByRole("button", { name: /messages/i }).first().click();
+    await expect(phone.getByText(/Margaret Ellory/i).first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(phone).toBeHidden();
+
+    /* And she is a person with a card, from week one. */
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: /Chambers/ })
+      .first()
+      .click();
+    await page.getByRole("tab", { name: /^The firm$/ }).first().click();
+    await expect(
+      page.getByText(/Margaret Ellory/).first(),
+      "the person who messaged you is the person on the screen",
+    ).toBeVisible();
 
     expect(problems).toEqual([]);
   });

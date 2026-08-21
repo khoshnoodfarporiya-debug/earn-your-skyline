@@ -88,6 +88,28 @@ export const LIFESTYLE: LifestyleItem[] = [
     status: 9,
   },
   {
+    id: "estate_car",
+    label: "Estate car",
+    blurb:
+      "Room for the dog, the bikes and a week's shopping. Nobody has ever been impressed by one and it has never once let anybody down.",
+    category: "car",
+    cost: 52_000,
+    upkeep: 130,
+    retention: 0.52,
+    status: 3,
+  },
+  {
+    id: "electric_saloon",
+    label: "Electric saloon",
+    blurb:
+      "Silent, quick, and cheap to run. The only car on this list whose weekly cost is genuinely low.",
+    category: "car",
+    cost: 71_000,
+    upkeep: 70,
+    retention: 0.42,
+    status: 6,
+  },
+  {
     id: "sports_car",
     label: "Sports car",
     blurb: "Impractical, loud, and worth substantially less the moment you drive it away.",
@@ -96,6 +118,30 @@ export const LIFESTYLE: LifestyleItem[] = [
     upkeep: 620,
     retention: 0.4,
     status: 18,
+  },
+  {
+    id: "classic_car",
+    label: "Classic car",
+    blurb:
+      "Unreliable, uncomfortable, and the only car here that will be worth more in ten years than it is today. It will also spend a fortnight a year with a specialist.",
+    category: "car",
+    cost: 340_000,
+    upkeep: 890,
+    /* The one appreciating vehicle, and the reason the car ladder is not
+       simply "spend more, lose more". It costs the most to keep. */
+    retention: 1.08,
+    status: 21,
+  },
+  {
+    id: "supercar",
+    label: "Supercar",
+    blurb:
+      "Two seats, no luggage, and a service bill that reads like a small mortgage. It is the loudest possible way to say the practice is doing well.",
+    category: "car",
+    cost: 720_000,
+    upkeep: 2_100,
+    retention: 0.38,
+    status: 32,
   },
 
   // ------------------------------------------------------------------ perks
@@ -188,6 +234,54 @@ export const LIFESTYLE: LifestyleItem[] = [
     status: 44,
   },
 
+  {
+    id: "concierge",
+    label: "Concierge service",
+    blurb:
+      "Someone else queues, books, chases and waits in. It buys back the evenings you were spending on admin that is not medicine.",
+    category: "perk",
+    cost: 9_000,
+    upkeep: 1_100,
+    retention: 0,
+    burnoutRelief: 1.5,
+    status: 3,
+  },
+  {
+    id: "sabbatical_cabin",
+    label: "Cabin in the hills",
+    blurb:
+      "Two hours away, no signal, and a wood burner. The cheapest thing here that genuinely resets you.",
+    category: "perk",
+    cost: 185_000,
+    upkeep: 460,
+    retention: 0.9,
+    restBonus: 4,
+    status: 5,
+  },
+  {
+    id: "racehorse",
+    label: "Racehorse",
+    blurb:
+      "A share in something fast and expensive. It will introduce you to people who fund hospitals, and it will eat money every single week.",
+    category: "perk",
+    cost: 620_000,
+    upkeep: 4_800,
+    retention: 0.3,
+    status: 24,
+  },
+  {
+    id: "helicopter",
+    label: "Helicopter",
+    blurb:
+      "Turns the far side of the network into a forty-minute trip. Also the single most conspicuous object a doctor can own.",
+    category: "perk",
+    cost: 2_400_000,
+    upkeep: 16_000,
+    retention: 0.42,
+    timeBlocks: 1,
+    status: 36,
+  },
+
   // ----------------------------------------------------------- collectibles
   {
     id: "watches",
@@ -200,6 +294,17 @@ export const LIFESTYLE: LifestyleItem[] = [
     status: 6,
   },
   {
+    id: "wine_cellar",
+    label: "Wine cellar",
+    blurb:
+      "It appreciates quietly, it impresses the people worth impressing, and you are allowed to drink the mistakes.",
+    category: "collectible",
+    cost: 78_000,
+    upkeep: 210,
+    retention: 1.06,
+    status: 4,
+  },
+  {
     id: "art",
     label: "Art collection",
     blurb:
@@ -209,6 +314,28 @@ export const LIFESTYLE: LifestyleItem[] = [
     upkeep: 320,
     retention: 1.18,
     status: 13,
+  },
+  {
+    id: "rare_books",
+    label: "Medical library",
+    blurb:
+      "First editions of the texts the profession was built on. It appreciates, and it is the only thing on this page that your colleagues will actually envy.",
+    category: "collectible",
+    cost: 210_000,
+    upkeep: 240,
+    retention: 1.12,
+    status: 11,
+  },
+  {
+    id: "vineyard",
+    label: "Vineyard",
+    blurb:
+      "Land that makes something. It holds its value better than anything else here at this price, and it will want your attention every autumn whether you have any to give or not.",
+    category: "collectible",
+    cost: 1_650_000,
+    upkeep: 6_200,
+    retention: 1.02,
+    status: 31,
   },
 ];
 

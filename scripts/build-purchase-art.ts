@@ -45,8 +45,19 @@ import sharp from "sharp";
 
 const PURCHASES = join("art-source", "visuals", "purchases");
 const CHARACTERS = join("art-source", "visuals", "characters");
+/*
+ * Career environments — currently the Chef's pack.
+ *
+ * They sit beside the career covers in `art-source/visuals/careers` because
+ * that is what they are: pictures of a career rather than of a purchasable
+ * item. Only the `chef-` prefixed masters go through here; the three cover
+ * images were converted before this script existed and re-emitting them would
+ * rewrite files nothing asked to change.
+ */
+const CAREER_ART = join("art-source", "visuals");
 const OUT_PURCHASES = join("public", "visuals", "purchases");
 const OUT_CHARACTERS = join("public", "visuals", "characters");
+const OUT_CAREER_ART = join("public", "visuals");
 const BRAND_MASTER = join(
   "art-source",
   "branding",
@@ -58,12 +69,72 @@ const GROUPS = [
   "facilities",
   "departments",
   "equipment",
+  /* Ambulances. Same treatment as every other wide purchase image — the group
+     exists separately so the shot list, the registry and the folder all agree
+     on what a vehicle is. */
+  "fleet",
   "homes",
   "lifestyle",
+  /* Recruitment artwork. Staff are not a purchase catalogue, but they use
+     the same card/detail derivatives and live with the other medical assets. */
+  "staff",
 ] as const;
 
 /** The portrait collections, under `art-source/visuals/characters`. */
 const CHARACTER_GROUPS = ["cast", "social"] as const;
+
+/** Career-environment collections, under `art-source/visuals`. */
+const CAREER_ART_GROUPS = ["careers", "events", "setbacks", "milestones"] as const;
+
+/**
+ * Which masters in a group this batch owns.
+ *
+ * `careers/` holds two different jobs — three career covers that already ship,
+ * and the Chef's environment pack — so the batch says which files are its own
+ * rather than converting the whole directory and rewriting the covers.
+ */
+const CAREER_ART_FILES = new Set([
+  /* Chef environments. */
+  "chef-market-kitchen-v1.png",
+  "chef-premises-bistro-v1.png",
+  "chef-premises-restaurant-v1.png",
+  "chef-premises-flagship-v1.png",
+  "chef-premises-destination-v1.png",
+  "chef-service-lunch-v1.png",
+  "chef-dinner-service-v1.png",
+  "chef-service-private-event-v1.png",
+  "chef-service-catering-v1.png",
+  "chef-service-tasting-v1.png",
+  "chef-service-counter-v1.png",
+  "chef-larder-fresh-v1.png",
+  "chef-larder-expiring-v1.png",
+  "chef-supplier-delivery-v1.png",
+  "chef-brigade-briefing-v1.png",
+  "chef-event-critic-v1.png",
+  /* Solicitor environments and work states. */
+  "solicitor-borrowed-desk-v1.png",
+  "solicitor-chambers-v1.png",
+  "solicitor-established-firm-v1.png",
+  "solicitor-court-corridor-v1.png",
+  "solicitor-client-meeting-v1.png",
+  "solicitor-case-files-v1.png",
+  "solicitor-case-preparation-v1.png",
+  "solicitor-negotiation-v1.png",
+  "solicitor-hearing-v1.png",
+  "solicitor-legal-team-v1.png",
+  "solicitor-regulatory-investigation-v1.png",
+  /* Shared state artwork. */
+  "event-outbreak-containment-v1.png",
+  "setback-collapse-v1.png",
+  "setback-suspension-v1.png",
+  "setback-insolvency-v1.png",
+  "setback-disgrace-v1.png",
+  "milestone-debt-free-v1.png",
+  "milestone-first-million-v1.png",
+  "milestone-international-group-v1.png",
+  "milestone-second-site-v1.png",
+  "milestone-went-viral-v1.png",
+]);
 
 /** Card width, detail width. Height follows the master's aspect ratio. */
 const SIZES = [
@@ -88,6 +159,16 @@ const PORTRAIT_SIZES = [
   { suffix: "", width: 160, quality: 82 },
   { suffix: "@profile", width: 512, quality: 80 },
 ] as const;
+
+/** Career-selection covers keep their original width for the large cards. */
+const COVER_SIZES = [{ suffix: "", width: 1448, quality: 82 }] as const;
+
+const CAREER_COVER_FILES = new Set([
+  "career-architect.png",
+  "career-founder.png",
+  "career-politician.png",
+  "career-engineer.png",
+]);
 
 /**
  * Three cars were re-drawn because the first pass produced recognisable
@@ -133,6 +214,26 @@ async function main() {
       out: OUT_CHARACTERS,
       groups: CHARACTER_GROUPS,
       sizes: PORTRAIT_SIZES,
+      prefix: undefined,
+    },
+    {
+      root: CAREER_ART,
+      out: OUT_CAREER_ART,
+      groups: CAREER_ART_GROUPS.slice(0, 1),
+      sizes: COVER_SIZES,
+      files: CAREER_COVER_FILES,
+    },
+    /*
+     * The Chef's environment pack. Same two widths as a purchase — a card at
+     * 720 and a banner at 1200 — because it is used the same way: a picture of
+     * a thing, in a fixed box, at card or hero scale.
+     */
+    {
+      root: CAREER_ART,
+      out: OUT_CAREER_ART,
+      groups: CAREER_ART_GROUPS,
+      sizes: SIZES,
+      files: CAREER_ART_FILES,
     },
   ] as const;
 
@@ -146,7 +247,10 @@ async function main() {
       const outDir = join(batch.out, group);
       mkdirSync(outDir, { recursive: true });
 
-      const files = readdirSync(dir).filter((f) => f.endsWith(".png"));
+      const ownedFiles = "files" in batch ? batch.files : undefined;
+      const files = readdirSync(dir)
+        .filter((f) => f.endsWith(".png"))
+        .filter((f) => !ownedFiles || ownedFiles.has(f));
       /* Highest version wins, so a -v2 supersedes its -v1 without the list above
        needing an entry for every future revision. SUPERSEDED is belt and
        braces for the three the brief names explicitly. */
@@ -172,8 +276,8 @@ async function main() {
             .webp({ quality, effort: 6 })
             .toFile(dest);
           if (suffix === "") {
-            const prefix = batch.root === CHARACTERS ? "characters/" : "";
-            sizes[`${prefix}${group}/${stem}`] = {
+            const keyPrefix = batch.root === CHARACTERS ? "characters/" : "";
+            sizes[`${keyPrefix}${group}/${stem}`] = {
               width: info.width,
               height: info.height,
             };

@@ -2,6 +2,18 @@ import type { RunState } from "../game/types";
 import { med } from "../game/careers/doctor";
 import { activeCities } from "../game/medical/sim";
 import type { ScreenId } from "./navigation";
+import {
+  CHEF_LESSONS,
+  CHEF_LESSON_IDS,
+  chefLearned,
+  chefRelevant,
+} from "./chefHelp";
+import {
+  LAWYER_LESSONS,
+  LAWYER_LESSON_IDS,
+  lawyerLearned,
+  lawyerRelevant,
+} from "./lawyerHelp";
 
 /**
  * TEACHING THROUGH THE FIRST WEEKS
@@ -39,13 +51,33 @@ import type { ScreenId } from "./navigation";
  * everywhere else.
  */
 
+/**
+ * Every lesson in the game, across every career.
+ *
+ * One union rather than three, because `taught` is a flat list in
+ * localStorage and a player who has been told what a time block is has been
+ * told — the ids are prefixed per career so nothing can collide.
+ */
 export type LessonId =
+  /* The Physician's. */
   | "first-week"
   | "first-report"
   | "first-purchase"
   | "first-hire"
   | "first-qualification"
-  | "first-city";
+  | "first-city"
+  /* The Chef's. */
+  | "chef-first-week"
+  | "chef-larder"
+  | "chef-menu"
+  | "chef-service"
+  | "chef-brigade"
+  /* The Solicitor's. */
+  | "law-first-week"
+  | "law-instructions"
+  | "law-casework"
+  | "law-books"
+  | "law-firm";
 
 export interface LessonPoint {
   /** The term as the interface labels it. */
@@ -74,7 +106,7 @@ export interface TeachContext {
   hasReport: boolean;
 }
 
-export const LESSONS: Record<LessonId, Lesson> = {
+const MEDICAL_LESSONS: Record<string, Lesson> = {
   "first-week": {
     id: "first-week",
     screen: "overview",
@@ -269,7 +301,14 @@ export const LESSONS: Record<LessonId, Lesson> = {
   },
 };
 
-export const LESSON_ORDER: LessonId[] = [
+/** Every career's lessons, in one index so `lessonFor` has one lookup. */
+export const LESSONS: Record<string, Lesson> = {
+  ...MEDICAL_LESSONS,
+  ...CHEF_LESSONS,
+  ...LAWYER_LESSONS,
+};
+
+const MEDICAL_ORDER: LessonId[] = [
   "first-week",
   "first-report",
   "first-purchase",
@@ -277,6 +316,20 @@ export const LESSON_ORDER: LessonId[] = [
   "first-qualification",
   "first-city",
 ];
+
+/**
+ * The order lessons are offered in, for this career.
+ *
+ * Per career rather than global: the sequences teach different loops, and a
+ * Chef has no use for being told about qualifications in a fixed position
+ * between two kitchen lessons.
+ */
+export function lessonOrderFor(careerId: string): LessonId[] {
+  if (careerId === "chef") return [...CHEF_LESSON_IDS] as LessonId[];
+  if (careerId === "lawyer") return [...LAWYER_LESSON_IDS] as LessonId[];
+  if (careerId === "doctor") return MEDICAL_ORDER;
+  return [];
+}
 
 /**
  * Has the player already shown they understand this?
@@ -293,6 +346,8 @@ export function learned(
      rather than the run is a change of one line rather than of every caller. */
   _ctx: TeachContext,
 ): boolean {
+  if (state.careerId === "chef") return chefLearned(id, state);
+  if (state.careerId === "lawyer") return lawyerLearned(id, state);
   if (state.careerId !== "doctor") return true;
   const m = med(state);
   switch (id) {
@@ -331,6 +386,8 @@ export function relevant(
   state: RunState,
   ctx: TeachContext,
 ): boolean {
+  if (state.careerId === "chef") return chefRelevant(id, state, ctx);
+  if (state.careerId === "lawyer") return lawyerRelevant(id, state, ctx);
   if (state.careerId !== "doctor") return false;
   const m = med(state);
   switch (id) {
@@ -374,9 +431,9 @@ export function lessonFor(
   ctx: TeachContext,
   taught: readonly string[],
 ): Lesson | null {
-  for (const id of LESSON_ORDER) {
+  for (const id of lessonOrderFor(state.careerId)) {
     const lesson = LESSONS[id];
-    if (lesson.screen !== screen) continue;
+    if (!lesson || lesson.screen !== screen) continue;
     if (taught.includes(id)) continue;
     if (learned(id, state, ctx)) continue;
     if (!relevant(id, state, ctx)) continue;
@@ -391,8 +448,10 @@ export function lessonStatus(
   ctx: TeachContext,
   taught: readonly string[],
 ): { lesson: Lesson; done: boolean }[] {
-  return LESSON_ORDER.map((id) => ({
-    lesson: LESSONS[id],
-    done: taught.includes(id) || learned(id, state, ctx),
-  }));
+  return lessonOrderFor(state.careerId)
+    .filter((id) => Boolean(LESSONS[id]))
+    .map((id) => ({
+      lesson: LESSONS[id],
+      done: taught.includes(id) || learned(id, state, ctx),
+    }));
 }

@@ -5,6 +5,8 @@ import type { RunState } from "@/lib/game/types";
 import { timelineOf, type TimelineKind } from "@/lib/game/timeline";
 import { upcoming } from "@/lib/game/consequences";
 import { Panel } from "../ui/Panel";
+import { MILESTONE_ART } from "@/lib/ui/careerSceneArt";
+import { ArtFrame } from "../visuals/ArtFrame";
 
 /**
  * THE TIMELINE
@@ -118,6 +120,15 @@ export function TimelinePanel({ state }: { state: RunState }) {
                     </span>
                   </div>
                   <h4 className="t-card mt-0.5 text-ink">{e.title}</h4>
+                  {MILESTONE_ART[e.id] ? (
+                    <ArtFrame
+                      visual={MILESTONE_ART[e.id]}
+                      ratio="aspect-[3/1]"
+                      scrim="bottom"
+                      sizes="(min-width: 768px) 560px, 85vw"
+                      className="mt-2 rounded-form border border-rule-soft"
+                    />
+                  ) : null}
                   <p className="mt-0.5 text-[13px] leading-snug text-ink-soft">
                     {e.detail}
                   </p>

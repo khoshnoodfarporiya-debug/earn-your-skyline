@@ -2,9 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { RunState } from "@/lib/game/types";
-import { med } from "@/lib/game/careers/doctor";
-import { unreadMessages, unreadNews } from "@/lib/game/medical/phone";
-import { PhoneShell, type PhoneApp } from "./PhoneShell";
+import {
+  phoneOf,
+  unreadMessagesIn,
+  unreadNewsIn,
+} from "@/lib/ui/phoneAccess";
+import {
+  CHEF_APPS,
+  CORE_APPS,
+  LAWYER_APPS,
+  PhoneShell,
+  type PhoneApp,
+} from "./PhoneShell";
+import { MarketApp } from "./MarketApp";
+import { AgencyApp } from "./AgencyApp";
+import { ListingsApp } from "./ListingsApp";
+import { RollApp } from "./RollApp";
 import { PulseApp } from "./PulseApp";
 import { MessagesApp } from "./MessagesApp";
 import { NewsApp } from "./NewsApp";
@@ -24,29 +37,41 @@ export function Phone({
   state,
   dispatch,
   onClose,
+  initialApp,
   returnFocusTo,
 }: {
   state: RunState;
   dispatch: (cmd: string, arg: string) => void;
   onClose: () => void;
+  /** Open straight onto one app — how a screen "makes the call" for you. */
+  initialApp?: PhoneApp;
   returnFocusTo?: React.RefObject<HTMLElement | null>;
 }) {
-  const m = med(state);
-  const [app, setApp] = useState<PhoneApp>(() =>
-    unreadMessages(m) > 0 ? "messages" : unreadNews(m) > 0 ? "news" : "pulse",
-  );
+  /* The career-aware door. The mount already guarantees a phone exists,
+     but a components tree must never crash on a shape it can also be handed
+     mid-migration, so the empty fallback stays. */
+  const phone = phoneOf(state);
+  const [app, setApp] = useState<PhoneApp>(() => {
+    if (initialApp) return initialApp;
+    return phone && unreadMessagesIn(phone) > 0
+      ? "messages"
+      : phone && unreadNewsIn(phone) > 0
+        ? "news"
+        : "pulse";
+  });
   const panelRef = useRef<HTMLDivElement>(null);
   const headingId = "phone-title";
 
   // Mark the opened app read. Runs on app change as well as on open.
   useEffect(() => {
-    if (app === "messages" && unreadMessages(m) > 0)
+    if (app === "messages" && phone && unreadMessagesIn(phone) > 0)
       dispatch("readMessages", "");
-    if (app === "news" && unreadNews(m) > 0) dispatch("readNews", "");
+    if (app === "news" && phone && unreadNewsIn(phone) > 0)
+      dispatch("readNews", "");
     // dispatch and m are recreated each render; keying on the app and the
     // counts is what actually decides whether anything needs marking.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [app, unreadMessages(m), unreadNews(m)]);
+  }, [app, phone ? unreadMessagesIn(phone) : 0, phone ? unreadNewsIn(phone) : 0]);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -113,11 +138,18 @@ export function Phone({
           <PhoneShell
             week={state.week}
             app={app}
+            apps={
+              state.careerId === "chef"
+                ? CHEF_APPS
+                : state.careerId === "lawyer"
+                  ? LAWYER_APPS
+                  : CORE_APPS
+            }
             onSelect={setApp}
             onClose={onClose}
             badges={{
-              messages: unreadMessages(m),
-              news: unreadNews(m),
+              messages: phone ? unreadMessagesIn(phone) : 0,
+              news: phone ? unreadNewsIn(phone) : 0,
             }}
           >
             {app === "pulse" && <PulseApp state={state} dispatch={dispatch} />}
@@ -125,6 +157,16 @@ export function Phone({
               <MessagesApp state={state} dispatch={dispatch} />
             )}
             {app === "news" && <NewsApp state={state} />}
+            {app === "market" && (
+              <MarketApp state={state} dispatch={dispatch} />
+            )}
+            {app === "agency" && (
+              <AgencyApp state={state} dispatch={dispatch} />
+            )}
+            {app === "listings" && (
+              <ListingsApp state={state} dispatch={dispatch} />
+            )}
+            {app === "roll" && <RollApp state={state} dispatch={dispatch} />}
           </PhoneShell>
         </div>
       </div>

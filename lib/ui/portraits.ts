@@ -135,6 +135,20 @@ export const ORGANISATIONS: ReadonlySet<string> = new Set([
   "@clinicallede",
   "@rhb_press",
   "@wellwise",
+  /* The Chef's institutional accounts — trade press, the market, a rival
+     kitchen's house account, an events agency. Same rule as above: an
+     institution renders as a rounded tile, never as somebody's face. */
+  "@thepassdaily",
+  "@marchecouvert",
+  "@saltandcinders",
+  "@berger_events",
+  /* The Solicitor's — a law report, a recruitment consultancy, the regulator
+     and the listing office. Same rule again: an institution is not a person
+     and must not borrow somebody's face. */
+  "@thelawreport",
+  "@fenwick_legal",
+  "@standardsboard",
+  "@causelist",
 ]);
 
 /**

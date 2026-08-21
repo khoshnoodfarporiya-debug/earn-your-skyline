@@ -1,6 +1,7 @@
-# Physician visual system — asset manifest
+# Visual system — asset manifest
 
-Every visual in the Physician career, what job it does, and where it lives.
+Every visual in the game, what job it does, and where it lives. The Physician
+is most of it; section 1a is the Chef's environment pack.
 
 The registry in [`lib/ui/visuals.ts`](../lib/ui/visuals.ts) is the machine-readable
 half of this document: paths, intrinsic dimensions, alt text and focal points.
@@ -142,8 +143,8 @@ which is every one of them, because none is informational.
 | ID | File (`public/visuals/…`) | Screen | Purpose | Dimensions | Focal point | Alt | Role | Loading |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `career-physician` | `careers/career-physician.webp` | Career select | Establishes the profession before a run exists | 1448×1086 | `center 35%` | `""` | Decorative | Lazy |
-| `career-chef` | `careers/career-chef.webp` | Career select | Same, for an unbuilt career | 1448×1086 | `center 40%` | `""` | Decorative | Lazy |
-| `career-solicitor` | `careers/career-solicitor.webp` | Career select | Same, for an unbuilt career | 1448×1086 | `center 35%` | `""` | Decorative | Lazy |
+| `career-chef` | `careers/career-chef.webp` | Career select | Same, for the Chef | 1448×1086 | `center 40%` | `""` | Decorative | Lazy |
+| `career-solicitor` | `careers/career-solicitor.webp` | Career select | Same, for a career with no environment art yet | 1448×1086 | `center 35%` | `""` | Decorative | Lazy |
 | `practice-progression` | `practice-progression.webp` | Practice → Build | The street your practice stands on, filling in as you buy | 1672×941 | `center 72%` | `""` | Decorative | **Priority** (LCP) |
 | `section-overview` | `sections/section-overview.webp` | Overview | Place, under the week's headline | 1672×941 | `center 42%` | `""` | Decorative | Lazy |
 | `section-staff` | `sections/section-staff.webp` | Practice → Staff | Place | 1919×820 | `center 40%` | `""` | Decorative | Lazy |
@@ -164,6 +165,96 @@ which is every one of them, because none is informational.
 Mobile crops are handled by `object-position` from the `focus` column plus
 `object-cover` on a fixed-height box — never by a second file. Every focal point
 was chosen so a hard portrait crop keeps its subject.
+
+### 1a. The Chef's environment pack
+
+Fourteen images, built by `npm run build:art` from the 1536×1024 masters in
+`art-source/visuals/careers/`, at the same two widths as a purchase — 720px
+for a card, 1200px for a screen's lead image. The registry is
+[`lib/ui/chefArt.ts`](../lib/ui/chefArt.ts), and like `purchaseArt.ts` it is
+keyed by **the simulation's own ids** rather than by filenames, so a screen
+cannot show a flagship dining room to a player standing at a market stall.
+
+Every one of them is a *state*, not scenery. That is the rule the pack was
+integrated against: if an image could be swapped for another without the
+player being misinformed, it does not belong on the screen.
+
+| ID | File (`public/visuals/careers/…`) | Shown when | Alt | Loading |
+| --- | --- | --- | --- | --- |
+| `stall` | `chef-market-kitchen.webp` | premises is the market stall | Descriptive | **Priority** (screen lead) |
+| `bistro` | `chef-premises-bistro.webp` | premises is the bistro — and on its upgrade card | Descriptive / `""` on cards | Priority / lazy |
+| `restaurant` | `chef-premises-restaurant.webp` | premises is the restaurant — and on its upgrade card | Descriptive / `""` on cards | Priority / lazy |
+| `flagship` | `chef-premises-flagship.webp` | premises is the flagship — and on its upgrade card | Descriptive / `""` on cards | Priority / lazy |
+| `larder.fresh` | `chef-larder-fresh.webp` | stock held, none within a week of its life | Descriptive | Priority (screen lead) |
+| `larder.expiring` | `chef-larder-expiring.webp` | any lot is on its last week or already over | Descriptive | Priority (screen lead) |
+| `supplier` | `chef-supplier-delivery.webp` | beside the ordering panel | `""` | Lazy |
+| `lunch` | `chef-service-lunch.webp` | the lunch card, and the lead if lunch ran | Descriptive / `""` | Lazy |
+| `dinner` | `chef-dinner-service.webp` | the dinner card, and the lead if dinner ran | Descriptive / `""` | Lazy |
+| `event` | `chef-service-private-event.webp` | the private-event card, and the lead if it ran | Descriptive / `""` | Lazy |
+| `catering` | `chef-service-catering.webp` | the catering card, and the lead if it ran | Descriptive / `""` | Lazy |
+| `tasting` | `chef-service-tasting.webp` | the tasting card, and the lead if it ran | Descriptive / `""` | Lazy |
+| `brigade` | `chef-brigade-briefing.webp` | the Brigade screen, once anybody is employed | Descriptive | Priority (screen lead) |
+| `critic` | `chef-event-critic.webp` | the `critic` event fires, via `EVENT_VISUALS` | Descriptive | Lazy |
+
+Two of these are derived rather than chosen. `larderArt()` reads the lots and
+returns the expiring picture only when stock is genuinely within a week of
+being written off — the same arithmetic the rows underneath print — and the
+"last service" lead is the service with the most covers in `lastService.lines`,
+so the picture is a report rather than a mood. Both are asserted in
+`npm run check` under **The Chef's artwork**.
+
+The critic is registered in `EVENT_VISUALS` like every other career's events,
+so the dialog that renders a Physician's inspection renders it with no
+knowledge of which career raised it.
+
+### 1b. The Solicitor, which still has none
+
+The Solicitor ships with a career cover (`careers/career-solicitor.webp`) and
+shares the world map. **Everything else on its screens is typographic.**
+Nothing is faked: its cards and panels are built to read without artwork
+rather than pointing at images that do not exist.
+
+Outstanding: borrowed desk, small chambers, established firm, court corridor,
+client meeting room, case files, evidence review, negotiation, hearing, legal
+staff roles, and a regulatory investigation.
+
+These are not registered anywhere — there is no entry pointing at a missing
+file, so no check passes on their behalf. When the masters arrive they go
+through the same pipeline the Chef's did.
+
+### 1c. Awaiting artwork
+
+Fourteen purchasable items — the three ambulances and eleven new lifestyle
+items — have shipped their gameplay ahead of their masters. They are listed by
+id in `AWAITING_ART` (`lib/ui/purchaseArt.ts`) and briefed in
+[`artwork-shot-list.md`](./artwork-shot-list.md). Their cards render the
+typographic fallback until the files land. `missingArt()` still fails for any
+item *not* on that list, so the coverage guarantee holds for everything else.
+
+### 1d. Brand
+
+All five are cut by `buildBrand()` in `scripts/build-purchase-art.ts` from one
+master, `art-source/branding/earn-your-skyline-logo-v1.png` — there is no
+per-file master, which is why the harness checks this collection by asserting
+that the single master is present rather than by deriving a filename.
+
+| ID | File | Screen | Purpose | Dimensions | Alt | Role | Loading |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `logo-lockup` | `brand/logo-lockup.webp` | Career select | The title lockup, emblem and wordmark | 640×261 | *described* | **Informational** | **Priority** |
+| `logo-lockup@2x` | `brand/logo-lockup@2x.webp` | Career select | The same at 2× for dense displays | 1280×523 | — | — | via `srcset` |
+| `logo-mark-64` | `brand/logo-mark-64.webp` | *(not rendered)* | Square emblem, for a surface that needs the mark alone | 64×64 | `""` | Decorative | Not loaded |
+| `logo-mark-128` | `brand/logo-mark-128.webp` | *(not rendered)* | Same, larger | 128×128 | `""` | Decorative | Not loaded |
+| `logo-mark-256` | `brand/logo-mark-256.webp` | *(not rendered)* | Same, larger again | 256×256 | `""` | Decorative | Not loaded |
+
+The tab icon and the link-unfurl card are **not** in this table and not in
+`public/`: they are `app/icon.png` and `app/opengraph-image.png`, written by the
+same function into Next's file conventions, which serve them automatically.
+That is why the browser tab has an icon although no mark below is referenced.
+
+The three `logo-mark-*` files ship 28KB that nothing currently requests. They
+are kept rather than pruned because the emblem-alone crop is what a touch icon
+or a web-app manifest would need, and regenerating them means re-deriving the
+measured bounding box. Anything added that uses one should be recorded here.
 
 ---
 
@@ -244,8 +335,9 @@ caution `#F59E55`, good `#43C78B`), which is asserted by a test.
 1. **Setback artwork** — the four setbacks (signed off, suspended, insolvent,
    disgraced) are the most dramatic beats in a run and have no visual at all.
 2. **Milestones beyond the hospital** — only one milestone has an image.
-3. **Chef and Solicitor environments** — both careers have a cover image and
-   nothing else, because neither career is built.
+3. **Solicitor environments** — the career has a cover image and nothing else.
+   The Chef's pack (section 1a) is the template: fourteen images, each tied to
+   a state the simulation already tracks.
 4. **A second outbreak image** — one response photograph serves every pathogen.
 5. **Staff roles** — seven roles on the hire screen are still icon-only. They
    are the last purchase in the game rendered without a picture, and unlike

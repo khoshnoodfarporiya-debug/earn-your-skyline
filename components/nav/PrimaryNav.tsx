@@ -1,6 +1,10 @@
 "use client";
 
-import { SECTIONS, defaultScreen, type SectionId } from "@/lib/ui/navigation";
+import {
+  defaultScreen,
+  sectionsFor,
+  type SectionId,
+} from "@/lib/ui/navigation";
 import type { Severity } from "@/lib/ui/alerts";
 import { NavIcon } from "./NavIcon";
 
@@ -14,10 +18,13 @@ import { NavIcon } from "./NavIcon";
  */
 export function PrimaryNav({
   active,
+  careerId,
   onNavigate,
   badges,
 }: {
   active: SectionId;
+  /** Which career's destinations to show — they are not the same set. */
+  careerId: string;
   onNavigate: (screen: ReturnType<typeof defaultScreen>) => void;
   /** Worst outstanding severity per section, if any. */
   badges: Partial<Record<SectionId, { severity: Severity; count: number }>>;
@@ -29,7 +36,7 @@ export function PrimaryNav({
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="mx-auto flex max-w-6xl lg:gap-1 lg:p-1">
-        {SECTIONS.map((section) => {
+        {sectionsFor(careerId).map((section) => {
           const isActive = active === section.id;
           const badge = badges[section.id];
           return (

@@ -14,12 +14,17 @@ import { sectionOf, type ScreenId } from "@/lib/ui/navigation";
  */
 export function SectionNav({
   active,
+  careerId,
   onNavigate,
 }: {
   active: ScreenId;
+  /* Which career is looking. Two careers can share a screen id — `home` is
+     both the Solicitor's whole map and the first of the Chef's two — and the
+     sibling screens are different in each. */
+  careerId: string;
   onNavigate: (screen: ScreenId) => void;
 }) {
-  const section = sectionOf(active);
+  const section = sectionOf(active, careerId);
   if (section.screens.length <= 1) return null;
 
   return (

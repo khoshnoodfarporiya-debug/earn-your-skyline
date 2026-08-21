@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { money } from "@/lib/game/format";
+import type { Visual } from "@/lib/ui/visuals";
 import { type Tone, TONE_TEXT } from "./Panel";
 
 /**
@@ -78,6 +80,7 @@ export function ItemCard({
   consequence,
   footnote,
   blocker,
+  visual,
   children,
 }: {
   title: string;
@@ -126,6 +129,8 @@ export function ItemCard({
   footnote?: ReactNode;
   /** Why this cannot be bought yet, in the player's words. */
   blocker?: ReactNode;
+  /** Optional catalogue artwork. The text below remains the source of truth. */
+  visual?: Visual;
   /** The action(s). Kept outside the card body so the card is not a button. */
   children?: ReactNode;
 }) {
@@ -148,6 +153,22 @@ export function ItemCard({
         ["--dept" as string]: owned ? "#2DD4BF" : (accent ?? "transparent"),
       }}
     >
+      {visual ? (
+        <div className="relative -mx-4 -mt-3.5 mb-3 aspect-[5/1] overflow-hidden border-b border-rule-soft bg-paper">
+          <Image
+            src={visual.src}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 720px, 100vw"
+            className="object-cover opacity-90"
+            style={{ objectPosition: visual.focus }}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-t from-card/70 via-transparent to-transparent"
+          />
+        </div>
+      ) : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="t-card text-ink">

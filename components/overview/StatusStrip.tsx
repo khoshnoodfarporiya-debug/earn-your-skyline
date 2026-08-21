@@ -36,7 +36,11 @@ export function StatusStrip({
     {
       label: "Cash",
       value: money(state.r.cash),
-      sub: burn > 0 ? `${money(burn)}/wk out` : "no fixed costs",
+      /* `weeklyCosts` is the Physician's sum and only theirs, so "no fixed
+         costs" is a claim this component can only make about a doctor. A Chef
+         pays rent from week one; saying otherwise under their cash figure
+         would be plainly false. */
+      sub: burn > 0 ? `${money(burn)}/wk out` : isDoctor ? "no fixed costs" : "",
       tone:
         state.r.cash < 0
           ? "alarm"

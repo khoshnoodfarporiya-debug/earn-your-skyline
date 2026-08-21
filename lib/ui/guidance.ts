@@ -2,6 +2,8 @@ import type { RunState } from "../game/types";
 import { med } from "../game/careers/doctor";
 import { activeCities, capacityIn } from "../game/medical/sim";
 import type { ScreenId } from "./navigation";
+import { chefStep } from "./chefHelp";
+import { lawyerStep } from "./lawyerHelp";
 
 /**
  * Progressive disclosure, done as one sentence at a time.
@@ -42,13 +44,13 @@ export function nextStep(
   budget: number,
   hasCommitted: boolean,
 ): Step | null {
-  if (state.careerId !== "doctor") return null;
-  const m = med(state);
-  const week = state.week;
-  const clinicBlocks = alloc.clinic ?? 0;
-
   /*
    * --- the loop itself ----------------------------------------------------
+   *
+   * Hoisted above the career dispatch, because an unspent block is an unspent
+   * block whatever the profession — and these three were the reason a Chef and
+   * a Solicitor got no guidance at all rather than merely no career-specific
+   * guidance.
    *
    * The week-one framing used to live here as its own step: "your week is six
    * blocks of time", followed by the same sentence the onboarding lesson now
@@ -73,13 +75,22 @@ export function nextStep(
     };
   }
 
-  if (!hasCommitted && week === 1) {
+  if (!hasCommitted && state.week === 1) {
     return {
       id: "intro:commit",
       title: "Commit the week",
       detail: "Nothing is spent, and nothing resolves, until you do.",
     };
   }
+
+  /* Past the plan, the next step is entirely the career's own business. */
+  if (state.careerId === "chef") return chefStep(state, alloc);
+  if (state.careerId === "lawyer") return lawyerStep(state, alloc);
+  if (state.careerId !== "doctor") return null;
+
+  const m = med(state);
+  const week = state.week;
+  const clinicBlocks = alloc.clinic ?? 0;
 
   // --- capacity, the first real constraint ---------------------------------
   const cities = activeCities(m);

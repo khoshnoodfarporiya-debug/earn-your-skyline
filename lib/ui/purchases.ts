@@ -26,6 +26,7 @@ import {
   techniciansNeeded,
 } from "../game/medical/sim";
 import { cityOf } from "../game/medical/cities";
+import { FLEET, crewNeeded, crewOn } from "../game/medical/fleet";
 import { money } from "../game/format";
 import { purchaseArt, type PurchaseArt } from "./purchaseArt";
 import type { MedIconName } from "../../components/visuals/MedIcon";
@@ -59,12 +60,13 @@ import type { MedIconName } from "../../components/visuals/MedIcon";
  */
 
 export type PurchaseKind =
-  "facility" | "department" | "equipment" | "lifestyle";
+  "facility" | "department" | "equipment" | "vehicle" | "lifestyle";
 
 export type PurchaseGroupId =
   | "facilities"
   | "departments"
   | "equipment"
+  | "fleet"
   | "homes"
   | "vehicles"
   | "services"
@@ -455,6 +457,111 @@ function equipmentItems(state: RunState): PurchaseItem[] {
 }
 
 /**
+ * The ambulances.
+ *
+ * The card has to carry the one thing that makes this group different from
+ * equipment: a vehicle is bought and then *crewed*, and until it is crewed it
+ * is doing nothing while charging upkeep. That is a caveat rather than a lock,
+ * exactly as it is for an unstaffed scanner — the sale is allowed and the
+ * consequence is stated.
+ */
+function fleetItems(state: RunState): PurchaseItem[] {
+  const m = med(state);
+  const crew = crewOn(m);
+  const needed = crewNeeded(m);
+
+  return FLEET.map((v) => {
+    const owned = (m.fleet ?? []).includes(v.id);
+    const affordable = state.r.cash >= v.cost;
+    /* What the crew position would be once this one is on the road, which is
+       the number a player is actually deciding against. */
+    const neededAfter = needed + (owned ? 0 : v.crew);
+    const shortAfter = Math.max(0, neededAfter - crew);
+
+    const caveats: string[] = [];
+    if (!owned && shortAfter > 0) {
+      caveats.push(
+        `Your fleet would need ${neededAfter} paramedic${neededAfter === 1 ? "" : "s"} and you have ${crew}. Until that is covered, none of your vehicles brings anyone in and all of them charge upkeep.`,
+      );
+    } else if (!owned) {
+      caveats.push(
+        `Needs ${v.crew} paramedic${v.crew === 1 ? "" : "s"} on the payroll. You have enough for this one.`,
+      );
+    } else if (needed > crew) {
+      caveats.push(
+        `Short ${needed - crew} paramedic${needed - crew === 1 ? "" : "s"}. The whole fleet is parked until that is fixed.`,
+      );
+    }
+    if (v.acuity > 0) {
+      caveats.push(
+        "Brings in more serious work. That pays well if your departments can cover it, and costs you standing when it has to be turned away.",
+      );
+    }
+
+    return {
+      id: v.id,
+      kind: "vehicle" as const,
+      group: "fleet" as const,
+      label: v.label,
+      blurb: v.blurb,
+      art: purchaseArt(v.id),
+      price: v.cost,
+      upkeep: v.upkeep,
+      headline: `Reaches ${Math.round(v.reach * 100)}% more of the population around you`,
+      effects: [
+        {
+          label: "Catchment",
+          value: `+${Math.round(v.reach * 100)}%`,
+          tone: "good" as const,
+        },
+        {
+          label: "Case mix",
+          value:
+            v.acuity > 0
+              ? `+${Math.round(v.acuity * 100)}% toward serious cases`
+              : "Unchanged — routine patients",
+          tone: v.acuity > 0 ? ("neutral" as const) : ("good" as const),
+        },
+        {
+          label: "Crew",
+          value: `${v.crew} paramedic${v.crew === 1 ? "" : "s"}`,
+          tone: "cost" as const,
+        },
+        {
+          label: "Upkeep",
+          value: `${money(v.upkeep)}/wk`,
+          tone: "cost" as const,
+        },
+        {
+          label: "Net worth",
+          value: `holds ${Math.round(v.retention * 100)}% of what you paid`,
+          tone: "cost" as const,
+        },
+      ],
+      caveats,
+      lock: null,
+      owned,
+      active: owned,
+      affordable,
+      shortfall: Math.max(0, v.cost - state.r.cash),
+      state: stateOf(null, owned, false, affordable),
+      categoryWord: "Vehicle",
+      tradeIn: null,
+      comparison: {
+        label: "Crew needed",
+        now: `${needed}`,
+        after: `${neededAfter}`,
+      },
+      coverage: null,
+      buy: { cmd: "buyVehicle", arg: v.id },
+      sell: null,
+      icon: "ambulance" as MedIconName,
+      accent: null,
+    };
+  });
+}
+
+/**
  * How many condition types this machine is a hard requirement for.
  *
  * Counted from `CONDITIONS`, so a machine's stated value is the number of
@@ -619,6 +726,12 @@ export const GROUP_META: Record<
     icon: "clinic",
     short: "Premises",
   },
+  fleet: {
+    label: "Ambulances",
+    note: "The only thing you can buy that changes who arrives rather than what you can do for them. Every vehicle needs a crew before it does anything at all.",
+    icon: "ambulance",
+    short: "Vehicle",
+  },
   equipment: {
     label: "Clinical equipment",
     note: "What you are able to diagnose and treat. Some of it is useless without a technician to run it.",
@@ -655,6 +768,7 @@ const GROUP_ORDER: PurchaseGroupId[] = [
   "facilities",
   "departments",
   "equipment",
+  "fleet",
   "homes",
   "vehicles",
   "services",
@@ -668,6 +782,7 @@ export function allPurchases(state: RunState): PurchaseItem[] {
     ...facilityItems(state),
     ...departmentItems(state),
     ...equipmentItems(state),
+    ...fleetItems(state),
     ...lifestyleItems(state),
   ];
 }

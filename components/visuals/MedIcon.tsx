@@ -56,6 +56,7 @@ export type MedIconName =
   | "clipboard" // contracts and administration
   | "money" // finance
   | "clock" // time and hours
+  | "ambulance" // the fleet
   // --- departments
   | "heart"
   | "brain"
@@ -122,6 +123,19 @@ const PATHS: Record<MedIconName, React.ReactNode> = {
       <path d="M15 21V11h6v10" />
       <path d="M3 21h18" />
       <path d="M9 9v4M7 11h4" />
+    </>
+  ),
+  /* A van in profile with the cross on its flank. The cross appears on
+     exactly one other glyph, and this is the second place it earns its
+     keep — an ambulance without one reads as a delivery van. */
+  ambulance: (
+    <>
+      <path d="M2 17V8h11v9" />
+      <path d="M13 11h4l4 3.5V17h-3" />
+      <path d="M2 17h4M11 17h2" />
+      <circle cx="8" cy="17.5" r="2" />
+      <circle cx="18" cy="17.5" r="2" />
+      <path d="M6.5 10.5v3M5 12h3" />
     </>
   ),
   bed: (

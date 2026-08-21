@@ -22,6 +22,9 @@
  * it is the ceiling their patient list drifts toward.
  */
 
+import { CHEF_TERMS } from "./chefHelp";
+import { LEGAL_TERMS } from "./lawyerHelp";
+
 export interface Term {
   id: string;
   term: string;
@@ -139,6 +142,21 @@ export const GLOSSARY: Term[] = [
 ];
 
 export const TERM_BY_ID = new Map(GLOSSARY.map((t) => [t.id, t]));
+
+/**
+ * The vocabulary for the career being played.
+ *
+ * `GLOSSARY` above is the Physician's — panels, triage, CPD — and showing it
+ * to a Chef was the same leak the screens themselves had. Each career carries
+ * its own words in its own help module; a career with none gets an empty list
+ * and the control that opens this simply does not render.
+ */
+export function glossaryFor(careerId: string): Term[] {
+  if (careerId === "doctor") return GLOSSARY;
+  if (careerId === "chef") return CHEF_TERMS;
+  if (careerId === "lawyer") return LEGAL_TERMS;
+  return [];
+}
 
 /** The glossary in the order a player meets these words, not alphabetical. */
 export const GLOSSARY_ORDER = GLOSSARY.map((t) => t.id);

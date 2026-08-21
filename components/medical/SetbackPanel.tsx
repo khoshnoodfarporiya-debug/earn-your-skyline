@@ -9,6 +9,8 @@ import {
   type ActiveSetback,
 } from "@/lib/game/setbacks";
 import { ActionButton } from "../ui/ItemCard";
+import { SETBACK_ART, asBanner } from "@/lib/ui/careerSceneArt";
+import { ArtFrame } from "../visuals/ArtFrame";
 
 /**
  * A SETBACK, AND THE WAY OUT
@@ -57,6 +59,19 @@ function SetbackCard({
       className="spine form overflow-hidden"
       style={{ ["--dept" as string]: "#EF6461" }}
     >
+      <ArtFrame
+        visual={asBanner(SETBACK_ART[sb.kind])}
+        ratio="aspect-[21/6]"
+        scrim="full"
+        sizes="(min-width: 1152px) 1104px, 100vw"
+        className="border-b border-rule"
+      >
+        <div className="absolute inset-x-0 bottom-0 px-5 py-3">
+          <p className="sign text-[11px] text-alarm drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
+            Active setback · recovery remains possible
+          </p>
+        </div>
+      </ArtFrame>
       <div className="form-head flex flex-wrap items-baseline justify-between gap-2 px-5 py-2.5">
         <h3 className="t-label text-alarm">{SETBACK_LABEL[sb.kind]}</h3>
         <span className="num text-[12px] text-ink-soft">

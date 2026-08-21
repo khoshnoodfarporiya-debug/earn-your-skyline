@@ -86,9 +86,71 @@ const countries: FeatureCollection = {
   features: all.features.filter((f) => (f.properties?.name ?? "") !== "Antarctica"),
 };
 
+
+/**
+ * CUT THE SUBPATHS THAT WRAP THE ANTIMERIDIAN
+ *
+ * `geoTransform` is a raw pass-through, not a real d3 projection, so nothing
+ * clips at 180 degrees. A ring with a vertex at +179 followed by one at -179
+ * is therefore drawn as a straight line all the way across the board.
+ *
+ * Six of them were showing on the finished map: Chukotka at roughly 65-72N and
+ * Fiji at roughly 16-17S, both of which genuinely straddle the meridian. They
+ * read as rendering faults because that is what they were.
+ *
+ * Rather than clip the geometry — which needs a real projection stream and
+ * would change every coordinate in the file — this cuts the *output*: any
+ * step that jumps more than half the board horizontally cannot be a real
+ * coastline at this scale, so the subpath is broken there and resumed on the
+ * other side. Each surviving piece is emitted whole, which is what a landmass
+ * running off the edge of a cropped map should look like.
+ */
+function cutAntimeridian(d: string, close: boolean): string {
+  /* Subpaths, each starting at its own M. */
+  const subpaths = d.split("M").filter(Boolean);
+  const out: string[] = [];
+
+  for (const raw of subpaths) {
+    const closed = /Z$/i.test(raw.trim());
+    const body = raw.replace(/Z$/i, "");
+    const points = body
+      .split("L")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .map((t) => t.split(",").map(Number) as [number, number])
+      .filter((pt) => pt.length === 2 && Number.isFinite(pt[0]));
+
+    if (points.length < 2) continue;
+
+    let piece: [number, number][] = [points[0]];
+    const pieces: [number, number][][] = [];
+    for (let i = 1; i < points.length; i++) {
+      if (Math.abs(points[i][0] - points[i - 1][0]) > W / 2) {
+        pieces.push(piece);
+        piece = [points[i]];
+      } else {
+        piece.push(points[i]);
+      }
+    }
+    pieces.push(piece);
+
+    const wasCut = pieces.length > 1;
+    for (const part of pieces) {
+      if (part.length < 2) continue;
+      const dd = "M" + part.map((q) => `${q[0]},${q[1]}`).join("L");
+      /* A filled shape has to close or the fill rule goes strange. A stroked
+         border that has just been cut in two must NOT close, or each half
+         grows a line back to where it started — which is the artefact this
+         function exists to remove. */
+      out.push(dd + (close || (closed && !wasCut) ? "Z" : ""));
+    }
+  }
+  return out.join("");
+}
+
 /** Every country merged into one landmass, so overlaps and shared borders
     disappear and the fill is a single shape. */
-const land = path({
+const landRaw = path({
   type: "MultiPolygon",
   coordinates: countries.features.flatMap((f) =>
     f.geometry.type === "Polygon"
@@ -97,11 +159,17 @@ const land = path({
   ),
 }) as string;
 
+/* Land is a fill, so every piece closes. */
+const land = cutAntimeridian(landRaw, true);
+
 /** Internal boundaries only — the lines *between* countries, drawn once each
     rather than twice as coincident coastlines. */
-const borders = path(
+const bordersRaw = path(
   mesh(world, world.objects.countries, (a, b) => a !== b),
 ) as string;
+
+/* Borders are strokes, so a cut piece stays open. */
+const borders = cutAntimeridian(bordersRaw, false);
 
 /**
  * A 20-degree graticule, confined to the crop.

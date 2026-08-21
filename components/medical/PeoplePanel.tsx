@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { RunState } from "@/lib/game/types";
 import type { PersonState } from "@/lib/game/people";
 import { standingOf } from "@/lib/game/people";
-import { CAST_BY_ID } from "@/lib/game/medical/cast";
+import { personDefIn } from "@/lib/ui/castAccess";
 import { Panel } from "../ui/Panel";
 
 /**
@@ -24,6 +24,7 @@ import { Panel } from "../ui/Panel";
  */
 export function PeoplePanel({ state }: { state: RunState }) {
   const people = state.people ?? [];
+  const careerId = state.careerId;
   const [open, setOpen] = useState<string | null>(null);
 
   if (people.length === 0) {
@@ -33,8 +34,9 @@ export function PeoplePanel({ state }: { state: RunState }) {
         note="Nobody yet. The people in a career arrive with the career."
       >
         <p className="text-[14px] text-ink-soft">
-          Your supervisor, your rivals and the people who will work for you
-          appear as the run gives them a reason to.
+          The people you trained under, the ones across the table from you and
+          the ones who will work for you appear as the run gives them a reason
+          to.
         </p>
       </Panel>
     );
@@ -55,6 +57,7 @@ export function PeoplePanel({ state }: { state: RunState }) {
         {sorted.map((p) => (
           <PersonCard
             key={p.id}
+            careerId={careerId}
             person={p}
             week={state.week}
             open={open === p.id}
@@ -67,17 +70,20 @@ export function PeoplePanel({ state }: { state: RunState }) {
 }
 
 function PersonCard({
+  careerId,
   person,
   week,
   open,
   onToggle,
 }: {
+  /** Whose cast to look the authored detail up in. */
+  careerId: string;
   person: PersonState;
   week: number;
   open: boolean;
   onToggle: () => void;
 }) {
-  const def = CAST_BY_ID.get(person.id);
+  const def = personDefIn(careerId, person.id);
   if (!def) return null;
 
   const silence = week - person.lastSeen;

@@ -118,6 +118,33 @@ export type RunOutcome = {
   body: string;
 };
 
+/**
+ * WHERE A RUN CAN BEGIN
+ *
+ * A career that offers more than one of these lets the player choose the city
+ * before week one. It is not a skin: the career applies the choice to its own
+ * state in `applyStartCity`, and from then on the city is that career's
+ * business — the engine never reads it again.
+ *
+ * `effects` is the contract with the player. Every line in it has to be
+ * something the simulation actually does, because a card that promises a
+ * cheaper market and changes nothing is the placeholder mechanic this codebase
+ * refuses to ship.
+ */
+export interface StartCity {
+  id: string;
+  name: string;
+  country: string;
+  /** Key into the projected map positions, so the picker can draw it. */
+  position: string;
+  /** What this place is, in one line. */
+  blurb: string;
+  /** What choosing it changes, stated as the player will feel it. */
+  effects: string[];
+  /** Named honestly. A hard start is a hard start. */
+  difficulty: "gentle" | "even" | "hard";
+}
+
 export interface CareerDef {
   id: string;
   label: string;
@@ -147,6 +174,20 @@ export interface CareerDef {
    * buildings, unlocked departments. Lives on RunState.data.
    */
   initialData: () => Record<string, unknown>;
+  /**
+   * The places this career can start in. The first is the default, and a
+   * career that omits this starts in the one place it has always started in.
+   */
+  startCities?: StartCity[];
+  /**
+   * Apply the chosen start city to the career's own state, once, at week one.
+   *
+   * Called by `startRun` after `initialData` and before backgrounds and
+   * legacies, so where you are is true before anything is added on top of it.
+   * Must be deterministic and must not touch the RNG: two runs on the same
+   * seed and the same city are the same run.
+   */
+  applyStartCity?: (s: RunState, cityId: string) => void;
   /**
    * Career-specific commands dispatched from its own UI (hire, buy a
    * facility, open a department, set a policy). The engine clones state
@@ -304,6 +345,15 @@ export interface RunState {
   ambitionsDone?: AmbitionId[];
   /** Where this character came from. Fixed at startRun. */
   background?: BackgroundId;
+  /**
+   * Which city the run began in, recorded the way `background` is.
+   *
+   * The career already holds the city in its own state — that copy is what
+   * the simulation reads. This one is the record of the *choice*, so a
+   * restart can offer the same start, and so a save can say where it began
+   * without the engine having to understand any career's data.
+   */
+  startCity?: string;
   /** Personality. Two from the background, the rest earned by behaviour. */
   traits?: TraitId[];
   /** What a previous character passed on, applied once at startRun. */

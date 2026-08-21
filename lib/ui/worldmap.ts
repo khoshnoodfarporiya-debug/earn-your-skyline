@@ -22,6 +22,8 @@
  * `sy()` is the one conversion between them.
  */
 
+import { LAND_PATH } from "./worldmap.generated";
+
 export const MAP_VIEWBOX = { w: 100, h: 56 } as const;
 
 /** City-space Y (0–100) to map-space Y (0–56). */
@@ -210,10 +212,38 @@ function inPolygon(px: number, py: number, poly: [number, number][]): boolean {
   return inside;
 }
 
-/** Is this city-space point on any landmass? */
+/**
+ * The coastline the map actually draws, as polygons, parsed once.
+ *
+ * `LAND_PATH` is generated from real coastline data and is what `MapSurface`
+ * renders; the hand-drawn `LANDMASSES` above are a much coarser stand-in kept
+ * for the shapes that reason about continents. Two hundred and eighty-odd
+ * closed subpaths, all straight segments, so the same parser works on it.
+ */
+let drawnLand: [number, number][][] | null = null;
+function landPolygons(): [number, number][][] {
+  if (drawnLand) return drawnLand;
+  drawnLand = LAND_PATH.split("Z")
+    .map(landPolygon)
+    .filter((poly) => poly.length >= 3);
+  return drawnLand;
+}
+
+/**
+ * Is this city-space point on land?
+ *
+ * Tested against the drawn coastline rather than the coarse landmasses,
+ * because the coarse ones are not what the player sees: New York and São
+ * Paulo both sit on the map's real land and *outside* the hand-drawn polygon
+ * for their continent, so the old test called two shipped markers sea. Islands
+ * and inland seas are handled by counting crossings odd-even across every
+ * subpath, which is the fill rule the browser uses to paint the same path.
+ */
 export function isOnLand(x: number, y: number): boolean {
   const my = sy(y);
-  return LANDMASSES.some((l) => inPolygon(x, my, landPolygon(l.d)));
+  let crossings = 0;
+  for (const poly of landPolygons()) if (inPolygon(x, my, poly)) crossings++;
+  return crossings % 2 === 1;
 }
 
 /**

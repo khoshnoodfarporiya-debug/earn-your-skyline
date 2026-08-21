@@ -59,6 +59,7 @@ import {
   weeklyUpkeep as medUpkeep,
 } from "../medical/sim";
 import {
+  CITIES,
   CITY_BY_ID,
   HOME_CITY,
   cityOf,
@@ -71,6 +72,8 @@ import {
   severityCeiling,
 } from "../medical/outbreaks";
 import { validateMedicalData } from "../medical/validate";
+import { totalOutstanding } from "../finance";
+import { FLEET_BY_ID } from "../medical/fleet";
 import {
   canPostThisWeek,
   generateWeek,
@@ -159,7 +162,29 @@ import { weekRng } from "../rng";
 const WEEK_LIMIT = 156;
 export const LOAN_RATE = 0.0011;
 const STARTING_DEBT = 165_000;
+const STARTING_CASH = 24_000;
+
+/**
+ * What this run actually borrowed to qualify.
+ *
+ * The training debt is denominated where you trained, so the objective and
+ * the milestone read it from the run rather than from the constant. A save
+ * written before the choice existed has no `_startDebt` and falls back to the
+ * figure it was written with, which is the right answer for it.
+ */
+export const startDebtOf = (s: RunState): number =>
+  s.r._startDebt && s.r._startDebt > 0 ? s.r._startDebt : STARTING_DEBT;
 const NET_WORTH_GOAL = 2_500_000;
+
+/**
+ * What the practice has to be worth, in the money of the market you are in.
+ *
+ * Lyon is 1.0, so the figure every published balance number was measured
+ * against is unchanged. A practice billing at 0.4× in Lagos is not asked to
+ * reach a New York number.
+ */
+export const goalFor = (s: RunState): number =>
+  Math.round(NET_WORTH_GOAL * cityOf(med(s).homeCity).feeIndex);
 
 // ---------------------------------------------------------------- helpers
 
@@ -258,7 +283,7 @@ function recordMilestones(s: RunState, m: MedicalState): void {
       "debt-clear",
       "money",
       "You cleared your student debt",
-      `${money(STARTING_DEBT)} gone. Half the objective.`,
+      `${money(startDebtOf(s))} gone. Half the objective.`,
     );
   }
   if (netWorth(s) >= 1_000_000) {
@@ -280,7 +305,7 @@ function recordMilestones(s: RunState, m: MedicalState): void {
    * a person does after they have already succeeded is the interesting half
    * and the old design threw it away.
    */
-  if (s.r.debt <= 0 && netWorth(s) >= NET_WORTH_GOAL) {
+  if (s.r.debt <= 0 && netWorth(s) >= goalFor(s)) {
     mark(
       s,
       "the-hospital-is-yours",
@@ -453,8 +478,23 @@ export const effectiveSkill = (s: RunState) =>
 export const assetValue = (s: RunState) =>
   medAssetValue(med(s)) + lifestyleValue(med(s));
 
+/**
+ * What the practice is actually worth.
+ *
+ * Money you have borrowed is money you owe. That sounds obvious, and it was
+ * missing: `outstanding` was subtracted inside `borrowingCapacity` and nowhere
+ * else, so a bank facility arrived as pure cash and lifted this figure by the
+ * full amount drawn. Since the goal is `debt <= 0 && netWorth >= 2,500,000`,
+ * the shortest route to winning was to borrow $900,000 and sit on it — and the
+ * balance harness found exactly that, which is most of why the leveraged
+ * strategy was the only one "succeeding".
+ *
+ * The student loan and the bank are both debts and both belong here. Nothing
+ * about the borrowing *rules* changed: `borrowingCapacity` reconstructs the
+ * gross figure so lenders still lend precisely what they lent before.
+ */
 export const netWorth = (s: RunState) =>
-  s.r.cash + assetValue(s) - s.r.debt;
+  s.r.cash + assetValue(s) - s.r.debt - totalOutstanding(s);
 
 export const weeklyCosts = (s: RunState) =>
   medUpkeep(med(s)) +
@@ -526,8 +566,9 @@ export const doctor: CareerDef = {
   ],
 
   initialResources: () => ({
-    cash: 24_000,
+    cash: STARTING_CASH,
     debt: STARTING_DEBT,
+    _startDebt: STARTING_DEBT,
     panel: 90,
     burnout: 18,
     // `reputation` IS professional credibility. See lib/game/reputation.ts.
@@ -540,6 +581,72 @@ export const doctor: CareerDef = {
   }),
 
   cast: FULL_CAST,
+
+  /*
+   * WHERE YOU TRAINED
+   *
+   * The fourteen markets were always here; what is new is that one of them can
+   * be the one your licence already works in. Nothing about the expansion
+   * system changes — `entryCost`, licences and the network map are untouched —
+   * you simply start holding a different licence.
+   *
+   * The effects are read off the existing city table rather than written by
+   * hand, so a market cannot advertise a fee index it does not have.
+   */
+  startCities: CITIES.map((c) => ({
+    id: c.id,
+    name: c.name,
+    country: c.country,
+    position: c.id,
+    blurb: c.blurb,
+    effects: [
+      `${Math.round(c.feeIndex * 100)}% on every case you bill`,
+      `${Math.round(c.costIndex * 100)}% wages and upkeep`,
+      `${Math.round(c.propertyIndex * 100)}% on premises`,
+      `${(c.population * 1.3).toFixed(1)}k patients is the ceiling here`,
+      `${Math.round(c.competition * 100)}% of the market already spoken for`,
+      ...(Object.keys(c.bias).length > 0
+        ? [`Sends you more ${Object.keys(c.bias).filter((k) => c.bias[k as SpecialtyId]! > 1).join(", ") || "of its own case mix"}`]
+        : []),
+    ],
+    /*
+     * Where you trained is where your money is, so the opening scales with the
+     * city (see `applyStartCity`) and difficulty is about the *market*: how
+     * much of it incumbents already hold, and how thin the margin between the
+     * fees and the costs is.
+     */
+    difficulty:
+      c.feeIndex / c.costIndex >= 1.05 && c.competition <= 0.24
+        ? ("gentle" as const)
+        : c.feeIndex / c.costIndex < 0.92 || c.competition >= 0.38
+          ? ("hard" as const)
+          : ("even" as const),
+  })),
+
+  applyStartCity: (s, cityId) => {
+    const city = CITY_BY_ID.get(cityId as CityId);
+    if (!city) return;
+    const m = med(s);
+    m.facilities = m.facilities.map((f) => ({ ...f, city: city.id }));
+    m.cities = [city.id];
+    m.homeCity = city.id;
+    m.panels = { [city.id]: s.r.panel };
+
+    /*
+     * Your training debt and your first month's float are in the money of the
+     * place you trained in, and both move together.
+     *
+     * Without this the fixed $165,000 would be a different animal in every
+     * market: two years of billing in Lagos and four months of it in New York.
+     * The city is meant to change *what the practice is* — the case mix, the
+     * ceiling, who already holds the market — not how long you have before the
+     * first bank letter. `_startDebt` is recorded because the objective's
+     * progress is measured against what you actually owed.
+     */
+    s.r.debt = Math.round(STARTING_DEBT * city.costIndex);
+    s.r.cash = Math.round(STARTING_CASH * city.costIndex);
+    s.r._startDebt = s.r.debt;
+  },
 
   initialData: () => {
     const state: MedicalState = {
@@ -562,6 +669,9 @@ export const doctor: CareerDef = {
       solved: [],
       phone: initialPhone(),
       supplies: initialSupplies(),
+      /* A new run owns no ambulances. Written explicitly rather than left
+         undefined so a fresh save and a migrated one have the same shape. */
+      fleet: [],
       nextId: 2,
     };
     return { med: state };
@@ -669,6 +779,19 @@ export const doctor: CareerDef = {
         if (s.r.cash < eq.cost) return;
         s.r.cash -= eq.cost;
         m.equipment.push(eq.id);
+        break;
+      }
+
+      case "buyVehicle": {
+        const v = FLEET_BY_ID.get(arg);
+        if (!v) return;
+        /* One of each. A second identical ambulance would be a pure
+           multiplier on reach with no new decision attached to it, and the
+           three tiers already cover "I want more range". */
+        if ((m.fleet ?? []).includes(v.id)) return;
+        if (s.r.cash < v.cost) return;
+        s.r.cash -= v.cost;
+        m.fleet = [...(m.fleet ?? []), v.id];
         break;
       }
 
@@ -2253,13 +2376,16 @@ export const doctor: CareerDef = {
     ];
   },
 
-  objective: (s) => ({
-    text: `Clear your student debt and build a practice worth ${money(NET_WORTH_GOAL)}. A strong first three years gets there by week ${WEEK_LIMIT}; there is no deadline, and reaching it is a milestone rather than an ending.`,
-    progress: Math.min(
-      1 - s.r.debt / STARTING_DEBT,
-      Math.max(0, Math.min(1, netWorth(s) / NET_WORTH_GOAL)),
-    ),
-  }),
+  objective: (s) => {
+    const goal = goalFor(s);
+    return {
+      text: `Clear your student debt and build a practice worth ${money(goal)} in ${cityOf(med(s).homeCity).name}. A strong first three years gets there by week ${WEEK_LIMIT}; there is no deadline, and reaching it is a milestone rather than an ending.`,
+      progress: Math.min(
+        1 - s.r.debt / startDebtOf(s),
+        Math.max(0, Math.min(1, netWorth(s) / goal)),
+      ),
+    };
+  },
 
   events: [
     /*

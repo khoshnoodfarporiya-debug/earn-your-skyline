@@ -25,10 +25,15 @@ export default function Page() {
     saveRun(next);
   };
 
-  const begin = (careerId: string) => {
+  /*
+   * `city` is where the run begins, for a career that offers a choice. It is
+   * passed straight through to `startRun`, which resolves an unknown id to
+   * the career's default rather than starting a run half-placed.
+   */
+  const begin = (careerId: string, city?: string) => {
     const career = getCareer(careerId);
     if (!career) return;
-    const fresh = startRun(career);
+    const fresh = startRun(career, undefined, { city });
     clearRun();
     update(fresh);
   };
@@ -73,7 +78,9 @@ export default function Page() {
       career={career}
       state={run}
       setState={update}
-      onRestart={() => begin(career.id)}
+      /* Same career, same city. A restart is another go at the run you
+         chose, not a silent move back to the default market. */
+      onRestart={() => begin(career.id, run.startCity)}
       onMenu={() => {
         setSavedRun(run.outcome ? null : run);
         setRun(null);

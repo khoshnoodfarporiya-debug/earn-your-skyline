@@ -1,19 +1,9 @@
 "use client";
 
 import type { RunState } from "@/lib/game/types";
-import { med } from "@/lib/game/careers/doctor";
-import type { PhoneMessage } from "@/lib/game/medical/types";
+import { phoneOf, roleLabel } from "@/lib/ui/phoneAccess";
 import { Avatar } from "../ui/Avatar";
 import { EndOfList } from "./EndOfList";
-
-const ROLE_LABEL: Record<PhoneMessage["role"], string> = {
-  staff: "Your team",
-  recruiter: "Recruiter",
-  journalist: "Press",
-  regulator: "Regulator",
-  rival: "Competitor",
-  peer: "Colleague",
-};
 
 /**
  * Messages: private conversations that react to the run.
@@ -29,8 +19,8 @@ export function MessagesApp({
   state: RunState;
   dispatch: (cmd: string, arg: string) => void;
 }) {
-  const m = med(state);
-  const messages = m.phone.messages;
+  const phone = phoneOf(state);
+  const messages = phone?.messages ?? [];
 
   if (messages.length === 0) {
     return (
@@ -63,7 +53,7 @@ export function MessagesApp({
                     {msg.from}
                   </span>
                   <span className="sign rounded-sm bg-card px-1.5 py-0.5 text-[11.5px] text-ink-faint">
-                    {ROLE_LABEL[msg.role]}
+                    {roleLabel(state.careerId, msg.role)}
                   </span>
                   <span className="num text-[12px] text-ink-faint">
                     wk {msg.week}

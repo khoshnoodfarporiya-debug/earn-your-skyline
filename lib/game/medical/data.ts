@@ -325,6 +325,18 @@ export const STAFF_ROLES: StaffRole[] = [
     specialised: false,
   },
   {
+    id: "paramedic",
+    label: "Paramedic",
+    blurb:
+      "Rides the ambulance and starts the treatment on the way in. Every vehicle needs a crew before it is anything but a parked expense.",
+    hireCost: 3_000,
+    salary: 1_300,
+    /* Fewer units than a GP: most of the week is spent travelling, and the
+       care given on the road is real but narrow. */
+    units: 8,
+    specialised: false,
+  },
+  {
     id: "comms",
     label: "Communications manager",
     blurb:

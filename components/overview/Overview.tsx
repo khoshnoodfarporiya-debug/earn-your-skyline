@@ -26,6 +26,17 @@ import { TrendCard } from "./TrendCard";
  * detail (vitals, trend, notes) sits below the fold on mobile and beside the
  * loop on desktop.
  */
+/**
+ * The running record, in each career's own words.
+ *
+ * Presentation only: the log itself is engine-level and identical everywhere.
+ */
+const LOG_HEADING: Record<string, string> = {
+  doctor: "Case notes",
+  chef: "The service book",
+  lawyer: "Attendance notes",
+};
+
 export function Overview({
   career,
   state,
@@ -230,7 +241,12 @@ export function Overview({
             <section className="form flex flex-wrap items-center justify-between gap-3 p-4">
               <div className="min-w-0">
                 <h2 className="text-[14px] font-semibold text-ink">
-                  Student debt
+                  {/* The career's own word for what it owes. Hardcoding
+                      "Student debt" put a Physician's loan on a Chef's
+                      overview, where it is a fit-out loan and nothing to do
+                      with medical school. */}
+                  {career.resources.find((r) => r.id === "debt")?.label ??
+                    "Outstanding loan"}
                 </h2>
                 <p className="num mt-0.5 text-[13px] text-ink-soft">
                   {money(state.r.debt)} outstanding
@@ -285,7 +301,12 @@ export function Overview({
 
           <section className="form">
             <h2 className="form-head sign px-4 py-2.5 text-[11.5px] text-ink-soft">
-              Case notes
+              {/* What this career calls its own running record. "Case notes"
+                  is what a doctor keeps; a kitchen keeps a service book and a
+                  firm keeps attendance notes. The default is deliberately
+                  plain so a career added later reads sensibly without needing
+                  an entry here. */}
+              {LOG_HEADING[state.careerId] ?? "What has happened"}
             </h2>
             {state.log.length === 0 ? (
               <p className="px-4 py-4 text-[14px] text-ink-soft">

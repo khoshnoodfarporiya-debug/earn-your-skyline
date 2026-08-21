@@ -5,8 +5,13 @@
  * establish the floor: what a competent-but-unimaginative operator achieves.
  */
 
-import { doctor, med } from "../lib/game/careers/doctor";
-import { CONDITIONS, EQUIPMENT_BY_ID, SPECIALTY_BY_ID } from "../lib/game/medical/data";
+import { doctor, med, netWorth } from "../lib/game/careers/doctor";
+import {
+  CONDITIONS,
+  EQUIPMENT_BY_ID,
+  ROLE_BY_ID,
+  SPECIALTY_BY_ID,
+} from "../lib/game/medical/data";
 import { CAMPAIGN_BY_ID } from "../lib/game/medical/marketing";
 import { LIFESTYLE_BY_ID } from "../lib/game/medical/lifestyle";
 import {
@@ -24,15 +29,17 @@ import {
   slotsIn,
   techniciansNeeded,
 } from "../lib/game/medical/sim";
-import { CITIES, cityOf } from "../lib/game/medical/cities";
+import { CITIES, CITY_BY_ID, cityOf } from "../lib/game/medical/cities";
 import { OUTBREAK_BY_ID } from "../lib/game/medical/outbreaks";
 import { tierCost, weeksOfCover } from "../lib/game/medical/supplies";
 import type { RunState } from "../lib/game/types";
+import type { CityId } from "../lib/game/medical/types";
 import { stageOf } from "../lib/game/crisis";
 import { RECOVERY } from "../lib/game/setbacks";
 import { CONTRACT_BY_ID } from "../lib/game/medical/contractList";
 import { cultureScore, hydrateStaff } from "../lib/game/medical/culture";
 import { effectiveFee, marketOf } from "../lib/game/medical/economy";
+import { borrowingCapacity, totalOutstanding } from "../lib/game/finance";
 
 export interface Command {
   cmd: string;
@@ -93,6 +100,86 @@ export function upkeep(
  * month of running costs. Fixed thresholds do not work here because weekly
  * costs span three orders of magnitude between week 1 and a full hospital.
  */
+/**
+ * WHAT A COMMAND ACTUALLY COSTS
+ *
+ * Read from the same tables the engine charges against, so a budget built on
+ * these cannot disagree with what the purchase does.
+ *
+ * Zero for anything free — recovery steps, crisis choices, triage, toggles.
+ * Those are decisions, not purchases, and must never be squeezed out of a week
+ * by a spending cap.
+ */
+function costOf(s: RunState, c: Command): number {
+  const m = med(s);
+  switch (c.cmd) {
+    case "buyFacility": {
+      const [type, city] = c.arg.split(":");
+      return facilityPrice(type, (city as CityId) ?? m.homeCity);
+    }
+    case "hire":
+      return ROLE_BY_ID.get(c.arg.split(":")[0] as never)?.hireCost ?? 0;
+    case "openDepartment":
+      return SPECIALTY_BY_ID.get(c.arg as never)?.unlockCost ?? 0;
+    case "buyEquipment":
+      return EQUIPMENT_BY_ID.get(c.arg as never)?.cost ?? 0;
+    case "buySupplies":
+      return tierCost(m, c.arg);
+    case "enterCity":
+      return CITY_BY_ID.get(c.arg as CityId)?.entryCost ?? 0;
+    case "payLoan":
+      return Math.min(10_000, s.r.debt, Math.max(0, s.r.cash));
+    case "buyLifestyle":
+      return LIFESTYLE_BY_ID.get(c.arg)?.cost ?? 0;
+    /*
+     * A rise deducts nothing today — it raises payroll from next week. The
+     * engine's `cash >= rise * 8` is a prudence gate, not a price, and
+     * charging it here spent a budget that was never actually spent: it
+     * starved departments of money the practice still had. Zero, and the
+     * engine's own gate decides.
+     */
+    case "rewardStaff":
+      return 0;
+    case "trainStaff":
+      return 9_000;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Can this command be paid for out of the money on hand, right now?
+ *
+ * ------------------------------------------------------------- the bug this fixes
+ *
+ * Every `shop()` computed `spendable(s)` once and then tested that same stale
+ * figure in every branch below it. So a single week could emit "buy a clinic"
+ * *and* "hire a GP" *and* "hire a nurse" *and* "open a department" — each one
+ * individually affordable against a balance that the previous three had
+ * already spent. The engine refuses whatever is genuinely unaffordable when it
+ * arrives, so nothing went negative directly; what happened instead is that
+ * the bot drained itself to near-zero every week and had nothing left when the
+ * payroll and upkeep landed.
+ *
+ * ------------------------------------------------------------ why it is live
+ *
+ * The first fix trimmed the whole week's list up front against one budget.
+ * That is wrong in the other direction: a week that raises a bank facility and
+ * then spends it would have had the spending trimmed against the balance from
+ * *before* the money arrived. Asking the question one command at a time,
+ * against the state as it actually stands, is the only version that survives
+ * both cases.
+ *
+ * Applied centrally rather than inside each strategy: not spending money you
+ * do not have is a property of playing the game, not of a strategy, and doing
+ * it in one place means a new strategy inherits it.
+ */
+export function canAfford(s: RunState, c: Command): boolean {
+  const cost = costOf(s, c);
+  /* Free actions — and the ones the engine prices itself — always pass. */
+  return cost === 0 || cost <= spendable(s);
+}
+
 function spendable(s: RunState): number {
   const m = med(s);
   const weekly =
@@ -103,6 +190,57 @@ function spendable(s: RunState): number {
   // becomes a straitjacket once payroll is five figures, freezing the bot out
   // of every purchase for the rest of the run.
   return s.r.cash - Math.min(weekly * 2 + 5_000, 45_000);
+}
+
+/**
+ * BORROWING TO BUILD
+ *
+ * Sixteen of the eighteen strategies never raised a penny of outside money.
+ * They funded a capital-intensive business out of retained earnings, starting
+ * from $165,000 of student debt and one rented room — and the traces show what
+ * that costs: overdrawn from about week 45 to the horizon, stuck at two
+ * departments, payroll spent and no staff left to show for it. Financing is a
+ * built mechanic with a screen of its own, and a competent operator uses it.
+ *
+ * This is deliberately not `borrower`'s "take everything, every week". That
+ * strategy is the leverage stress test and has to stay one. This is the
+ * ordinary version: borrow when there is a specific thing to build, the money
+ * is not already there, and the practice is big enough that a lender would
+ * actually say yes.
+ *
+ * Bank only. The investor and the partner cost equity, and how much of your
+ * practice you are willing to sell is a judgement call that belongs to a
+ * strategy rather than to the baseline every strategy inherits.
+ */
+function financeGrowth(s: RunState): Command[] {
+  /* Nothing worth building means nothing worth borrowing for. */
+  if (bestInvestment(s).length === 0) return [];
+  /* The money is already on hand — a facility here would just accrue. */
+  if (spendable(s) > 60_000) return [];
+
+  const revenue = Math.max(0, s.r._lastRevenue ?? 0);
+  /*
+   * Interest compounds on the balance and nothing forces repayment, so debt
+   * taken against a practice that is not yet earning quietly grows for the
+   * rest of the run. Borrow against a business that exists.
+   *
+   * $1,500 was tried, on the theory that the lender's own floor was the only
+   * gate needed. It measured worse across the board — Epidemiologist went from
+   * +$1.7M to -$639k — because money borrowed against a practice that cannot
+   * yet convert it compounds for the rest of the run. The higher floor is kept
+   * on that evidence.
+   */
+  if (revenue < 4_000) return [];
+  /*
+   * Keep the balance inside a quarter of the income the bank itself
+   * underwrites. Past that the practice is carrying more debt than its own
+   * lender's view of it comfortably supports.
+   */
+  if (totalOutstanding(s) > revenue * 13) return [];
+  /* Below the bank's own floor the offer comes back blocked anyway. */
+  if (borrowingCapacity(s, netWorth(s), revenue) < 25_000) return [];
+
+  return [cmd("raiseFunds", "bank")];
 }
 
 /**
@@ -140,31 +278,76 @@ function bestInvestment(s: RunState): Command[] {
     }
   }
 
-  const top = (map: Map<string, number>) =>
-    [...map.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  /*
+   * ONE RANKING, ACROSS ALL THREE
+   *
+   * This function's job is to buy whatever unblocks the most money per dollar.
+   * It used to emit a fixed order instead — every affordable specialist, then
+   * equipment, then a department last — on the reasoning that staffing an open
+   * department is the cheapest unlock. That reasoning is fine in isolation and
+   * wrong in aggregate: with a live budget the department is the item the week
+   * always runs out of money before reaching, so the practice hired people it
+   * then had nothing profitable for. The traces are unambiguous about the
+   * result — 43% of capacity idle while a third of arrivals were turned away,
+   * and payroll at two thirds of revenue.
+   *
+   * So the three categories compete on the same measure, value per dollar, and
+   * the winner goes first. Ties and near-ties sort themselves out over weeks.
+   */
+  const best = <K,>(
+    map: Map<K, number>,
+    costOfKey: (k: K) => number,
+  ): { key: K; value: number; cost: number } | null => {
+    let win: { key: K; value: number; cost: number } | null = null;
+    for (const [key, value] of map) {
+      const cost = Math.max(1, costOfKey(key));
+      if (!win || value / cost > win.value / win.cost) win = { key, value, cost };
+    }
+    return win;
+  };
 
-  // Staffing an open department is the cheapest unlock, so it comes first.
-  const staffGap = top(lostByStaff);
-  if (staffGap) out.push(cmd("hire", `specialist:${staffGap}`));
+  const candidates: { cmd: Command; value: number; cost: number }[] = [];
 
-  // Then equipment, cheapest-first among the valuable ones.
-  const equipGap = [...lostByEquip.entries()]
-    .sort((a, b) => {
-      const ca = EQUIPMENT_BY_ID.get(a[0] as never)?.cost ?? 1;
-      const cb = EQUIPMENT_BY_ID.get(b[0] as never)?.cost ?? 1;
-      return b[1] / cb - a[1] / ca;
-    })[0]?.[0];
-  if (equipGap) out.push(cmd("buyEquipment", equipGap));
-
-  // Then a new department, if there is room for one.
-  if (m.departments.length < departmentSlots(m)) {
-    const deptGap = [...lostByDept.entries()].sort((a, b) => {
-      const ca = SPECIALTY_BY_ID.get(a[0] as never)?.unlockCost ?? 1;
-      const cb = SPECIALTY_BY_ID.get(b[0] as never)?.unlockCost ?? 1;
-      return b[1] / (cb || 1) - a[1] / (ca || 1);
-    })[0]?.[0];
-    if (deptGap) out.push(cmd("openDepartment", deptGap));
+  const staffGap = best(lostByStaff, (k) =>
+    ROLE_BY_ID.get("specialist" as never)?.hireCost ?? SPECIALTY_BY_ID.get(k as never)?.unlockCost ?? 1,
+  );
+  if (staffGap) {
+    candidates.push({
+      cmd: cmd("hire", `specialist:${staffGap.key}`),
+      value: staffGap.value,
+      cost: staffGap.cost,
+    });
   }
+
+  const equipGap = best(
+    lostByEquip,
+    (k) => EQUIPMENT_BY_ID.get(k as never)?.cost ?? 1,
+  );
+  if (equipGap) {
+    candidates.push({
+      cmd: cmd("buyEquipment", equipGap.key),
+      value: equipGap.value,
+      cost: equipGap.cost,
+    });
+  }
+
+  /* A department still needs somewhere to put it. */
+  if (m.departments.length < departmentSlots(m)) {
+    const deptGap = best(
+      lostByDept,
+      (k) => SPECIALTY_BY_ID.get(k as never)?.unlockCost ?? 1,
+    );
+    if (deptGap) {
+      candidates.push({
+        cmd: cmd("openDepartment", deptGap.key),
+        value: deptGap.value,
+        cost: deptGap.cost,
+      });
+    }
+  }
+
+  candidates.sort((a, b) => b.value / b.cost - a.value / a.cost);
+  out.push(...candidates.map((c) => c.cmd));
 
   return out;
 }
@@ -254,16 +437,64 @@ export const builder: Strategy = {
   shop: (s) => {
     const m = med(s);
     /* Trouble first, always. Everything downstream assumes a practice that is
-       operating, and a setback is the state where it is not. */
-    const out: Command[] = [...handleTrouble(s)];
+       operating, and a setback is the state where it is not. Then the team:
+       replacing somebody costs more than keeping them. */
+    const out: Command[] = [...handleTrouble(s), ...keepStaff(s)];
+    /* Before any of the spending below, decide whether to fund it. */
+    out.push(...financeGrowth(s));
     const free = spendable(s);
 
     // Keep enough physical space and enough people to use it.
     const cap = computeCapacity(m, 3, s.r.skill, s.r.burnout);
     const expected = s.r.panel * 0.28 * 2.2;
 
-    if (cap.effective < expected) {
-      if (cap.limitedBy === "space") {
+    /*
+     * CAPABILITY BEFORE CAPACITY
+     *
+     * This used to come last, after premises, hiring and supplies had taken
+     * their share — so with a real budget the department never got bought at
+     * all. The diagnostics say plainly why that is the wrong order: the
+     * practice ran at ~49% idle capacity while turning away ~36% of arrivals.
+     * Those are only compatible if the patients are being turned away for
+     * want of a *department*, not for want of room or hours. Buying more
+     * capacity in that state buys nothing.
+     *
+     * So the blocked-revenue signal goes first, which is what this strategy's
+     * name always claimed it did. It is also what the Caseload screen tells a
+     * human player, in those words, under "your main limit this week".
+     */
+    if (free > 8_000) out.push(...bestInvestment(s));
+
+    /*
+     * And only add capacity when capacity is genuinely the constraint. Being
+     * short of *space* is a real reason to build; being short of nothing is
+     * not, and this branch fired unconditionally whenever demand outran a
+     * capacity figure the practice could not use anyway.
+     */
+    const blockedOnCapacity =
+      m.lastCases.reduce(
+        (n, c) => n + (c.blockedBy === "capacity" ? c.turnedAway : 0),
+        0,
+      ) >
+      m.lastCases.reduce(
+        (n, c) => n + (c.blockedBy === "department" ? c.turnedAway : 0),
+        0,
+      );
+
+    /*
+     * Premises are also how you get somewhere to *put* a department: a rented
+     * room holds one, a clinic three, a centre six. So when every slot is full
+     * and departments are what the caseload is short of, building is the move
+     * even though patient capacity is not the binding constraint.
+     */
+    const outOfSlots = m.departments.length >= departmentSlots(m);
+
+    if (
+      (cap.effective < expected &&
+        (blockedOnCapacity || m.lastCases.length === 0)) ||
+      (outOfSlots && !blockedOnCapacity && m.lastCases.length > 0)
+    ) {
+      if (cap.limitedBy === "space" || outOfSlots) {
         const slots = facilitySlots(m);
         if (free > 520_000 && slots > 350) out.push(cmd("buyFacility", "hospital"));
         else if (free > 185_000) out.push(cmd("buyFacility", "centre"));
@@ -288,7 +519,6 @@ export const builder: Strategy = {
       }
     }
 
-    if (free > 8_000) out.push(...bestInvestment(s));
     if (free > 2_600 && m.staff.filter((x) => x.role === "admin").length < 2) {
       out.push(cmd("hire", "admin"));
     }
@@ -706,6 +936,44 @@ function handleTrouble(s: RunState): Command[] {
 /** Kept for readability at the call sites; both kinds of trouble, one call. */
 const handleCrises = handleTrouble;
 
+/**
+ * KEEPING THE PEOPLE YOU HIRED
+ *
+ * Expectations creep every week — `culture.ts` raises `expects` with skill and
+ * ambition — while salary is fixed at the moment of hire. Left alone the gap
+ * widens, culture falls under 25, and staff resign. The counter-play is
+ * `rewardStaff`, which closes the gap exactly and permanently.
+ *
+ * Only one strategy used it, and behind `cash > 200_000` — a balance no run
+ * ever reached. So every other strategy hired continuously, lost everyone to
+ * churn, and paid the hiring cost again: that is where the payroll went in a
+ * practice that ends the run with no staff.
+ *
+ * This is the floor, not a strategy: retaining somebody you are already paying
+ * is cheaper than replacing them, and any competent player does it. Strategies
+ * that want to spend *more* on their team still can, and `manager` still does.
+ *
+ * Deliberately conservative — it acts on a gap of 12% or more, and the engine
+ * enforces its own eight-weeks-of-cover guard on top.
+ */
+function keepStaff(s: RunState): Command[] {
+  const m = med(s);
+  if (m.staff.length === 0) return [];
+  const out: Command[] = [];
+
+  /* Workload is practice-wide and free, so it comes first. */
+  if (cultureScore(m, s.week).score < 45) out.push(cmd("easeWorkload"));
+
+  /* Worst-underpaid first, so a tight week fixes the person closest to
+     leaving rather than whoever happens to be first in the array. */
+  const behind = m.staff
+    .map((raw) => hydrateStaff(raw))
+    .filter((x) => x.expects > x.salary * 1.12)
+    .sort((a, b) => b.expects - b.salary - (a.expects - a.salary));
+  for (const x of behind) out.push(cmd("rewardStaff", x.id));
+  return out;
+}
+
 /** Accept offers matching a filter, and pass on the rest so they do not clog. */
 function takeOffers(
   s: RunState,
@@ -745,10 +1013,18 @@ export const conservative: Strategy = {
     }
     return plan;
   },
+  /*
+   * The control, and it has to stay one. `builder` now raises a bank facility
+   * when growth needs funding, and this strategy inherits `builder.shop`
+   * wholesale — so the borrowing is filtered back out here rather than by
+   * keeping a second copy of the shopping logic in step by hand. If somebody
+   * later teaches `builder` a new way to raise money, this still never takes
+   * it, which is the whole point of the comparison.
+   */
   shop: (s) => [
     ...handleCrises(s),
     ...takeOffers(s, (_k, risk) => risk < 0.3),
-    ...builder.shop(s),
+    ...builder.shop(s).filter((c) => c.cmd !== "raiseFunds"),
   ],
 };
 

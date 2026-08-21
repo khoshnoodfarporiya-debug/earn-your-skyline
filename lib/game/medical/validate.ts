@@ -17,6 +17,7 @@ import {
 import { QUALIFICATION_BY_ID } from "./progression";
 import { CAMPAIGN_BY_ID } from "./marketing";
 import { LIFESTYLE_BY_ID } from "./lifestyle";
+import { FLEET_BY_ID } from "./fleet";
 import { OUTBREAK_BY_ID } from "./outbreaks";
 import type { TriagePolicy } from "./types";
 
@@ -82,6 +83,14 @@ export function validateMedicalData(data: unknown): boolean {
 
   if (!every(m.departments, (d) => inCatalogue(d, SPECIALTY_BY_ID))) return false;
   if (!every(m.equipment, (e) => inCatalogue(e, EQUIPMENT_BY_ID))) return false;
+  /*
+   * The fleet is optional: a save written before ambulances existed has no
+   * `fleet` at all, and that is a valid v11 save rather than a corrupt one.
+   * Present-but-wrong is still rejected — `undefined` is the only pass.
+   */
+  if (m.fleet !== undefined && !every(m.fleet, (v) => inCatalogue(v, FLEET_BY_ID))) {
+    return false;
+  }
   if (
     !every(
       m.qualifications,

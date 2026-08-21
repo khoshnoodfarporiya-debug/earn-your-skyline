@@ -1,3 +1,5 @@
+import { LAWYER_CRISIS_STAGES } from "./careers/lawyerCrises";
+
 
 /**
  * CRISES
@@ -75,6 +77,14 @@ export interface ActiveCrisis {
   /** Weeks since the player last did anything about it. */
   ignored: number;
   city?: string;
+  /**
+   * Whose stage set this runs on.
+   *
+   * Optional, and absent means the Physician's — which is what every crisis
+   * written before any other career had one actually was. A save from then
+   * reads and plays exactly as it did.
+   */
+  career?: string;
 }
 
 /** Two at once is a bad month; three is noise. */
@@ -92,6 +102,17 @@ export interface CrisisChoice {
   severity: number;
   /** Reputation movement, by category. */
   rep?: Partial<Record<string, number>>;
+  /**
+   * Movement in the career's own headline standing.
+   *
+   * `rep` writes the Physician's six categories, which have a screen behind
+   * them in exactly one career; a Solicitor moved that way would be moving a
+   * number nothing reads. Careers whose standing is a single figure use this
+   * instead, and apply it in their own handler.
+   */
+  standing?: number;
+  /** Borrowing taken on. For the choices that are "find the money somewhere". */
+  debt?: number;
   /** People who notice, and how. */
   people?: { id: string; warmth?: number; trust?: number; respect?: number; why: string }[];
   /** Where this leads. Absent means stay on this stage. */
@@ -177,6 +198,7 @@ export function startCrisis(
   week: number,
   severity: number,
   city?: string,
+  career?: string,
 ): ActiveCrisis {
   return {
     id: `${kind}-${week}`,
@@ -187,6 +209,7 @@ export function startCrisis(
     taken: [],
     ignored: 0,
     city,
+    ...(career ? { career } : {}),
   };
 }
 
@@ -201,10 +224,21 @@ export function tickCrisis(c: ActiveCrisis): {
   escalated: boolean;
   burnedOut: boolean;
 } {
+  /*
+   * Something you have already finished cannot be neglected.
+   *
+   * The drift below is never less than +2, and the weekly loops check
+   * `isResolved` *after* ticking — so a crisis answered all the way down to
+   * zero drifted straight back to 2 and stayed open for ever. It was
+   * unreachable in practice until a second career's stages made a two-choice
+   * resolution ordinary, and then it was every time.
+   */
+  if (isResolved(c)) return { escalated: false, burnedOut: false };
+
   c.ignored += 1;
   const drift = c.ignored >= 2 ? 6 + c.ignored : 2;
   c.severity = Math.min(100, c.severity + drift);
-  const stages = CRISIS_STAGES[c.kind];
+  const stages = stagesFor(c.kind, c.career);
   const escalated = c.ignored >= 4 && c.stage < stages.length - 1;
   if (escalated) c.stage = stages.length - 1;
 
@@ -239,7 +273,7 @@ export const isResolved = (c: ActiveCrisis): boolean => c.severity <= 0;
  * The terminal stage always offers something — a crisis with no way out is a
  * loss screen, and the game has those already.
  */
-export const CRISIS_STAGES: Record<CrisisKind, CrisisStage[]> = {
+const MEDICAL_STAGES: Record<CrisisKind, CrisisStage[]> = {
   walkout: [
     {
       title: "Your nurses have stopped covering the gaps",
@@ -785,8 +819,36 @@ export const CRISIS_STAGES: Record<CrisisKind, CrisisStage[]> = {
   ],
 };
 
-export const stageOf = (c: ActiveCrisis): CrisisStage =>
-  CRISIS_STAGES[c.kind][Math.min(c.stage, CRISIS_STAGES[c.kind].length - 1)];
+/**
+ * The stages this crisis actually runs on.
+ *
+ * A career with its own set gets it; anybody else gets the Physician's, which
+ * is what the whole system was until a second career needed one. Falling back
+ * rather than throwing matters: a career may author three of the five kinds
+ * and must still be able to receive the other two.
+ */
+const STAGE_SETS: Record<string, Partial<Record<CrisisKind, CrisisStage[]>>> = {
+  lawyer: LAWYER_CRISIS_STAGES,
+};
+
+/**
+ * The Physician's set, still exported under its old name.
+ *
+ * Several callers read it directly and none of them are wrong to: it is the
+ * default set, and it is what a crisis with no career on it runs. Anything
+ * that needs the set for a *specific* crisis should use `stagesFor`.
+ */
+export const CRISIS_STAGES = MEDICAL_STAGES;
+
+export function stagesFor(kind: CrisisKind, careerId?: string): CrisisStage[] {
+  const own = careerId ? STAGE_SETS[careerId]?.[kind] : undefined;
+  return own ?? MEDICAL_STAGES[kind];
+}
+
+export const stageOf = (c: ActiveCrisis): CrisisStage => {
+  const stages = stagesFor(c.kind, c.career);
+  return stages[Math.min(Math.max(0, c.stage), stages.length - 1)];
+};
 
 export function severityWord(n: number): string {
   if (n >= 75) return "Critical";

@@ -63,6 +63,19 @@ export default {
         gold: "#F4B860",
         "gold-tint": "#2E2415",
 
+        /**
+         * The Chef's own accent: muted copper, taken from the warm end of that
+         * career's artwork.
+         *
+         * It exists because teal is the app's "yours / active / do this" and a
+         * kitchen photographed under heat lamps fights it. Copper is used only
+         * where a Chef screen needs to mark its own state — a live service, the
+         * room you are in — and never as a second action colour, so `clinical`
+         * still means the same thing in every career.
+         */
+        chef: "#D08A4A",
+        "chef-tint": "#2A1B10",
+
         /** It went well. */
         good: "#43C78B",
         "good-tint": "#102C22",

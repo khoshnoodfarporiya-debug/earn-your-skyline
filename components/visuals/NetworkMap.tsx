@@ -516,31 +516,52 @@ export function NetworkMap({
               })}
             </g>
 
-            {/* Leader lines, drawn only where a label was moved sideways. */}
+            {/* Leader lines, drawn only where a label was moved sideways.
+                Offsets divided by zoom for the same reason the labels are —
+                see the note on the names below. */}
             <g stroke="#8AA0C4" strokeWidth={1} vectorEffect="non-scaling-stroke" opacity={0.5}>
               {nodes
                 .filter((n) => Math.abs(n.label.dx) >= 2)
                 .map((n) => (
                   <line
                     key={`lead-${n.id}`}
-                    x1={n.x + (n.label.dx > 0 ? 1.1 : -1.1)}
+                    x1={n.x + (n.label.dx > 0 ? 1.1 : -1.1) / zoom}
                     y1={sy(n.y)}
-                    x2={n.x + n.label.dx * 0.82}
-                    y2={sy(n.y + n.label.dy)}
+                    x2={n.x + (n.label.dx * 0.82) / zoom}
+                    y2={sy(n.y) + sy(n.label.dy) / zoom}
                   />
                 ))}
             </g>
 
-            {/* Names. In the SVG so they scale and clip with the board. */}
+            {/*
+             * Names. In the SVG so they clip with the board — but sized in
+             * screen pixels rather than board units.
+             *
+             * Everything here is divided by `zoom` on purpose. The SVG grows
+             * with the zoom level (`minWidth: MIN_MAP_PX * zoom`), so a
+             * `fontSize` in viewBox units grows with it: at 6x, "London" was
+             * rendered six times larger and the names covered the continent
+             * they were labelling. Dividing by the same factor holds them at a
+             * constant size on screen, which is how a map label is supposed to
+             * behave — you zoom to see more places, not larger words.
+             *
+             * The offsets go the same way, so a name stays the same distance
+             * from its marker rather than drifting further off as you zoom.
+             *
+             * This also makes the rendering agree with the collision code
+             * above, which has always measured labels as `/ zoom` — it was
+             * already deciding which names fit on the assumption that they
+             * were a fixed screen size, while they were drawn scaling.
+             */}
             <g className="select-none">
               {labelled.map((n) => (
                 <text
                   key={`label-${n.id}`}
-                  x={n.x + n.label.dx}
-                  y={sy(n.y + n.label.dy)}
+                  x={n.x + n.label.dx / zoom}
+                  y={sy(n.y) + sy(n.label.dy) / zoom}
                   textAnchor={n.label.anchor}
                   dominantBaseline="middle"
-                  fontSize={1.4}
+                  fontSize={1.4 / zoom}
                   className={
                     n.id === selected
                       ? "fill-ink font-semibold"
@@ -551,7 +572,8 @@ export function NetworkMap({
                   style={{
                     paintOrder: "stroke",
                     stroke: "#0A1220",
-                    strokeWidth: 0.55,
+                    /* The halo has to shrink with the text or it swallows it. */
+                    strokeWidth: 0.55 / zoom,
                     strokeLinejoin: "round",
                   }}
                 >

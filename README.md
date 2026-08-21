@@ -6,8 +6,17 @@ Simulator, built against the opposite principle: there, every player is a
 generic owner optimising the same cash loop. Here, what constrains you depends
 on who you are.
 
-The **Physician** career is complete and playable: you start as one doctor in
-one rented room and finish, if it goes well, running a regional hospital.
+Three careers are playable, and they are not the same game with different
+nouns — each is built around a different binding constraint:
+
+| Career | What constrains you | State |
+| --- | --- | --- |
+| **Physician** | Capability — you cannot treat what you have no department for | The most complete career, and the baseline the others are built against |
+| **Chef** | Spoilage — stock decays and is served oldest-first | Playable: recipes, a menu, an ingredient pantry, and a service pipeline worked by a brigade of positions |
+| **Solicitor** | The case pipeline — nothing pays until it settles, and it might not | Playable, with a smaller UI and feature set (see Status) |
+
+A run has **no forced ending**. Failure produces setbacks with recovery routes,
+never a game-over screen, and retirement is something you choose.
 
 ```bash
 npm install
@@ -103,8 +112,8 @@ pathogen currently possible — rather than hiding the curve.
 
 ### Cities
 
-You start in Lyon, where your licence already works. Fourteen markets are
-open to expand into — Paris, London, New York, Tokyo, Dubai, Singapore,
+You choose which of the fourteen markets your licence works in before week
+one, and the rest are open to expand into — Paris, London, New York, Tokyo, Dubai, Singapore,
 Mumbai, Lagos and more — and a city is not a skin on the same market. Each
 changes four things at once, pulling against each other:
 
@@ -128,6 +137,103 @@ spread across the network in proportion to the space each city has.
 Because population is a hard cap, a single mid-size city eventually walls you
 in no matter how much you hire. Expanding is not optional flavour; it is how
 the late game exists at all.
+
+---
+
+## Where the run begins
+
+Every career now asks a second question before week one: **which city**. It is
+one choice, made once, and there is no moving afterwards — a licence, a
+kitchen and a set of chambers are all things you are in rather than things you
+carry.
+
+It is not a difficulty slider. A city moves several numbers at once and they
+pull against each other, so the best one depends on how you intend to play:
+
+| | The Chef | The Solicitor | The Physician |
+| --- | --- | --- | --- |
+| **Money in** | spend per head | what an instruction bills | the fee index |
+| **Money out** | rent, produce, wages | chambers, salaries | costs, property, wages |
+| **Who turns up** | how many want a table | how often work comes in | population and competition |
+| **The signature axis** | **shelf life** — Milan gains a week, New York and Mumbai lose one | **reach** — a quiet market never sends the group claim, however good you get | **case mix** — Tokyo sends tumours, Madrid sends babies |
+
+Seven cities for the Chef, six for the Solicitor, all fourteen markets for the
+Physician. The card for each states what it changes, and those lines are
+generated from the same tables the simulation reads — a city cannot advertise
+a rate it does not have.
+
+### Everything is in local money
+
+The rule that makes this work, and it was learned the hard way: **if any part
+of a run is denominated locally, all of it must be.** The first pass scaled
+rent, produce and takings but left wages, equipment, event costs and the
+insolvency threshold at their Lyon values, so a kitchen in Mumbai took 45% of
+Lyon's money at the till and paid 100% of Lyon's wages at the pass. The
+simulation was insolvent for 119 weeks out of 120 there and it was arithmetic,
+not difficulty.
+
+So the opening loan and float, wages and hiring, equipment and its upkeep,
+premises, one-off sums in events, the insolvency line and **the target itself**
+all scale with the city. What is left is the trade — and the trade is the
+point.
+
+### Scaling with *what*, though — the second half of the lesson
+
+Making everything local was necessary and not sufficient. The follow-up
+question is which local number each thing scales with, and getting it wrong
+cost the expensive cities tens of thousands a run in arithmetic rather than in
+difficulty.
+
+There are two indices, and the split is the whole of it:
+
+| | scales with | because |
+| --- | --- | --- |
+| Rent | the city's own rent | the city's premium, and the dial the cities differ on |
+| Wages, hiring | **what a cover is worth** | a wage is a cost of producing revenue, exactly as produce is |
+| Equipment, the lease, the fit-out loan, upkeep | **the blend of the two** | a thing you buy is priced off the local cost base |
+
+Wages used to sit on the blend, on the reasoning that a cook is not paid in
+menu prices. True of the world, wrong for this model: it left London labour
+costing 19% more *relative to takings* than Lyon's, on top of a lease that was
+being charged the city's property premium twice — once as capital when you took
+the room, and again as rent every week you held it.
+
+Compounded up a four-rung ladder the result was a kitchen that could not grow.
+`npm run cities` showed it plainly: a competent London or New York operator was
+**still on the market stall after a hundred and twenty weeks**, and finished
+tens of thousands worse than the same operator in Lyon for no reason anybody
+had chosen. Putting labour on takings and capital on the blend moved New York
+from −$88,572 to −$48,062 and London from −$69,669 to −$53,487, while Lyon and
+Milan did not move at all — which is what a fix to an asymmetry should look
+like.
+
+The residual is deliberate. New York and Mumbai are still the hardest places to
+run a kitchen, because a lorry and a hot climate are what those cards promise.
+
+Lyon (Chef, Physician) and London (Solicitor) are neutral on every axis. That
+is deliberate: they are where every run before this feature started, so a save
+written then reads as its career's default and plays exactly as it did, and
+every published figure below is still measured against the same conditions
+that produced it.
+
+### Does every city play?
+
+```bash
+npm run cities            # both new careers, every city, one control bot
+npm run balance -- 40 --city=lagos    # the Physician's whole table, elsewhere
+```
+
+`scripts/cities.ts` plays one deliberately unclever bot — identical rules in
+every city — and reports what happened. It is a control, not a player: it
+exists to catch a city where an ordinary approach is insolvent for the whole
+run, not to prove the cities are equal, which they are not meant to be.
+
+At 24 seeds over 120 weeks, **no city leaves the bot overdrawn** (Chef) and
+none of the six legal markets is worse than a firm carrying its work in
+progress ought to be. The bot reaches the target in **none** of them, in the
+neutral city as well as the hard ones — that is a limitation of the bot, which
+never grows past its first room, not a verdict on any market. Treat these as a
+solvency check; the Chef's and Solicitor's balance remains first-pass.
 
 ### The clinical ladder
 
@@ -737,6 +843,7 @@ npm run typecheck
 npm run lint                 # TypeScript, React hooks, Next, a11y, dead code
 npm run check                # command contracts, save validation, visual registry
 npm run balance              # win rates per strategy, 40 seeds each
+npm run cities               # every start city of the Chef and the Solicitor
 npm run balance -- 250       # the authoritative pass; 250 seeds, 95% intervals
 npm run trace builder 1074   # week-by-week table for one run
 npm run fixtures             # regenerate the deterministic browser fixtures
@@ -935,18 +1042,618 @@ beside it in `public/visuals/…`, and add one registry entry.
 
 ---
 
+## The Chef's dishes
+
+The Chef shipped with produce and no food: crates of "basic", "market" and
+"luxury" bought *covers*, and a cover was an abstraction — nobody ever chose a
+dish. Recipes, a menu and a pantry of named ingredients are the layer where
+that choice lives.
+
+### It sits on top of the crates, not instead of them
+
+The load-bearing decision in the whole feature. A crate is still the staple —
+the stock, the trimmings, the things a kitchen buys by the box and does not
+write down — and it still meters covers, ages, feeds plate quality through
+freshness and grade, and writes off what it loses. **Every figure this career
+was balanced against is that system, and it is untouched.**
+
+A recipe is what turns one of those covers into a *dish*: it costs the staple
+cover plus its own named ingredients, and in exchange it sets what the cover
+sells for and how good it is. A kitchen with no menu plays exactly as it did
+before the feature existed — which is what lets an old save carry on without
+being quietly re-balanced, and is asserted in `npm run check`.
+
+### The loop
+
+1. **Develop a dish.** Twelve recipes, gated on craft, on the room and on
+   standing. Three are what any cook already knows; the rest cost money and a
+   week's attention. An original can be given a house name — the catalogue
+   keeps its own id and name, so a rename can never orphan the row.
+2. **Put it on the menu, and price it.** The price is yours. What the room
+   *expects* to pay is the premises' spend per head, in the money of the city.
+3. **Order the ingredients it is made of.** Fourteen ingredients across six
+   categories, each with a unit, a shelf life, a storage requirement and a
+   supplier who decides what it costs and how much life it lands with. Two are
+   seasonal and cost 55% more out of season.
+4. **Serve.** A cover orders one main and is tempted by the rest in proportion
+   to how popular each dish is — so breadth genuinely earns more a head, and
+   only if the pantry can carry all of it. Ingredients come out oldest first.
+5. **Read it back.** Money → Food cost gives takings, what the crates and the
+   pantry cost to put on plates, what was thrown away, the food-cost share and
+   every dish's own covers, revenue and margin.
+
+### The trades
+
+| | |
+| --- | --- |
+| **A broad menu** | reaches more people and earns more a head — and holds more perishable stock for dishes nobody ordered |
+| **A short menu** | is a sharper kitchen: consistency rises as the list shrinks |
+| **A high price** | earns more per cover and empties tables. Priced above what the room expects, covers fall away |
+| **A slow menu** | eats the pass. The same brigade plates fewer covers of a tasting course than of soup |
+| **Premium ingredients** | lift the plate and die faster. Truffle is one week of life at $46 a portion |
+| **A dish beyond the brigade** | is not refused — it goes out *worse*, which is the outcome a player can learn from |
+
+Every one of those is a real number in `menuFactors`, and every one is printed
+on the Menu screen rather than left to be inferred from a bad week.
+
+### Freshness, and the rule the system rests on
+
+Ingredients age **by game week**, never by wall-clock time, so a save closed
+for a month opens exactly as it was left. Four states — fresh, fine, use this
+week, gone — because "62% fresh" is not a decision and "use it this week" is.
+
+**Nothing spoiled can ever be served.** It is swept before service, at the top
+of the week, so it is not in the pantry by the time a plate is called; the
+count that decides what can be cooked excludes it; and `consumeForCovers`
+skips it even if a caller forgets to sweep. The player can also bin it
+deliberately, and both routes cost exactly the same.
+
+Refrigeration is the modifier, as it is for the crates: a cold room adds real
+weeks to **chilled** stock, does nothing for a sack of flour, and frozen stock
+barely ages at all.
+
+### One source of financial truth
+
+Ingredients are paid for **when the order is placed**, like every other
+purchase in this career. Consumption and spoilage therefore move no cash: what
+they change is the *stock*, which stops counting towards what the business is
+worth the moment it leaves the shelf. The weekly ledger reports both as
+information lines carrying the money, and `npm run check` asserts that cash
+movement equals the ledger's own arithmetic — the check that caught the first
+version charging for every ingredient twice.
+
+---
+
+---
+
+## The service, order by order
+
+Phase 1 asked how much food should be in the building. This asks what happens
+on the night: tickets arrive, somebody preps them, somebody cooks them,
+somebody plates them, and a table either gets what it ordered while it still
+wanted it or does not.
+
+### Why it is a recording, not a timer
+
+There is no `setInterval` anywhere in this feature, and that is a design
+decision rather than a shortcut. A service played against a wall clock cannot
+be paused, cannot be saved mid-night, cannot be replayed and cannot be tested —
+and this game is played a week at a time on a save that has to survive being
+closed for a month.
+
+So the night runs as **ticks**, all of them, when the week resolves, on the
+run's own seeded stream. Every tick is recorded, and the dashboard renders the
+recording: the player steps through the service that happened with a scrubber,
+watches the queues build, and sees the moment the pass fell behind. Leaving the
+screen, reloading the save and coming back later all show the same night,
+because the night is data.
+
+The player's decisions are the **policies** — how the kitchen behaves when the
+tickets come — and the hires, the kit and the menu that decide what each
+station can move. Staff process the orders; the player decides how.
+
+### The stations
+
+Six queues, each with a throughput built from three things a player controls:
+who is standing there, what is installed, and how complicated the menu is.
+
+| | Fed by | Fails as |
+| --- | --- | --- |
+| **Preparation** | Commis, prep station | Tickets never start |
+| **Hot line** | Chef de partie, range, deck oven | Food is not cooked |
+| **Pastry** | Pastry chef, pastry section | Puddings jam the mains |
+| **The pass** | Sous chef, you | Everything backs up at the end |
+| **Wash-up** | Kitchen porter, dishwasher | Nothing clean to plate on |
+| **Front of house** | Servers, manager | Food goes cold under the lamp |
+
+The station whose queue grows worst against its capacity is **named** in the
+report, with the hire or the purchase that fixes it. "Efficiency low" is not
+something a player can act on; "the pass is drowning and a sous chef runs the
+pass" is.
+
+**The scale is borrowed, not invented.** Total capacity comes from
+`brigadeCovers` — the figure the whole career is balanced against — and the
+pipeline only decides *where* it sits. A brigade with no pastry chef has the
+same total capacity and a pastry queue that ruins the night.
+
+### The five services are five different nights
+
+Not one calculation with five labels. Each changes how the room arrives, how
+long it will wait, and what it is judging:
+
+| | Arrives | Patience | Judged on | Plates a cover |
+| --- | --- | --- | --- | --- |
+| **Lunch** | Steadily, in a rush | 3 ticks | Speed — a plain plate is forgiven, a wait is not | 1 |
+| **Dinner** | Steadily | 5 ticks | The whole thing: wait, plate and room | 1.4 |
+| **Private event** | **All at once** | 9 ticks | The contract — everybody eats or it failed | 2 |
+| **Catering** | **One batch, no room** | n/a | A complete, on-time delivery | 1 |
+| **Tasting menu** | All at once | 12 ticks | The plate, and almost nothing else | **4** |
+
+A tasting menu is four tickets a cover, which is why twelve diners can drown a
+kitchen that serves a hundred at dinner. Catering has nobody sitting in your
+dining room, so nobody walks out — the deadline is the van. A private event
+paid in advance for a stated number of covers, so failing to feed them is a
+breach rather than a busy night.
+
+### Policies, with costs
+
+| | Buys | Costs |
+| --- | --- | --- |
+| Prioritise late tickets | Far fewer walkouts | The line loses its rhythm — more mistakes |
+| Simplify the plating | A third more through the pass | Presentation drops on every dish |
+| Push the brigade | Every station moves faster | Real fatigue, lower morale, more mistakes |
+| Hold the walk-ins | Nobody seated into a queue | Covers you turned away are covers unpaid |
+| Comp the worst delays | The table stays, and forgives | You cooked it and it was free |
+
+### The brigade, as positions
+
+Eight roles, and a role now says *where* somebody can stand rather than how
+many covers they are worth. Executive chef (you), sous chef, chef de partie,
+pastry chef, commis, kitchen porter, restaurant manager and server.
+
+Each person carries skill, salary, morale, loyalty, **fatigue**, **experience**,
+**training progress** and one or two **traits** — calm under pressure, fast
+learner, perfectionist, creative, reliable, team player, wasteful,
+temperamental. Every trait states its modifier on the card: a calm cook halves
+their share of the mistakes, a perfectionist is slower and better, a reliable
+one tires a third more slowly.
+
+Fatigue is distinct from morale on purpose. Morale is how somebody feels about
+working here and moves slowly; fatigue is how much service they have absorbed
+and moves every week. A tired cook makes mistakes; an unhappy one leaves. A
+week off clears most of a month of nights and costs you the week — they work no
+services and learn nothing, and you pay them anyway.
+
+Experience is earned by working, not bought, and a commis who has cooked enough
+services can be **promoted** — at which point paying them properly is the only
+decision left.
+
+### What lands where
+
+Every night's outcome flows into the systems that already existed: revenue and
+ingredient cost into the weekly ledger, satisfaction and walkouts into the
+reviews, fatigue and experience onto the people, dishes served onto the recipes
+that sold them. Nothing is settled twice, and `npm run check` asserts that cash
+moved by exactly what the ledger says.
+
+---
+
+## What the city thinks
+
+The third layer on the Chef: **why** the numbers move. Everything below is
+built out of what the restaurant actually did, and every one of it is readable
+by the player at the point it happens.
+
+### Reputation, in seven parts
+
+"Reputation 62" answered no useful question. A kitchen whose food is superb and
+whose service is chaos, and one that is merely competent at everything, had the
+same number — and the player had no way to know which of their problems was
+costing them covers.
+
+| | Moved by |
+| --- | --- |
+| **Food quality** | Plate quality, freshness, who cooked it |
+| **Service** | Waits, walkouts, mistakes, covers turned away |
+| **Value** | Your prices against the plate and against the city |
+| **Atmosphere** | The room, how full it is, how calm the brigade looked |
+| **Consistency** | How much plate quality moves from week to week |
+| **Hygiene** | Spoilage, waste, inspections, allergy handling |
+| **Innovation** | Original dishes, signatures, how long the menu has stood still |
+
+**`s.r.reputation` is unchanged.** That number is written from about twenty
+places and read by the forecast, hiring, events, the objective and every
+setback check. Replacing it would have meant rewriting all of them and any one
+missed would be a silent balance change. So every existing write now goes
+through `applyStanding`, which moves the overall by exactly what it always
+moved *and* files the move under the part of the restaurant that caused it,
+with the sentence the simulation wrote at the moment it decided.
+
+There are two kinds of movement, and the distinction is the whole compatibility
+story:
+
+- **`applyStanding` is for news** — a bad night, a critic, a complaint. It
+  moves the category and the overall together, by the same amount.
+- **`settleStanding` is for facts** — atmosphere is a property of the room you
+  bought, value of the prices you set. It moves the category toward what is
+  demonstrably true and **never touches the overall**, because pushing
+  reputation every week for owning a nice dining room would run it to 100
+  inside a season.
+
+There is no random drift term anywhere in either. If a bar moves, the screen
+can say what moved it.
+
+### Who is in the room
+
+Eight segments, and what separates them is *which of the seven they weigh*.
+
+| | Wants most | Pays | Patience |
+| --- | --- | --- | --- |
+| Budget diners | Value (55%) | 72% | short |
+| Local regulars | Consistency (34%) | 95% | long |
+| Business customers | Service (36%) | 130% | very short |
+| Tourists | Atmosphere (34%) | 110% | fair |
+| Families | Value (34%) | 85% | shortest |
+| Food enthusiasts | Food (42%) | 125% | longest |
+| Luxury diners | Food (30%), room (28%) | 195% | fair |
+| Event clients | Service (34%) | 140% | longest |
+
+The mix decides how many people want a table, what they spend per head, how
+long they will wait before walking, and **who writes the reviews and about
+what**. It is per city and per season: Mumbai is twice as price-sensitive as
+Paris, summer nearly doubles the tourist share and empties the regulars', and
+winter is when the event bookings come.
+
+Both the demand and the spend figures are expressed **against the ordinary
+restaurant in that city and season**, and that is not a stylistic choice.
+`city.spend` already says Mumbai eats cheaply; if the mix also reported a low
+spend there — because Mumbai's mix is mostly budget diners, which it is — the
+city's poverty would be charged twice. It was, when this was first written, and
+`npm run cities` found it: a competently run Mumbai kitchen was overdrawn for
+91 weeks in 120. The same correction applies to appeal, which is measured
+relative to your own reputation rather than absolutely, because the forecast
+has priced general attractiveness since this career shipped.
+
+### Reviews
+
+Concise, fictional, and assembled entirely from facts the service produced: the
+dish that table ordered, how many ticks it waited, whether a plate went back,
+what it cost, and which categories the segment writing it cares about.
+
+Nothing appears in a review that did not happen. A complaint about the wait is
+only written when the wait exceeded what that segment bears; a compliment names
+a dish that was actually sent out. `recurringProblems` counts the tags across
+recent reviews and answers the question the player is really asking — not "what
+did somebody say" but "what do I keep getting wrong" — and names the control
+that fixes each one.
+
+### The phone, earning its place
+
+The handset had followers and a sentiment score and neither did anything. Now:
+
+- **`interest`** — people who want a table because of something you said.
+  Decays weekly. This is the upside, and it is real money.
+- **`expectation`** — how good a night now has to be to count as good. Raised
+  by every promise and every review, and subtracted from what the room thinks
+  of an ordinary night. This is the price, and it is paid later.
+- **`reach`** — posting three weeks running reaches about half as many people.
+  Not a punishment; an audience that hears from you weekly stops looking.
+
+Promoting a dish raises its share of the room's orders for three weeks, which
+is a mechanical statement rather than a claim on a card. A player who promotes
+hard and cooks well is rewarded twice. One who promotes hard and cooks
+adequately ends up with a full room of people who were told to expect better.
+
+### Complaints, and six ways to answer one
+
+When a customer post gains attention it becomes a complaint that sits open,
+spreading while you think about it. Six answers — apologise, compensate,
+investigate, explain, ignore, defend — and **no universally correct one**. The
+outcome depends on whether the complaint is accurate, which answer was chosen,
+your standing, whether anybody in the building can find out what happened, how
+long you took, and how many times you have answered the same thing before.
+
+Whether it is true is *not* printed on the card. The service dashboard for that
+week says exactly what the waits and the mistakes were; reading it is the skill.
+`npm run check` asserts that at least three different answers win outright in
+different situations.
+
+### Critics
+
+Five, and none of them tells you what they want.
+
+| | Weighs | Also checks |
+| --- | --- | --- |
+| **Pascale Arnaud**, *La Table* | Food, consistency | Whether two nights a fortnight apart were the same night |
+| **Ines Gallo**, *Course* | Innovation, food | Whether one dish on the menu is original |
+| **Tom Rowntree**, *The Weekly Table* | Value, food | Your prices against what the room is |
+| **Margit Halász**, *Front of House* | Service, atmosphere | Consistency across two visits |
+| **Ola Fenn**, *Ground Up* | Hygiene, food, innovation | How much of your larder is out of season |
+
+You get a window and partial clues, drawn from that critic's real weights, and
+never a date. A verdict moves the categories that critic weighs, raises
+expectations, and can produce an award — which is a record and a burden, never
+an ending. Nothing in this phase can terminate a run.
+
+### The other kitchens
+
+Three per city, named, and no more: two hundred invisible restaurants produce a
+number you cannot argue with, three named ones produce a decision. Each has a
+concept, a price level, a strength, a weakness, the segments it is built for
+and a current strategy — and pressure is computed **per segment**, so the cheap
+neighbourhood room takes your families and cannot touch your luxury table.
+
+Strategies are reactive, hold for at least four weeks, and are announced when
+they change: being beaten on their own strength sends a rival to compete on
+price, a signature dish of yours gets copied, a brigade with collapsing morale
+gets raided, and occasionally somebody suggests working together.
+
+### Twelve things that happen to restaurants
+
+Supplier shortage · equipment breakdown · a surprise large booking · staff
+illness · a hygiene inspection · the city food festival · a seasonal window ·
+an influencer's request · a celebrity reservation · a power cut · an allergy
+incident · a rival's promotion.
+
+Every one is attached to a system already being run — the shortage moves the
+supplier account, the breakdown removes a piece of equipment from the list it
+was bought from, the inspection reads the actual state of the pantry, the
+festival only happens in autumn. Each states what is true now, offers two or
+more choices with the cost on the card, and several schedule a **delayed
+consequence** that arrives weeks later.
+
+Their cash costs scale with the room as well as the city: a market stall does
+not pay a flagship's price for a generator. Without that, every one of them was
+a flat Lyon-sized bill landing on a Mumbai market stall, and the city harness
+showed what that does.
+
+### Save compatibility
+
+Ten new fields on the kitchen, all optional, all validated when present and all
+bounded. Absent is the correct reading of every save written before this phase:
+no breakdown, no reviews, no rivals, and a reputation that is exactly the
+single number it always was. A save with no `standing` reads as a kitchen whose
+seven parts all agree with its reputation, which is the only honest thing to
+say about a run that was never measured in parts.
+
+Reloading cannot duplicate anything: the week is resolved once on commit, the
+pending queue hands each consequence over exactly once, and `npm run check`
+asserts that a serialise-parse-migrate-validate round trip leaves the review
+count, the verdict count and the reputation unchanged.
+
+---
+
+## The craft, and the top of the trade
+
+The fourth layer on the Chef, and the first that is about **the person rather
+than the restaurant**. It has its own destination in the bar — "You" — for the
+same reason the Physician's Career section exists: a player deciding whether to
+spend a week learning to fillet fish is not thinking about their larder.
+
+### Fourteen techniques, five disciplines
+
+Skill used to be one number that went up when you spent a week on it. That is a
+progress bar, not a craft: it answered "how good are you" and never "good at
+what", so a chef who had spent three years on pastry and one who had spent them
+on butchery were the same person.
+
+| | Techniques | What the discipline does |
+| --- | --- | --- |
+| **Butchery** | Breaking down a carcass · Filleting · Dry-ageing | Recovers waste, opens the langoustine and the aged rib |
+| **Sauce** | Stocks · Emulsions · Classical jus | Lifts every sauced dish, cuts mistakes on the hot line |
+| **Pastry** | Doughs · Sugarwork · Petits fours | Lifts every pudding, and the last thing anybody eats |
+| **Larder** | Curing · Fermentation · Caviar service | Waste, originality, and the ability to serve caviar at all |
+| **Modern** | Precision cooking · Plating at the pass | Fewer mistakes everywhere, and the counter's own course |
+
+There is no technique whose effect is "+2 skill". Each one either unlocks a
+dish that cannot otherwise be cooked, lets you handle an ingredient that would
+otherwise be wasted, lifts every dish in *its own discipline*, or takes real
+money off the waste line — and a player who learns butchery can point at the
+dishes it opened and the write-off that fell.
+
+Three ways to learn, and all of them cost the week rather than money:
+
+- **Cooking it.** A menu that uses a discipline teaches it, slowly. About
+  twenty weeks a technique.
+- **A block of practice.** Twenty-two points, and it comes out of *working the
+  room* rather than out of a service — the honest cost is the hour you would
+  have spent being charming at table six.
+- **A stage.** A week in somebody else's kitchen: unpaid, exhausting, and the
+  fastest thing there is. It clears your services for that week, because you
+  are not there to cook them. Five of them, and the three-star kitchen in Tokyo
+  does not answer a stall-holder's letter.
+
+### What other chefs think you are
+
+Out of all of it comes `chefRank` — Nobody in particular → A working chef →
+Chef-patron → A name other chefs know → One of the serious ones → One of the
+best in the country. It is computed from technique, stars, the room you run and
+whether the city has a dish it associates with you, and it is **not a
+scoreboard**: it decides who will come and work for you, which kitchens will
+have you for a stage, and which of the offers below get made at all.
+
+### The cellar
+
+The one thing in a restaurant that gets *better* while it sits there, and that
+inversion is why it exists as its own system rather than as another shelf in
+the larder. Everything else in this career is about spoilage. Wine is the
+opposite trade: money you take off the floor and put in a rack, worth more
+every week you leave it and worth nothing at all if you needed it on Tuesday.
+
+Nine wines from house red to grand cru burgundy. Four rules keep it a
+restaurant's cellar rather than a wine fund with a kitchen attached:
+
+1. **You need somewhere to put it.** Without the wine store it is a rack behind
+   the bar — enough to pour with, nothing you would age.
+2. **Bottles are drunk.** Covers open them, oldest-first within each wine, and
+   a list that runs out stops earning.
+3. **It peaks and then it fades.** Held past its peak a bottle declines, and
+   maturity is capped at 2.4× cost. The sale price compresses the markup as the
+   bottle appreciates — a £100 bottle worth £240 later does not go on the list
+   at £720.
+4. **A sommelier sells it.** The role earns its salary here and nowhere else,
+   pouring about half again as much and selling from the top of the list.
+
+The cellar counts on the balance sheet at what a *merchant* would pay — the
+same 72% `sellWine` pays out — because you cannot realise a wine list at list
+prices.
+
+### The guide, and what a star costs
+
+Not another critic. A critic writes a piece and moves on; the guide comes back
+every year and can take back what it gave. It measures six things — the
+cooking, technique, the personality of the menu, the room and service, the
+list, and the kitchen itself — publishes in the same week every year, and gives
+no reasons.
+
+A star is three things at once, and the third is the point: a **draw** (people
+plan journeys around starred restaurants), a **premium** on every cover, and a
+**standard you now have to hold**. Expectations rise permanently while you hold
+it, every service is judged against them, and a year of coasting loses it.
+Winning is harder than keeping — the thresholds are deliberately asymmetric, so
+a restaurant on the boundary does not gain and lose a star every year — and
+nobody goes from nothing to two in one edition.
+
+**Three stars is not a win screen.** Nothing in this phase writes `outcome`.
+The week after the guide publishes is an ordinary Monday with a harder problem
+in it.
+
+### Beyond the kitchen
+
+A pop-up, a consultancy, a masterclass series, the book, the television series.
+All five are paid for out of the same thing: **weeks you are not on your own
+pass.** A venture takes blocks out of every week it runs — the same blocks that
+would have opened a service — and there is a six-week gap before the next
+commitment, because a chef who is permanently on contract is not making a
+decision.
+
+The book and the series pay royalties afterwards: the only money in this career
+that arrives whether or not the doors opened, which is exactly why a chef
+writes one. The series is also the single most expensive line in the file — it
+raises expectations sixteen points, permanently, and everybody who books
+afterwards has seen you on television and expects to be able to tell.
+
+### The luxury tier
+
+- **The destination** — the fifth premises, and deliberately *not* a bigger
+  flagship. Forty covers a night at nearly twice the spend: the room at the top
+  of this trade is small and expensive, not large.
+- **The chef's counter** — eight stools facing the pass, six times the spend
+  per cover, and the most exposed service in the game. It has the highest
+  review weight and by far the highest walkout cost, because a table that gets
+  up and leaves the counter does it in front of everybody else eating there.
+- **Porcelain and glassware**, and a **private dining room**.
+- **Three luxury ingredients** — live langoustines, dry-aged rib, caviar — each
+  gated on a *technique* rather than on money, and each sharing one property
+  that makes it a decision: the better it is, the faster it dies.
+- **Five luxury dishes**, each behind both a technique and the ordinary craft,
+  room and reputation gates.
+
+### What the balance harness found
+
+`npm run cities` now runs **two** bots: the plain kitchen that has always been
+the control, and an ambitious one that practises, builds a cellar, hires a
+sommelier and takes every offer. The comparison caught three real faults that
+were invisible in review:
+
+- **Technique paid four times over.** It lifted the plate, cut the waste and
+  opened dishes — and then also multiplied every cover by up to +55%. The
+  ambitious bot ended a hundred and twenty weeks three and a half million ahead
+  of the plain one. The multiplier is now capped at +18%.
+- **The venture fee was an unstable feedback loop.** Tied to the restaurant's
+  own takings, it raised the cash, which bought the room, which raised the
+  takings, which raised the fee. A thirty per cent change to one number moved a
+  run by seven million in both directions. Fees are now flat and localised, with
+  no feedback in them at all.
+- **A flat repair bill in Mumbai** is two weeks of takings, so the equipment
+  breakdown is scaled to the room as well as to the city.
+
+The plain bot's figures are **unchanged** by this phase in every city, which is
+the compatibility guarantee: none of it is on the critical path of running a
+restaurant.
+
+---
+
 ## Status
 
-Playable end to end: career select → build/staff/caseload management → weekly
-allocation → live forecast → ledger → events with choices → win/lose screen
-with a run history. Progress saves to `localStorage`, and a save that fails
-validation is discarded rather than repaired.
+Playable end to end: career select → weekly allocation → live forecast →
+ledger → events with choices → setbacks with recovery routes. Progress saves
+to `localStorage`, and a save that fails validation is discarded rather than
+repaired.
 
-**Physician is the only implemented career.** Chef and Solicitor are designed
-— they have preview cards, cover art, difficulty, advantages and risks on the
-select screen — but neither has a `CareerDef`, so both are marked CLOSED and
-cannot be started. The engine already supports them; each is one `CareerDef`
-away, and Physician is the baseline they should be built against.
+There is **no win or lose screen**. Reaching the objective marks a milestone
+and the run continues; falling apart produces a recoverable setback. The only
+thing that ends a run is choosing to retire, which is optional and previewed
+before you commit.
 
-Not built: sound, the two stubbed careers, difficulty modes, meta-progression
-between runs.
+### Where each career stands
+
+**Physician — the most complete.** Seventeen screens: premises, departments,
+equipment, staff, caseload, supplies, contracts, the fourteen-market network
+map, outbreaks, qualifications, standing, people, timeline, phone, money and
+lifestyle. This is the career the others are measured against.
+
+**Chef — playable, smaller.** The spoilage model is real and simulated: lots
+age, are drawn oldest-first, and what expires is written off as a cost that
+also shows up in the reviews. Buying produce, hiring a brigade, taking on
+premises and running services all work through the interface, and the run
+saves and reloads. It has **twelve screens** against the Physician's seventeen:
+Overview, plus one Kitchen destination carrying seven — the room (premises and
+equipment), the larder (crates, the pantry and suppliers), the menu (recipes,
+prices and margins), the pass (the book, what you can serve, and the last
+service report), the brigade, money, and word of mouth (the seven standing
+categories, the reviews and any complaint waiting for an answer) — plus a Map
+destination carrying two, the base map and the scene (who eats out in this
+city, what the season is doing, and the three restaurants competing for the
+same tables) — and a fourth destination, "You", carrying the craft (fourteen
+techniques, five stages and what the trade thinks you are) and the work beyond
+the kitchen (books, television, consultancy and pop-ups).
+
+On top of the crate economy it runs **recipes, a menu and a pantry of named
+ingredients** ([The Chef's dishes](#the-chefs-dishes)) and a **service
+pipeline** where tickets move through six kitchen sections while the brigade
+works them ([The service, order by order](#the-service-order-by-order)). A
+kitchen with no menu still plays exactly as it did before either existed.
+
+On top of both it runs **reputation in seven parts, eight customer segments,
+generated reviews, an in-game social profile with real trade-offs, complaints
+you have to answer, five critics, three rival restaurants per city and twelve
+dynamic events** ([What the city thinks](#what-the-city-thinks)), and on top
+of *that* a **craft of fourteen techniques, a wine cellar, a guide that awards
+and withdraws stars, and the four things every chef is eventually offered**
+([The craft, and the top of the trade](#the-craft-and-the-top-of-the-trade)).
+
+**Solicitor — playable, smaller.** The case pipeline is real: instructions
+arrive, hours accumulate against a deadline, preparation moves the odds
+without ever reaching certainty, and every live case carries a settlement you
+can take instead. Still two screens plus a base map — it is where the Chef
+started.
+
+### Honest gaps
+
+- **Two Chef catalogue entries are waiting for their masters** — the
+  destination dining room and the chef's counter, both named in
+  `AWAITING_CHEF_ART` and rendering the typographic fallback until the art
+  lands. **The Solicitor has no bespoke artwork** beyond its career cover and
+  a shared world map. Fourteen purchase images are also still outstanding —
+  they are listed by id in `AWAITING_ART` and briefed in
+  [`docs/artwork-shot-list.md`](docs/artwork-shot-list.md), and their cards
+  render a typographic fallback until the masters land.
+- **The Solicitor has no browser-test coverage** yet. Both new careers are
+  covered by engine tests in `npm run check`, and the Chef has a Playwright
+  journey through its five screens; the Solicitor does not, so "playable"
+  there means verified by hand and by unit test, not by CI.
+- **The Solicitor participates in none of the shared systems**: no phone,
+  news, rivals, people, timeline, ambitions or expansion. The Chef now has a
+  phone, its own news, its own reviews and its own city rivals, but still no
+  engine-level `people`, `timeline` or `ambitions`. Their maps show every city the
+  trade is done in, mark the one you chose, and say plainly that you cannot
+  move — rather than implying a network that does not exist.
+- **Time-block cash costs are still global.** Developing a menu is $150 and
+  pitching for work is $250 wherever you are, because those are properties of
+  the action rather than of the run. They are small enough not to distort a
+  week and large enough to be worth fixing when actions learn about the city.
+- **Their balance is first-pass.** Tuned against a simple bot over 120-week
+  simulations, not playtested by a human.
+
+Not built anywhere: sound, difficulty modes, meta-progression between runs.

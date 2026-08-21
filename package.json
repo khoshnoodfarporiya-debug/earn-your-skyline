@@ -8,6 +8,7 @@
     "start": "next start -p 3500",
     "typecheck": "tsc --noEmit",
     "balance": "tsx scripts/balance.ts",
+    "cities": "tsx scripts/cities.ts",
     "trace": "tsx scripts/trace.ts",
     "check": "tsx scripts/commands.ts",
     "lint": "eslint .",

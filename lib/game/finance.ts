@@ -119,7 +119,15 @@ export function borrowingCapacity(
   netWorth: number,
   weeklyRevenue: number,
 ): number {
-  const asset = Math.max(0, netWorth) * 0.35;
+  /*
+   * `netWorth` now nets off what is already owed, and this function subtracts
+   * it again on the next line at a 1.15 haircut. Counting it twice would
+   * quietly tighten credit as a side effect of an accounting fix, so the gross
+   * figure is put back first: existing debt is charged for here, once, exactly
+   * as it always was.
+   */
+  const gross = netWorth + totalOutstanding(s);
+  const asset = Math.max(0, gross) * 0.35;
   const income = Math.max(0, weeklyRevenue) * 26;
   const room = asset + income - totalOutstanding(s) * 1.15;
   return Math.max(0, Math.round(room / 1000) * 1000);

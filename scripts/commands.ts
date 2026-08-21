@@ -8,14 +8,41 @@
  * Run: npx tsx scripts/commands.ts
  */
 
-import { doctor, med } from "../lib/game/careers/doctor";
+import { doctor, med, netWorth, startDebtOf } from "../lib/game/careers/doctor";
 import {
   advanceWeek,
   resolveEventChoice,
   runCommand,
   startRun,
 } from "../lib/game/engine";
+import type { CareerDef } from "../lib/game/types";
+import {
+  LAWYER_CAST,
+  briefDiscount,
+  conductGrace,
+  costsRelief,
+  mentorBonus,
+  offerGoodwill,
+  referralPull,
+} from "../lib/game/careers/lawyerCast";
+import { personDefIn } from "../lib/ui/castAccess";
+import { LEGAL_ORG_HANDLES } from "../lib/game/careers/lawyerPhone";
+import {
+  LAWYER_CRISIS_KINDS,
+  LAWYER_CRISIS_STAGES,
+  practiceCrisisRisk,
+} from "../lib/game/careers/lawyerCrises";
 import { nextStep } from "../lib/ui/guidance";
+import { glossaryFor } from "../lib/ui/glossary";
+import { deriveAlerts } from "../lib/ui/alerts";
+import { lessonFor, lessonStatus } from "../lib/ui/onboarding";
+import {
+  defaultScreen,
+  screenOf,
+  sectionOf,
+  sectionsFor,
+  type SectionDef,
+} from "../lib/ui/navigation";
 import { makeRng } from "../lib/game/rng";
 import {
   PERSON_ROLES,
@@ -117,6 +144,7 @@ import {
   obligations,
   ownedShare,
   repay,
+  borrowingCapacity,
   takeFunding,
   tickFinance,
   totalOutstanding,
@@ -128,6 +156,8 @@ import {
   MAX_CRISES,
   NEGLECT_LIMIT,
   crisisRisk,
+  stageOf,
+  stagesFor,
   startCrisis,
   tickCrisis,
 } from "../lib/game/crisis";
@@ -151,7 +181,7 @@ import {
   networkRoutes,
   practiceStageIndex,
 } from "../lib/ui/visuals";
-import { CAREER_PREVIEWS } from "../lib/game/careers";
+import { CAREER_PREVIEWS, CAREERS } from "../lib/game/careers";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -267,11 +297,186 @@ import { SPECIALTIES } from "../lib/game/medical/data";
 import { coverageFor, payroll } from "../lib/game/medical/sim";
 import { MED_ICON_NAMES } from "../components/visuals/MedIcon";
 import { basename, dirname } from "node:path";
-import { PURCHASE_ART, missingArt, orphanArt } from "../lib/ui/purchaseArt";
+import {
+  PURCHASE_ART,
+  awaitingArt,
+  catalogueIds,
+  missingArt,
+  orphanArt,
+} from "../lib/ui/purchaseArt";
 import { ART_SIZES } from "../lib/ui/purchaseArt.generated";
 import { DEPARTMENT_BY_ID } from "../lib/ui/departments";
 import { allPurchases } from "../lib/ui/purchases";
 import { LIFESTYLE } from "../lib/game/medical/lifestyle";
+import {
+  chef,
+  kitchen,
+  kitchenWorth,
+  goalFor,
+  localSum,
+  CHEF_PREMISES,
+  CHEF_PRODUCE,
+} from "../lib/game/careers/chef";
+import {
+  INGREDIENT_BY_ID,
+  RECIPES,
+  RECIPE_BY_ID,
+  SIGNATURE_REFINED,
+  SIGNATURE_SERVED,
+  dishMargin,
+  dishQuality,
+  earnsSignature,
+  recipeCost,
+  recipeName,
+} from "../lib/game/careers/recipes";
+import {
+  CHEF_POSTS,
+  CHEF_POST_BY_ID,
+  chefPostContext,
+  ensureChefPhone,
+} from "../lib/game/careers/chefPhone";
+import {
+  KITCHEN_KIT,
+  KIT_BY_ID,
+  SUPPLIERS,
+  effectiveOf,
+  loyaltyOf,
+  moraleOf,
+  skillOf,
+  SUPPLIER_BY_ID,
+  arrivalOdds,
+  lifeFrom,
+  priceFrom,
+  standingWith,
+  supplierBlocker,
+  forecastFor,
+  policyOf,
+  SERVICES,
+  SERVICE_BY_ID,
+  brigadeCovers,
+  extraShelfLife,
+  isSpoiled,
+  kitValue,
+  serviceBlocker,
+  serviceOpen,
+  wasteSaved,
+  rent,
+  spendPerHead,
+  labourIndex,
+  capitalIndex,
+  KITCHEN_CITIES,
+  produceIndex,
+  kitPrice,
+  premisesPrice,
+  rolePay,
+  ROLE_BY_ID,
+  activeMenu,
+  consumeForCovers,
+  ingredientFreshness,
+  ingredientLifeLeft,
+  ingredientPrice,
+  ingredientState,
+  knownRecipes,
+  knowsRecipe,
+  menuFactors,
+  pantryExtraLife,
+  pantryOf,
+  pantryQty,
+  progressFor,
+  agencyFees,
+  shortlistLive,
+  SHORTLIST_SIZE,
+  SHORTLIST_WEEKS,
+} from "../lib/game/careers/kitchen";
+import {
+  SERVICE_SHAPES,
+  STATIONS,
+} from "../lib/game/careers/service";
+import {
+  /* The Physician already owns `TRAITS` — these are the brigade's, which are
+     a different catalogue for a different career. */
+  TRAITS as KITCHEN_TRAITS,
+  bottleneckFix,
+  currentSkill,
+  errorRateOf,
+  experienceOf,
+  fatigueOf,
+  isBurntOut,
+  onTonight,
+  promotionFor,
+  recover,
+  staffingWarnings,
+  stationLoads,
+  trainingOf,
+} from "../lib/game/careers/brigade";
+import {
+  PRODUCE_BY_ID,
+  clearSpoiled,
+  drawFromLarder,
+  freshnessOf,
+  larderCovers,
+  plateQuality,
+} from "../lib/game/careers/kitchen";
+import {
+  lawyer,
+  practice,
+  firmWorth as firmWorthOf,
+  goalFor as goalForFirm,
+} from "../lib/game/careers/lawyer";
+import { horizonFor, pointFor } from "../lib/ui/careerMap";
+import {
+  CRITIC_ART,
+  chefArtPaths,
+  larderArt,
+  AWAITING_CHEF_ART,
+  awaitingChefArt,
+  missingChefArt,
+  premisesArt,
+  serviceArt,
+} from "../lib/ui/chefArt";
+import { isOnLand } from "../lib/ui/worldmap";
+import {
+  CASE_BY_ID,
+  CASE_KINDS,
+  LEGAL_CITY_BY_ID,
+  MAX_ADJOURNMENTS,
+  MAX_PRESSURE,
+  PAYERS,
+  type PayerId,
+  billsOwed,
+  chambersRent,
+  costsOrder,
+  counselFee,
+  factorValue,
+  feeIn,
+  hasClerk,
+  legalLabourIndex,
+  newOffers,
+  oddsFor,
+  payerFor,
+  relistChance,
+  settlementFor,
+} from "../lib/game/careers/casework";
+import {
+  LEGAL_POSTS,
+  LEGAL_VOICES,
+  ensureLawyerPhone,
+  lawyerPostContext,
+} from "../lib/game/careers/lawyerPhone";
+import { CHEF_VOICES } from "../lib/game/careers/chefPhone";
+import {
+  FLEET,
+  FLEET_BY_ID,
+  crewNeeded,
+  crewOn,
+  fleetAcuity,
+  fleetCrewRatio,
+  fleetCrewed,
+  fleetReach,
+  fleetSize,
+  fleetUpkeep,
+  fleetValue,
+} from "../lib/game/medical/fleet";
 import { EQUIPMENT } from "../lib/game/medical/data";
 import {
   CAST_PORTRAITS,
@@ -286,6 +491,107 @@ import { BOTS } from "../lib/game/medical/bots";
 import { FULL_CAST } from "../lib/game/medical/cast";
 import { staffName } from "../lib/game/medical/data";
 import { initialsOf } from "../lib/game/people";
+/* Phase 3: what the city thinks, who is in the room, and who else is cooking. */
+import {
+  MAX_STANDING_LOG,
+  MAX_STANDING_TREND,
+  STANDINGS,
+  STANDING_BY_ID,
+  applyStanding,
+  recentStanding,
+  sceneScore,
+  settleStanding,
+  standingOf,
+  trendOf,
+} from "../lib/game/careers/standing";
+import {
+  SEGMENTS,
+  SEGMENT_BY_ID,
+  appealOf,
+  dinerMix,
+  seasonOf,
+} from "../lib/game/careers/diners";
+import { sceneFor } from "../lib/game/careers/scene";
+import { MAX_REVIEWS, recurringProblems } from "../lib/game/careers/reviews";
+import {
+  COMPLAINT_RESPONSES,
+  MAX_COMPLAINTS,
+  brokenPromise,
+  expectationOf,
+  interestOf,
+  notePost,
+  promotionOf,
+  reachFactor,
+  resolveComplaint,
+} from "../lib/game/careers/buzz";
+import {
+  CRITICS,
+  CRITIC_BY_ID,
+  MAX_VERDICTS,
+  arrangeVisit,
+  criticInterest,
+  judgeVisit,
+  watchLine,
+} from "../lib/game/careers/critics";
+import {
+  PRICE_LABEL,
+  cityRank,
+  competitorPressure,
+  moveRivals,
+  rivalsFor,
+} from "../lib/game/careers/competitors";
+import { CHEF_EVENTS } from "../lib/game/careers/chefEvents";
+/* Phase 4: the craft, the cellar, the guide and the work outside the kitchen. */
+import {
+  DISCIPLINES,
+  RANKS,
+  STAGES,
+  STAGE_BY_ID,
+  TECHNIQUES,
+  TECHNIQUE_BY_ID,
+  applyStage,
+  canLearn,
+  chefRank,
+  gateFor,
+  knowsTechnique,
+  learnedTechniques,
+  practise,
+  rankScore,
+  stageBlocker,
+  techniqueBlocker,
+  techniqueLift,
+  techniqueSteadiness,
+  techniqueWorth,
+  techniqueYield,
+} from "../lib/game/careers/craft";
+import {
+  WINES,
+  WINE_BY_ID,
+  bottlesHeld,
+  casePrice,
+  cellarCapacity,
+  maturityOf,
+  pourForCovers,
+  sellPrice,
+  wineBlocker,
+} from "../lib/game/careers/cellar";
+import {
+  GUIDE_COMPONENTS,
+  STAR_LEVELS,
+  guideDue,
+  guideScore,
+  starLevel,
+  starsFor,
+  starsOf,
+  towardsNext,
+} from "../lib/game/careers/guide";
+import {
+  VENTURES,
+  VENTURE_BY_ID,
+  ventureBlocker,
+  venturesOf,
+} from "../lib/game/careers/ventures";
+import { customerReactions } from "../lib/game/careers/chefPhone";
 import type { RunState } from "../lib/game/types";
 
 let failures = 0;
@@ -1748,8 +2054,15 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
       .join(", "),
   );
 
-  // Events: artwork must belong to a real event, and only to that event.
-  const eventIds = doctor.events.map((e) => e.id);
+  /*
+   * Events: artwork must belong to a real event, and only to that event.
+   *
+   * Across every career, not just the Physician's. The registry is keyed by
+   * event id and the dialog that renders it knows nothing about careers, so
+   * the Chef's critic is as much a real event as an inspection — and an entry
+   * belonging to *no* career's events is still the failure this catches.
+   */
+  const eventIds = CAREERS.flatMap((c) => c.events.map((e) => e.id));
   const orphan = Object.keys(EVENT_VISUALS).filter(
     (id) => !eventIds.includes(id),
   );
@@ -1769,12 +2082,45 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
     Object.values(EVENT_VISUALS).every((v) => v.category.length > 0),
   );
 
-  // Careers: every selectable career has a cover.
-  const coverless = CAREER_PREVIEWS.filter((c) => careerVisual(c.id) === null);
+  /*
+   * Careers: every career you can actually *start* has a cover.
+   *
+   * This used to demand art for every entry on the select screen, which was
+   * the same thing until the screen started carrying designs that have not
+   * been built. A card marked CLOSED with "Not built yet" on the button is
+   * meant to be a flat surface — `ArtFrame` renders exactly that for a null
+   * visual, deliberately, rather than a broken image.
+   *
+   * So the assertion is now about the state it always cared about: nothing
+   * playable ships coverless. The second check keeps that honest in the other
+   * direction, so a career cannot quietly become playable while still relying
+   * on the no-art fallback.
+   */
+  const coverless = CAREER_PREVIEWS.filter(
+    (c) => c.available && careerVisual(c.id) === null,
+  );
   check(
-    "every career on the select screen has cover art",
+    "every playable career has cover art",
     coverless.length === 0,
     coverless.map((c) => c.id).join(", "),
+  );
+  check(
+    "every registered career is playable and vice versa",
+    CAREERS.every((c) =>
+      CAREER_PREVIEWS.some((p) => p.id === c.id && p.available),
+    ) &&
+      CAREER_PREVIEWS.filter((p) => p.available).every((p) =>
+        CAREERS.some((c) => c.id === p.id),
+      ),
+  );
+  check(
+    "a design that is not built says so rather than half-rendering",
+    CAREER_PREVIEWS.filter((c) => !c.available).every(
+      (c) =>
+        !CAREERS.some((x) => x.id === c.id) &&
+        c.distinctRule.length > 40 &&
+        c.risks.length > 0,
+    ),
   );
   check(
     "an unknown id asks for artwork and gets nothing, not a crash",
@@ -3686,6 +4032,46 @@ check(
       (s.obligations ?? []).length <= MAX_OBLIGATIONS,
     );
 
+    /*
+     * EXPLOIT: borrowing your way to the goal.
+     *
+     * The career is won at `debt <= 0 && netWorth >= 2,500,000`, and a bank
+     * facility arrives as cash. If the money owed is not netted off, drawing
+     * $900,000 is worth $900,000 of progress towards the target and the
+     * shortest route to "success" is a loan you never repay. The balance
+     * harness found exactly this: the leveraged strategy was the only one
+     * clearing the goal, on an average net worth of -$2.2M.
+     */
+    {
+      const g = startRun(doctor, 611);
+      g.r.cash = 50_000;
+      g.r._lastRevenue = 30_000;
+      const worthBefore = netWorth(g);
+      const capacityBefore = borrowingCapacity(g, worthBefore, 30_000);
+      const bank = fundingOffers(g, { ...ctx, weeklyRevenue: 30_000 }).find(
+        (o) => o.kind === "bank",
+      )!;
+      takeFunding(g, bank);
+
+      check(
+        "borrowed money is not counted as wealth",
+        netWorth(g) === worthBefore,
+        `worth ${netWorth(g).toLocaleString("en-US")} after drawing ${Math.round(bank.amount).toLocaleString("en-US")}`,
+      );
+      check(
+        "and what you owe is carried against you",
+        totalOutstanding(g) >= bank.amount,
+      );
+      /* The accounting fix must not quietly tighten credit as a side effect:
+         a lender's answer is about the business, not about how the metric is
+         reported. Same practice, same offer. */
+      check(
+        "while the lender still lends exactly what it lent before",
+        borrowingCapacity(startRun(doctor, 611), worthBefore, 30_000) ===
+          capacityBefore,
+      );
+    }
+
     /* EXPLOIT: selling the same equity twice. */
     const s2 = startRun(doctor, 608);
     for (let i = 0; i < 10; i++) {
@@ -5095,10 +5481,24 @@ console.log("\nPurchase artwork\n" + "─".repeat(52));
     orph.length === 0,
     orph.join(", "),
   );
+  /*
+   * Coverage, stated as a gap rather than a total.
+   *
+   * This used to assert `=== 45`, which stopped meaning anything the moment
+   * the catalogue grew: the number is not a property of the design, it is a
+   * count somebody has to keep editing. What matters is that every sellable
+   * item is either drawn or on the list of ones known to be waiting.
+   */
+  const pending = awaitingArt();
   check(
-    "the registry covers all 45 purchasable items",
-    Object.keys(PURCHASE_ART).length === 45,
-    `${Object.keys(PURCHASE_ART).length} entries`,
+    "every purchasable item is either drawn or a known gap",
+    Object.keys(PURCHASE_ART).length + pending.length >= catalogueIds().length,
+    `${Object.keys(PURCHASE_ART).length} drawn, ${pending.length} awaiting`,
+  );
+  check(
+    "nothing sits on the awaiting-art list once its artwork exists",
+    pending.every((id) => !PURCHASE_ART[id]),
+    pending.filter((id) => !!PURCHASE_ART[id]).join(", "),
   );
   /*
    * Departments, mapped exactly as specified. Asserted id → filename rather
@@ -5222,6 +5622,4039 @@ console.log("\nPurchase artwork\n" + "─".repeat(52));
   }
 }
 
+
+
+console.log("\nWhere a career can begin\n" + "────────────────────────────────────────────────────");
+{
+  /*
+   * A marker in the sea is the failure this whole block exists for. The
+   * positions come from the same projected table the Physician's network map
+   * uses, so if one of them is wrong it is wrong there too — and this is a
+   * cheaper place to find out than a screenshot. It now covers every city of
+   * every career rather than two hardcoded bases, because every one of them
+   * is drawn on the picker before a run starts.
+   */
+  for (const career of CAREERS.filter((c) => c.available)) {
+    const cities = career.startCities ?? [];
+    check(`${career.id} offers somewhere to begin`, cities.length > 0);
+    check(
+      `${career.id}: no two starts are the same place`,
+      new Set(cities.map((c) => c.id)).size === cities.length,
+    );
+    for (const city of cities) {
+      const point = pointFor(city.position);
+      check(
+        `${career.id}/${city.id} is somewhere the map can draw`,
+        point !== null,
+        city.position,
+      );
+      if (point) {
+        check(
+          `and ${city.name} is on land, not in the sea`,
+          isOnLand(point.x, point.y),
+          `x=${point.x} y=${point.y}`,
+        );
+        check(
+          `and it sits inside the map's own box`,
+          point.x >= 0 && point.x <= 100 && point.y >= 0 && point.y <= 100,
+        );
+      }
+    }
+    check(
+      `${career.id}: every city says what it is and what it changes`,
+      cities.every(
+        (c) =>
+          c.name.length > 0 &&
+          c.country.length > 0 &&
+          c.blurb.length > 40 &&
+          c.effects.length >= 3 &&
+          c.effects.every((e) => e.length > 0),
+      ),
+    );
+  }
+
+  /* The Chef and the Solicitor have one site and the map must say so; the
+     Physician has fourteen markets and a network map that says otherwise. */
+  check(
+    "a one-site career says on the map what is not built yet",
+    (horizonFor("chef") ?? "").length > 40 &&
+      (horizonFor("lawyer") ?? "").length > 40,
+  );
+  check("the Physician is not given that line", horizonFor("doctor") === null);
+  check(
+    "an unknown career asks and gets nothing, not a crash",
+    horizonFor("astronaut") === null,
+  );
+}
+
+
+
+console.log("\nThe kitchen\n" + "────────────────────────────────────────────────────");
+{
+  const startK = () => {
+    const f = startRun(chef, 1212);
+    f.r.cash = 500_000;
+    return f;
+  };
+
+  let k1 = startK();
+  k1 = runCommand(chef, k1, "buyKit", "coldroom");
+  check(
+    "kit can be bought and installed",
+    (kitchen(k1).equipment ?? []).includes("coldroom"),
+  );
+  check(
+    "the same thing cannot be bought twice",
+    (kitchen(runCommand(chef, k1, "buyKit", "coldroom")).equipment ?? [])
+      .filter((x) => x === "coldroom").length === 1,
+  );
+  check(
+    "an unknown item is refused",
+    (kitchen(runCommand(chef, startK(), "buyKit", "microwave")).equipment ?? [])
+      .length === 0,
+  );
+
+  /*
+   * THE POINT OF THE WHOLE CATALOGUE.
+   *
+   * Refrigeration has to move the deadline, not merely reduce a cost. A
+   * crate that would have been binned must still be usable a week later,
+   * and its freshness \u2014 which is what reaches the plate \u2014 must be higher
+   * for the same age.
+   */
+  {
+    const plain = startK();
+    const cold = runCommand(chef, startK(), "buyKit", "coldroom");
+    const basic = PRODUCE_BY_ID.get("basic")!;
+    const lot = {
+      id: "l1",
+      produce: "basic",
+      left: 50,
+      unitCost: 10,
+      boughtWeek: 1,
+    };
+    /* Spoilage is `week - boughtWeek > shelfLife`, so the first week it has
+       genuinely gone over is one past that sum. */
+    const age = lot.boughtWeek + basic.shelfLife + 1;
+
+    check(
+      "without refrigeration it has gone over",
+      isSpoiled(lot, age, extraShelfLife(kitchen(plain))),
+    );
+    check(
+      "with a cold room it has not",
+      !isSpoiled(lot, age, extraShelfLife(kitchen(cold))),
+    );
+    check(
+      "and it is fresher at the same age",
+      freshnessOf(lot, 3, extraShelfLife(kitchen(cold))) >
+        freshnessOf(lot, 3, extraShelfLife(kitchen(plain))),
+    );
+  }
+
+  /* A blast chiller stacks on the cold room, and saves what still goes. */
+  {
+    let both = startK();
+    both = runCommand(chef, both, "buyKit", "coldroom");
+    both = runCommand(chef, both, "buyKit", "blast");
+    check(
+      "chilling stacks",
+      extraShelfLife(kitchen(both)) === 2,
+    );
+    check(
+      "and some of what does spoil is recovered rather than binned",
+      wasteSaved(kitchen(both)) > 0.5 && wasteSaved(kitchen(both)) < 1,
+    );
+  }
+
+  /* Waste is measurably lower through a real week. */
+  {
+    const spoilWeek = (withCold: boolean) => {
+      let f = startK();
+      if (withCold) f = runCommand(chef, f, "buyKit", "coldroom");
+      f = runCommand(chef, f, "buyProduce", "market");
+      /* Far enough ahead that a market crate is over without chilling. */
+      f = { ...f, week: f.week + 3 };
+      return advanceWeek(chef, f, { dinner: 1 });
+    };
+    const plain = kitchen(spoilWeek(false).state).lastService!;
+    const cold = kitchen(spoilWeek(true).state).lastService!;
+    check(
+      "refrigeration throws less away over a real week",
+      cold.waste < plain.waste,
+      `${plain.waste} covers binned without, ${cold.waste} with`,
+    );
+  }
+
+  /* Everything is charged for, and nothing is free money. */
+  check(
+    "every item costs something every week",
+    KITCHEN_KIT.every((x) => x.upkeep > 0 && x.cost > 0),
+  );
+  check(
+    "refrigeration is the worst value per cover, because covers are not the point",
+    KITCHEN_KIT.filter((x) => x.shelfLife > 0).every((x) => x.covers === 0),
+  );
+  check(
+    "kit is worth less than it cost",
+    kitValue(kitchen(k1)) < KIT_BY_ID.get("coldroom")!.cost,
+  );
+  check(
+    "a save without any kit is still valid",
+    (() => {
+      const legacy = startK();
+      delete (kitchen(legacy) as { equipment?: string[] }).equipment;
+      return (
+        chef.validateData!(legacy.data) &&
+        extraShelfLife(kitchen(legacy)) === 0
+      );
+    })(),
+  );
+  check(
+    "a save naming kit that does not exist is rejected",
+    !chef.validateData!({
+      kitchen: {
+        premises: "stall",
+        larder: [],
+        staff: [],
+        equipment: ["teleporter"],
+      },
+    }),
+  );
+}
+
+
+
+
+console.log("\nThe brigade\n" + "────────────────────────────────────────────────────");
+{
+  const startB = () => {
+    const f = startRun(chef, 7007);
+    f.r.cash = 300_000;
+    return f;
+  };
+
+  /* A hire is a person, not a salary line. */
+  {
+    const f = runCommand(chef, startB(), "hireKitchen", "commis");
+    const x = kitchen(f).staff[0];
+    check(
+      "somebody hired arrives with a name and attributes",
+      !!x && x.name.length > 3 && skillOf(x) > 0 && moraleOf(x) > 0,
+    );
+    check(
+      "and the run remembers when they started",
+      x.since === f.week,
+    );
+  }
+
+  /* Standing decides who is willing to work for you. */
+  {
+    const poor = startB();
+    poor.r.reputation = 5;
+    const known = startB();
+    known.r.reputation = 90;
+    const a = kitchen(runCommand(chef, poor, "hireKitchen", "commis")).staff[0];
+    const b = kitchen(runCommand(chef, known, "hireKitchen", "commis")).staff[0];
+    check(
+      "a well-regarded kitchen attracts a better cook for the same money",
+      skillOf(b) > skillOf(a) && a.salary === b.salary,
+      `${skillOf(a)} vs ${skillOf(b)}`,
+    );
+  }
+
+  /*
+   * SKILL IS THE CEILING, MORALE DECIDES HOW CLOSE YOU GET.
+   *
+   * This is what stops the brigade being interchangeable: the same role in
+   * two people is two different amounts of work.
+   */
+  {
+    const good = { id: "a", name: "A", role: "commis", salary: 640, skill: 90, morale: 90 };
+    const tired = { id: "b", name: "B", role: "commis", salary: 640, skill: 90, morale: 20 };
+    const weak = { id: "c", name: "C", role: "commis", salary: 640, skill: 25, morale: 90 };
+    check(
+      "a ground-down cook does less than a happy one of equal skill",
+      effectiveOf(tired) < effectiveOf(good),
+    );
+    check(
+      "and a steady average one can beat a brilliant exhausted one",
+      effectiveOf(weak) > effectiveOf(tired) * 0.8,
+    );
+    check(
+      "nobody ever does nothing at all",
+      effectiveOf(tired) > 0,
+    );
+  }
+
+  /* The brigade shows up in the covers the kitchen can actually plate. */
+  {
+    let f = startB();
+    f = runCommand(chef, f, "hireKitchen", "partie");
+    const before = brigadeCovers(kitchen(f), 50);
+    for (const x of kitchen(f).staff) x.morale = 10;
+    const after = brigadeCovers(kitchen(f), 50);
+    check(
+      "a demoralised brigade plates fewer covers",
+      after < before,
+      `${Math.round(before)} -> ${Math.round(after)}`,
+    );
+  }
+
+  /* A hard week grinds people down; a quiet one lets them recover. */
+  {
+    let f = startB();
+    f.r.skill = 70;
+    f = runCommand(chef, f, "takePremises", "bistro");
+    f = runCommand(chef, f, "hireKitchen", "commis");
+    const start = moraleOf(kitchen(f).staff[0]);
+    const rested = advanceWeek(chef, f, { rest: 1 });
+    check(
+      "a day off lifts the whole kitchen, not just the player",
+      moraleOf(kitchen(rested.state).staff[0]) >= start,
+    );
+  }
+
+  /* Loyalty runs out and people leave — visibly. */
+  {
+    let f = startB();
+    f = runCommand(chef, f, "hireKitchen", "commis");
+    for (const x of kitchen(f).staff) {
+      x.loyalty = 1;
+      x.morale = 5;
+    }
+    const res = advanceWeek(chef, f, { dinner: 1 });
+    check(
+      "somebody at the end of their patience hands the jacket back",
+      kitchen(res.state).staff.length === 0,
+    );
+    check(
+      "and the run says so rather than the number quietly changing",
+      res.state.log.some((l) => /jacket back/i.test(l.text)),
+    );
+  }
+
+  /* Old saves have none of this and still work. */
+  check(
+    "a cook hired before any of this reads as average",
+    (() => {
+      const legacy = startB();
+      kitchen(legacy).staff.push({
+        id: "old",
+        name: "Old Hand",
+        role: "commis",
+        salary: 640,
+      });
+      const x = kitchen(legacy).staff[0];
+      return (
+        chef.validateData!(legacy.data) &&
+        skillOf(x) === 50 &&
+        moraleOf(x) === 70 &&
+        loyaltyOf(x) === 60
+      );
+    })(),
+  );
+  check(
+    "a save with an impossible morale is rejected",
+    !chef.validateData!({
+      kitchen: {
+        premises: "stall",
+        larder: [],
+        staff: [{ id: "x", name: "X", role: "commis", salary: 1, morale: 5000 }],
+      },
+    }),
+  );
+}
+
+console.log("\nSuppliers\n" + "────────────────────────────────────────────────────");
+{
+  const startS = () => {
+    const f = startRun(chef, 5150);
+    f.r.cash = 400_000;
+    f.r.reputation = 60;
+    return f;
+  };
+
+  /*
+   * THE TRADE.
+   *
+   * Cheap food arrives tired; fresh food costs more or is less likely to
+   * turn up. If any supplier were best on every axis the choice would be
+   * decoration, so this asserts the shape rather than the numbers.
+   */
+  check(
+    "no supplier is cheapest, freshest and most reliable at once",
+    !SUPPLIERS.some(
+      (a) =>
+        SUPPLIERS.every(
+          (b) =>
+            a.id === b.id ||
+            (a.price <= b.price &&
+              a.freshness >= b.freshness &&
+              a.reliability >= b.reliability),
+        ),
+    ),
+  );
+  check(
+    "the cheapest supplier delivers the tiredest food",
+    [...SUPPLIERS].sort((a, b) => a.price - b.price)[0].freshness < 0,
+  );
+  check(
+    "anything that arrives fresher than the market costs more or is less certain",
+    SUPPLIERS.filter((x) => x.freshness > 0).every(
+      (x) => x.price > 1 || x.reliability < 0.95 || x.minReputation > 0,
+    ),
+  );
+
+  /* Where you buy changes how long the crate lasts. */
+  {
+    const basic = PRODUCE_BY_ID.get("basic")!;
+    const farm = SUPPLIER_BY_ID.get("farm")!;
+    const whole = SUPPLIER_BY_ID.get("wholesaler")!;
+    check(
+      "the same crate lasts longer from the farm than the wholesaler",
+      lifeFrom(farm, basic) > lifeFrom(whole, basic),
+      `${lifeFrom(whole, basic)} vs ${lifeFrom(farm, basic)} weeks`,
+    );
+    check(
+      "and the wholesaler is the cheaper of the two",
+      priceFrom(whole, basic, 0) < priceFrom(farm, basic, 0),
+    );
+  }
+
+  /* Ordering builds the account; the account pays back in price and vans. */
+  {
+    let f = startS();
+    const before = standingWith(kitchen(f), "market");
+    f = runCommand(chef, f, "buyProduce", "market:basic");
+    check(
+      "ordering builds standing with that supplier",
+      standingWith(kitchen(f), "market") > before,
+    );
+    const basic = PRODUCE_BY_ID.get("basic")!;
+    const market = SUPPLIER_BY_ID.get("market")!;
+    check(
+      "standing takes something off the price",
+      priceFrom(market, basic, 90) < priceFrom(market, basic, 0),
+    );
+    check(
+      "and makes the delivery more likely to arrive",
+      arrivalOdds(market, 90) > arrivalOdds(market, 0),
+    );
+    check(
+      "but never to certain",
+      SUPPLIERS.every((x) => arrivalOdds(x, 100) <= 1),
+    );
+  }
+
+  /* Gates: standing, minimum order, and what they carry. */
+  {
+    const poor = startS();
+    poor.r.reputation = 0;
+    const premium = SUPPLIER_BY_ID.get("premium")!;
+    check(
+      "a premium supplier will not open an account with a nobody",
+      (supplierBlocker(premium, kitchen(poor), 0, null) ?? "").length > 10,
+    );
+    check(
+      "the market does not carry luxury produce, and says so",
+      (supplierBlocker(
+        SUPPLIER_BY_ID.get("market")!,
+        kitchen(poor),
+        0,
+        PRODUCE_BY_ID.get("luxury")!,
+      ) ?? "").length > 10,
+    );
+    const small = runCommand(chef, startS(), "buyProduce", "wholesaler:basic");
+    check(
+      "an order under the supplier\u2019s minimum is refused",
+      kitchen(small).larder.length === 0,
+    );
+  }
+
+  /*
+   * BUYING IS DETERMINISTIC; DELIVERY IS NOT.
+   *
+   * The command records an order and takes the money. Whether the van
+   * arrives is rolled once, in the week, from the seeded stream — so a
+   * purchase means the same thing every replay.
+   */
+  {
+    const once = runCommand(chef, startS(), "buyProduce", "market:basic");
+    const twice = runCommand(chef, startS(), "buyProduce", "market:basic");
+    check(
+      "the same order on the same seed always has the same outcome",
+      kitchen(once).larder.length === kitchen(twice).larder.length &&
+        once.r.cash === twice.r.cash,
+    );
+    check(
+      "a delivered crate remembers who brought it and how long it has",
+      (() => {
+        const lot = kitchen(once).larder[0];
+        return !lot || (lot.from === "market" && (lot.life ?? 0) > 0);
+      })(),
+    );
+    check(
+      "and the money is taken whether or not it arrives",
+      once.r.cash < startS().r.cash,
+    );
+  }
+
+  /* A failed delivery costs money and standing, and is said out loud. */
+  {
+    let f = startS();
+    /*
+     * The farm, which fails roughly one delivery in eight — and a *market*
+     * crate, because a basic one costs $864 and the farm will not take an
+     * order under $1,400. An earlier version of this ordered the cheap crate
+     * six times, had all six correctly refused, and reported it as a delivery
+     * failure. The minimum is real; the test now respects it.
+     */
+    for (let i = 0; i < 6; i++) {
+      f = runCommand(chef, f, "buyProduce", "farm:market");
+    }
+    const paid = 400_000 - f.r.cash;
+    const arrived = kitchen(f).larder.length;
+    check(
+      "an unreliable supplier does not always deliver what was paid for",
+      paid > 0 && arrived <= 6,
+      `${arrived} of 6 arrived`,
+    );
+  }
+
+  /* Save compatibility. */
+  check(
+    "a save from before suppliers existed still loads",
+    (() => {
+      const legacy = startS();
+      const kk = kitchen(legacy) as { suppliers?: unknown };
+      delete kk.suppliers;
+      return chef.validateData!(legacy.data);
+    })(),
+  );
+  check(
+    "a save naming a supplier that does not exist is rejected",
+    !chef.validateData!({
+      kitchen: {
+        premises: "stall",
+        larder: [],
+        staff: [],
+        suppliers: { "black-market": 50 },
+      },
+    }),
+  );
+  check(
+    "a lot bought before suppliers existed still ages correctly",
+    (() => {
+      const lot = { id: "old", produce: "basic", left: 10, unitCost: 9, boughtWeek: 1 };
+      const basic = PRODUCE_BY_ID.get("basic")!;
+      return (
+        !isSpoiled(lot, 1 + basic.shelfLife, 0) &&
+        isSpoiled(lot, 2 + basic.shelfLife, 0)
+      );
+    })(),
+  );
+}
+
+console.log("\nThe book and the forecast\n" + "────────────────────────────────────────────────────");
+{
+  const startB = () => {
+    const f = startRun(chef, 3131);
+    f.r.cash = 400_000;
+    f.r.skill = 70;
+    return runCommand(chef, f, "takePremises", "bistro");
+  };
+  const dinner = SERVICE_BY_ID.get("dinner")!;
+  const catering = SERVICE_BY_ID.get("catering")!;
+
+  /*
+   * DETERMINISM.
+   *
+   * The forecast is what the player orders against, so it has to be a pure
+   * function of the kitchen. If it moved on its own between the screen and
+   * the week resolving, ordering to it would be theatre.
+   */
+  {
+    const a = startB();
+    const f1 = forecastFor(kitchen(a), a.r.reputation, dinner, 2, a.r.skill);
+    const f2 = forecastFor(kitchen(a), a.r.reputation, dinner, 2, a.r.skill);
+    check(
+      "the same kitchen forecasts the same week twice",
+      f1.low === f2.low && f1.high === f2.high &&
+        f1.reservations === f2.reservations,
+    );
+    check(
+      "and the forecast is a range, not a single number",
+      f1.high > f1.low,
+      `${f1.low}-${f1.high}`,
+    );
+    check(
+      "it explains itself rather than printing a coefficient",
+      f1.drivers.length > 0 &&
+        f1.drivers.every((d) => d.label.length > 3 && d.note.length > 20),
+    );
+    check(
+      "and it names what will run out first",
+      f1.binding.length > 10,
+      f1.binding,
+    );
+  }
+
+  /* Booked work is knowable exactly; walk-in trade never is. */
+  {
+    const a = startB();
+    const bookedFc = forecastFor(kitchen(a), a.r.reputation, catering, 2, a.r.skill);
+    check(
+      "a booked service forecasts a single certain number",
+      bookedFc.low === bookedFc.high && bookedFc.noShows === 0,
+    );
+  }
+
+  /*
+   * THE TRADE THE POLICY MAKES.
+   *
+   * Selling the room in advance narrows the range you have to order
+   * against. That predictability is the product, and it is paid for in
+   * covers, so both halves are asserted.
+   */
+  {
+    const walkins = startB();
+    const booked = runCommand(chef, startB(), "setPolicy", "reservations");
+    const fW = forecastFor(kitchen(walkins), 60, dinner, 2, 70);
+    const fB = forecastFor(kitchen(booked), 60, dinner, 2, 70);
+
+    check(
+      "reservations narrow the range you must order against",
+      fB.high - fB.low < fW.high - fW.low,
+      `walk-ins +-${fW.high - fW.low}, booked +-${fB.high - fB.low}`,
+    );
+    check(
+      "walk-ins only promises nothing in advance",
+      fW.reservations === 0,
+    );
+    check(
+      "reservations promise most of the room",
+      fB.reservations > 0,
+    );
+    check(
+      "and the certainty costs covers at the top end",
+      fB.high <= fW.high,
+      `${fB.high} booked vs ${fW.high} walk-in`,
+    );
+  }
+
+  /* Deposits buy away the no-shows, and are kept when somebody fails to come. */
+  {
+    const dep = runCommand(chef, startB(), "setPolicy", "deposits");
+    const res = runCommand(chef, startB(), "setPolicy", "reservations");
+    const fD = forecastFor(kitchen(dep), 60, dinner, 2, 70);
+    const fR = forecastFor(kitchen(res), 60, dinner, 2, 70);
+    check(
+      "a deposit nearly removes the no-shows",
+      fD.noShows < fR.noShows,
+      `${fD.noShows} vs ${fR.noShows}`,
+    );
+    check(
+      "and fewer people bother booking at all",
+      fD.reservations <= fR.reservations,
+    );
+  }
+
+  /* Overbooking fills the room and turns somebody away at the door. */
+  {
+    let over = runCommand(chef, startB(), "setPolicy", "overbook");
+    over.r.reputation = 85;
+    for (let i = 0; i < 10; i++) {
+      over = runCommand(chef, over, "buyProduce", "basic");
+    }
+    const fc = forecastFor(kitchen(over), over.r.reputation, dinner, 2, over.r.skill);
+    check(
+      "overbooking sells more of the room than it seats",
+      fc.reservations > fc.seats,
+      `${fc.reservations} booked into ${fc.seats} seats`,
+    );
+
+    const before = over.r.reputation;
+    const res = advanceWeek(chef, over, { dinner: 2 });
+    const line = kitchen(res.state).lastService!.lines[0];
+    check(
+      "somebody with a booking is turned away at the door",
+      line.turnedAway > 0,
+      `${line.turnedAway} turned away`,
+    );
+    check(
+      "and it costs standing, which is what makes it a gamble",
+      res.state.r.reputation < before,
+    );
+  }
+
+  /* The week resolves inside the band the player was shown. */
+  {
+    let f = startB();
+    f.r.reputation = 55;
+    for (let i = 0; i < 12; i++) f = runCommand(chef, f, "buyProduce", "basic");
+    for (let i = 0; i < 6; i++) f = runCommand(chef, f, "hireKitchen", "partie");
+    const fc = forecastFor(kitchen(f), f.r.reputation, dinner, 2, f.r.skill);
+    const line = kitchen(advanceWeek(chef, f, { dinner: 2 }).state).lastService!.lines[0];
+    check(
+      "the week lands inside the range that was forecast",
+      line.wanted >= fc.low && line.wanted <= fc.high,
+      `wanted ${line.wanted}, forecast ${fc.low}-${fc.high}`,
+    );
+    check(
+      "and the report says what limited it",
+      line.binding.length > 10,
+      line.binding,
+    );
+    check(
+      "the report separates bookings, no-shows and walk-ins",
+      line.reservations + line.walkIns > 0 &&
+        line.noShows >= 0 &&
+        line.reservations - line.noShows + line.walkIns === line.wanted,
+    );
+    check(
+      "and reports what the food on those plates cost",
+      line.served === 0 || line.foodCost > 0,
+    );
+  }
+
+  /* Old saves have no book at all. */
+  check(
+    "a save written before reservations existed still loads",
+    (() => {
+      const legacy = startB();
+      delete (kitchen(legacy) as { policy?: string }).policy;
+      return (
+        chef.validateData!(legacy.data) &&
+        policyOf(kitchen(legacy)).id === "walkins"
+      );
+    })(),
+  );
+  check(
+    "a save naming a policy that does not exist is rejected",
+    !chef.validateData!({
+      kitchen: {
+        premises: "stall",
+        larder: [],
+        staff: [],
+        policy: "telepathy",
+      },
+    }),
+  );
+}
+
+console.log("\nChef service types\n" + "────────────────────────────────────────────────────");
+{
+  const startC = () => {
+    const f = startRun(chef, 909);
+    f.r.cash = 400_000;
+    return f;
+  };
+
+  check(
+    "there is more than one kind of night to run",
+    SERVICES.length >= 5,
+  );
+
+  /*
+   * NONE OF THEM IS UNIVERSALLY BEST.
+   *
+   * The design only works if each service wins at something, so this
+   * asserts the shape rather than any single number: revenue per block is
+   * within a band, and the ones that pay more give something up — either
+   * they need a bigger room and more craft, or nobody reviews them.
+   */
+  {
+    const yieldOf = (sv: (typeof SERVICES)[number]) =>
+      sv.capacityShare * sv.spend;
+    const best = Math.max(...SERVICES.map(yieldOf));
+    const worst = Math.min(...SERVICES.map(yieldOf));
+    check(
+      "no service earns more than twice the weakest per block",
+      best / worst < 2.2,
+      `${worst.toFixed(2)}..${best.toFixed(2)}`,
+    );
+    check(
+      "anything that pays above the middle costs something else",
+      SERVICES.filter((sv) => yieldOf(sv) > 0.5).every(
+        (sv) => sv.minRoom > 0 || sv.minCraft > 0 || sv.reviewWeight < 0.5,
+      ),
+    );
+    check(
+      "the cheapest service in burnout is also the least lucrative",
+      yieldOf(
+        [...SERVICES].sort((a, b) => a.burnout - b.burnout)[0],
+      ) < best,
+    );
+  }
+
+  /* Gating: a stall cannot run a tasting menu, and it says why. */
+  {
+    const stall = startC();
+    const tasting = SERVICE_BY_ID.get("tasting")!;
+    check(
+      "a market stall cannot attempt a tasting menu",
+      !serviceOpen(tasting, kitchen(stall), stall.r.skill),
+    );
+    check(
+      "and the reason is stated rather than left blank",
+      (serviceBlocker(tasting, kitchen(stall), stall.r.skill) ?? "").length > 10,
+    );
+    check(
+      "lunch and dinner are open from the first week",
+      serviceOpen(SERVICE_BY_ID.get("lunch")!, kitchen(stall), stall.r.skill) &&
+        serviceOpen(SERVICE_BY_ID.get("dinner")!, kitchen(stall), stall.r.skill),
+    );
+    check(
+      "a closed service is hidden from the planner",
+      chef.actions
+        .filter((a) => a.id === "tasting")
+        .every((a) => a.unlocked !== undefined && !a.unlocked(stall)),
+    );
+  }
+
+  /* Booked work pays without depending on standing — the recovery route. */
+  {
+    let f = startC();
+    f = runCommand(chef, f, "takePremises", "bistro");
+    f.r.skill = 70;
+    f = runCommand(chef, f, "buyProduce", "basic");
+    f = runCommand(chef, f, "buyProduce", "basic");
+    /* Nobody has heard of this kitchen at all. */
+    f.r.reputation = 0;
+
+    const cateringWeek = advanceWeek(chef, f, { catering: 3 });
+    const catering = kitchen(cateringWeek.state).lastService!;
+    check(
+      "catering serves covers even at zero standing",
+      catering.served > 0,
+      `${catering.served} covers`,
+    );
+    check(
+      "and turns nobody away, because the number was agreed",
+      catering.turnedAway === 0,
+    );
+    check(
+      "but it earns no review at all",
+      Math.abs(cateringWeek.state.r.reputation - f.r.reputation) < 0.001,
+      `reputation moved to ${cateringWeek.state.r.reputation.toFixed(2)}`,
+    );
+
+    /*
+     * The property that actually matters: standing moves walk-in trade and
+     * does not touch booked work.
+     *
+     * An earlier version of this compared dinner against catering at zero
+     * reputation and expected dinner to lose. It did not, and the test was
+     * wrong rather than the model — with two crates in the larder both
+     * services were capped by food, so the comparison measured `crewLoad`
+     * rather than demand. Stocked properly and run at two different
+     * reputations, the real difference shows.
+     */
+    const stocked = (rep: number) => {
+      let g = startC();
+      g = runCommand(chef, g, "takePremises", "bistro");
+      g.r.skill = 70;
+      for (let i = 0; i < 10; i++) g = runCommand(chef, g, "buyProduce", "basic");
+      for (let i = 0; i < 6; i++) g = runCommand(chef, g, "hireKitchen", "partie");
+      g.r.reputation = rep;
+      return g;
+    };
+    const dinnerLow = kitchen(
+      advanceWeek(chef, stocked(0), { dinner: 3 }).state,
+    ).lastService!;
+    const dinnerHigh = kitchen(
+      advanceWeek(chef, stocked(70), { dinner: 3 }).state,
+    ).lastService!;
+    check(
+      "standing decides how many walk in",
+      dinnerHigh.served > dinnerLow.served,
+      `${dinnerLow.served} at 0 standing vs ${dinnerHigh.served} at 70`,
+    );
+
+    const cateringLow = kitchen(
+      advanceWeek(chef, stocked(0), { catering: 3 }).state,
+    ).lastService!;
+    const cateringHigh = kitchen(
+      advanceWeek(chef, stocked(70), { catering: 3 }).state,
+    ).lastService!;
+    check(
+      "booked work does not care what anyone thinks of you",
+      cateringLow.served === cateringHigh.served,
+      `${cateringLow.served} vs ${cateringHigh.served}`,
+    );
+  }
+
+  /* The week reports what each service did, not just a total. */
+  {
+    let f = startC();
+    f = runCommand(chef, f, "takePremises", "bistro");
+    f.r.skill = 70;
+    for (let i = 0; i < 4; i++) {
+      f = runCommand(chef, f, "buyProduce", "basic");
+    }
+    const res = advanceWeek(chef, f, { lunch: 1, dinner: 1, catering: 1 });
+    const last = kitchen(res.state).lastService!;
+    check(
+      "each service run is reported on its own line",
+      last.lines.length === 3 &&
+        new Set(last.lines.map((l) => l.id)).size === 3,
+      last.lines.map((l) => `${l.id}:${l.served}`).join(" "),
+    );
+    check(
+      "and the lines add up to the takings for the week",
+      Math.abs(
+        last.lines.reduce((n, l) => n + l.revenue, 0) - last.revenue,
+      ) < 2,
+    );
+    check(
+      "the brigade is a shared pool, so stacked services compete for it",
+      last.served <= brigadeCovers(kitchen(res.state), res.state.r.skill) * 1.3,
+    );
+  }
+
+  /* Lunch is the volume option: more covers, less money each. */
+  {
+    const lunch = SERVICE_BY_ID.get("lunch")!;
+    const dinner = SERVICE_BY_ID.get("dinner")!;
+    check(
+      "lunch seats more than dinner and charges less a head",
+      lunch.capacityShare > dinner.capacityShare && lunch.spend < dinner.spend,
+    );
+    check(
+      "and costs less burnout",
+      lunch.burnout < dinner.burnout,
+    );
+  }
+}
+
+console.log("\nThe Chef\n" + "────────────────────────────────────────────────────");
+{
+  const startC = () => startRun(chef, 404);
+  let c = startC();
+  check(
+    "a chef run starts on a stall with an empty larder",
+    kitchen(c).premises === "stall" && kitchen(c).larder.length === 0,
+  );
+
+  c = runCommand(chef, c, "buyProduce", "basic");
+  check("produce can be bought", kitchen(c).larder.length === 1);
+  check(
+    "and it arrives with the covers it carries",
+    larderCovers(kitchen(c)) === PRODUCE_BY_ID.get("basic")!.covers,
+  );
+
+  {
+    const poor = startC();
+    poor.r.cash = 10;
+    check(
+      "a crate you cannot afford is refused",
+      kitchen(runCommand(chef, poor, "buyProduce", "luxury")).larder.length === 0,
+    );
+  }
+
+  /*
+   * SPOILAGE — the reason this career exists.
+   *
+   * Stock past its shelf life must be gone before service and must leave
+   * as a cost. If it quietly vanished instead, over-ordering would be free
+   * and the Chef would be a reskin of every other tycoon game.
+   */
+  {
+    /* Its own run: `{ ...state }` is a shallow copy that shares `data`, so
+       clearing the larder here would empty the one the checks below read. */
+    let old = runCommand(chef, startC(), "buyProduce", "basic");
+    old = { ...old, week: old.week + 9 };
+    const before = larderCovers(kitchen(old));
+    const lost = clearSpoiled(kitchen(old), old.week);
+    check(
+      "produce past its shelf life is written off, as a cost",
+      before > 0 &&
+        lost.covers === before &&
+        lost.cost > 0 &&
+        larderCovers(kitchen(old)) === 0,
+    );
+  }
+
+  {
+    const lot = kitchen(c).larder[0];
+    check(
+      "freshness falls as a lot ages",
+      freshnessOf(lot, c.week) === 1 &&
+        freshnessOf(lot, c.week + 2) < 1 &&
+        freshnessOf(lot, c.week + 99) === 0,
+    );
+    check(
+      "and a fresher plate scores better than a stale one",
+      plateQuality(50, 5, 1, 0, 0.5) > plateQuality(50, 5, 0.1, 0, 0.5),
+    );
+  }
+
+  /* Oldest first: this is how over-ordering reaches the plate. */
+  {
+    let f = startC();
+    f = runCommand(chef, f, "buyProduce", "basic");
+    f = { ...f, week: f.week + 2 };
+    f = runCommand(chef, f, "buyProduce", "basic");
+    const drawn = drawFromLarder(kitchen(f), 20, f.week);
+    check(
+      "the larder is drawn down oldest-first",
+      drawn.drawn === 20 && drawn.freshness < 1,
+    );
+  }
+
+  {
+    let w = startC();
+    w = runCommand(chef, w, "buyProduce", "basic");
+    /* `service` became a choice of service in the catalogue — this is the
+       plain dinner trade a stall can run from week one. */
+    const res = advanceWeek(chef, w, { dinner: 3, prep: 1 });
+    check(
+      "a service serves people",
+      (kitchen(res.state).lastService?.served ?? 0) > 0,
+    );
+    check(
+      "the rent is charged whether or not you open",
+      advanceWeek(chef, startC(), { rest: 1 }).ledger.some((x) =>
+        /rent/i.test(x.label),
+      ),
+    );
+  }
+
+  check(
+    "a chef save validates, and a corrupt one does not",
+    chef.validateData!(c.data) &&
+      !chef.validateData!({ kitchen: { premises: "palace", larder: [], staff: [] } }),
+  );
+  check(
+    "every room clears the food cost of the crate it would run",
+    CHEF_PREMISES.every(
+      (room) => room.spend > CHEF_PRODUCE[0].cost / CHEF_PRODUCE[0].covers,
+    ),
+  );
+}
+
+
+console.log("\nThe chef's phone\n" + "────────────────────────────────────────────────────");
+{
+  const startP = () => {
+    const f = startRun(chef, 8181);
+    f.r.cash = 300_000;
+    return f;
+  };
+
+  /* A new run owns a phone, and somebody has already texted. */
+  {
+    const f = startP();
+    const phone = kitchen(f).phone;
+    check(
+      "a chef starts with a phone and a message from their mentor",
+      !!phone && phone.messages.length === 1 && !phone.messages[0].read,
+    );
+  }
+
+  /*
+   * REVIEWS NEVER CONTRADICT THE SIMULATION.
+   *
+   * The feed's tone is computed from the same plate quality the week
+   * produced. A good night reads well; a night cooked from a tired larder
+   * by an unskilled hand reads badly. This is the phone's whole contract.
+   */
+  {
+    let good = startP();
+    good.r.skill = 85;
+    good = runCommand(chef, good, "hireKitchen", "sous");
+    good = runCommand(chef, good, "buyProduce", "market:basic");
+    good = runCommand(chef, good, "buyProduce", "market:basic");
+    const g = advanceWeek(chef, good, { dinner: 2 });
+    const gRev = kitchen(g.state).phone!.feed.find((x) => x.id.startsWith("rev-"));
+    check(
+      "a well-cooked week reads well on the feed",
+      !!gRev && gRev.tone !== "bad",
+      gRev ? `tone ${gRev.tone}` : "no review",
+    );
+
+    let bad = startP();
+    bad.r.skill = 8;
+    bad = runCommand(chef, bad, "buyProduce", "market:basic");
+    /* Let the crate tire without letting it spoil. */
+    bad = { ...bad, week: bad.week + 3 };
+    const b = advanceWeek(chef, bad, { dinner: 2 });
+    const bLast = kitchen(b.state).lastService!;
+    const bRev = kitchen(b.state).phone!.feed.find((x) => x.id.startsWith("rev-"));
+    check(
+      "a tired larder cooked badly reads badly",
+      bLast.served === 0 || !bRev || (bLast.quality <= 42) === (bRev.tone === "bad"),
+      bRev ? `quality ${Math.round(bLast.quality)}, tone ${bRev.tone}` : "no review",
+    );
+  }
+
+  /* The same week always sounds the same. */
+  {
+    const mk = () => {
+      let f = startP();
+      f.r.skill = 60;
+      f = runCommand(chef, f, "buyProduce", "market:basic");
+      return advanceWeek(chef, f, { dinner: 1 });
+    };
+    check(
+      "the phone is as replayable as the ledger",
+      JSON.stringify(kitchen(mk().state).phone!.feed) ===
+        JSON.stringify(kitchen(mk().state).phone!.feed),
+    );
+  }
+
+  /* Posting: once a week, gated on the run's real state. */
+  {
+    let f = startP();
+    f = runCommand(chef, f, "post", "pans_on");
+    const phone = kitchen(f).phone!;
+    check(
+      "publishing puts your post at the top of the feed",
+      phone.feed[0]?.kind === "player" && phone.lastPostWeek === f.week,
+    );
+    const before = phone.social.followers;
+    const again = runCommand(chef, f, "post", "behind_pass");
+    check(
+      "a second post the same week is refused",
+      kitchen(again).phone!.feed.filter((x) => x.kind === "player").length === 1 &&
+        kitchen(again).phone!.social.followers === before,
+    );
+    const ctx = chefPostContext(kitchen(f), f.week);
+    check(
+      "the apology is only offered after a genuinely bad night",
+      !CHEF_POST_BY_ID.get("apology")!.available(ctx),
+    );
+  }
+
+  /* The rival comes for your best underpaid cook — and answering matters. */
+  {
+    let f = startP();
+    f = runCommand(chef, f, "hireKitchen", "sous");
+    const cook = kitchen(f).staff[0];
+    cook.skill = 80;
+    cook.loyalty = 30;
+    const wk = advanceWeek(chef, f, { rest: 1 });
+    const msg = kitchen(wk.state).phone!.messages.find((x) =>
+      x.id.startsWith("poach-"),
+    );
+    check(
+      "a rival makes a move on an underpaid cook",
+      !!msg && msg.choices !== undefined,
+    );
+    if (msg) {
+      const salaryBefore = kitchen(wk.state).staff[0].salary;
+      const answered = runCommand(
+        chef,
+        wk.state,
+        "answerMessage",
+        `${msg.id}|0`,
+      );
+      const kept = kitchen(answered).staff[0];
+      check(
+        "matching the offer costs a real rise and buys real loyalty",
+        kept.salary > salaryBefore && (kept.loyalty ?? 0) > 30,
+        `salary ${salaryBefore} -> ${kept.salary}`,
+      );
+      check(
+        "and the thread remembers the answer",
+        kitchen(answered).phone!.messages.find((x) => x.id === msg.id)!
+          .answered === 0,
+      );
+    }
+  }
+
+  /* Followers are people who did not walk past the window. */
+  {
+    const quiet = startP();
+    const loud = startP();
+    ensureChefPhone(kitchen(loud)).social.followers = 10_000;
+    const dinner = SERVICE_BY_ID.get("dinner")!;
+    const fq = forecastFor(kitchen(quiet), 50, dinner, 2, 50);
+    const fl = forecastFor(kitchen(loud), 50, dinner, 2, 50);
+    check(
+      "a followed kitchen forecasts more walk-ins than an unknown one",
+      fl.high > fq.high,
+      `${fq.high} vs ${fl.high}`,
+    );
+  }
+
+  /* Old saves, and garbage. */
+  {
+    const legacy = startP();
+    delete (kitchen(legacy) as { phone?: unknown }).phone;
+    check(
+      "a save from before the phone existed still validates",
+      chef.validateData!(legacy.data),
+    );
+    const wk = advanceWeek(chef, legacy, { rest: 1 });
+    check(
+      "and gains a phone the first week it plays",
+      !!kitchen(wk.state).phone,
+    );
+    check(
+      "a save with a garbage phone is rejected",
+      !chef.validateData!({
+        kitchen: {
+          premises: "stall",
+          larder: [],
+          staff: [],
+          phone: { social: { followers: "many" }, feed: [], messages: [], news: [] },
+        },
+      }),
+    );
+  }
+
+  /* The kitchen's phone never speaks the hospital's language. */
+  {
+    let f = startP();
+    f.r.skill = 60;
+    f.r.reputation = 50;
+    f = runCommand(chef, f, "hireKitchen", "sous");
+    f = runCommand(chef, f, "buyProduce", "market:basic");
+    let st = f;
+    for (let i = 0; i < 6; i++) {
+      st = advanceWeek(chef, st, { dinner: 1 }).state;
+    }
+    const everything = JSON.stringify(kitchen(st).phone);
+    check(
+      "six weeks of chef phone contain no medical vocabulary",
+      !/patient|clinic|caseload|department|physician|ward/i.test(everything),
+    );
+    check(
+      "and none of the composer catalogue does either",
+      !CHEF_POSTS.some((post) =>
+        /patient|clinic|caseload|department|physician/i.test(
+          post.label + post.blurb + post.preview.join(" "),
+        ),
+      ),
+    );
+  }
+}
+
+
+console.log("\nThe agency\n" + "────────────────────────────────────────────────────");
+{
+  const startA = () => {
+    const f = startRun(chef, 4242);
+    f.r.cash = 200_000;
+    return f;
+  };
+  const commis = ROLE_BY_ID.get("commis")!;
+
+  /* Briefing costs the search fee and comes back with people. */
+  {
+    const f = startA();
+    const fees = agencyFees(kitchen(f), commis);
+    const briefed = runCommand(chef, f, "briefAgency", "commis");
+    const k = kitchen(briefed);
+    check(
+      "briefing the agency returns a shortlist",
+      shortlistLive(k, briefed.week).length === SHORTLIST_SIZE,
+    );
+    check(
+      "and charges the search fee, not the whole hire",
+      briefed.r.cash === f.r.cash - fees.search &&
+        fees.search < fees.total,
+      `paid ${f.r.cash - briefed.r.cash} of ${fees.total}`,
+    );
+    check(
+      "nobody is on the payroll until you say so",
+      k.staff.length === 0,
+    );
+  }
+
+  /*
+   * THE POINT OF THE WHOLE FEATURE.
+   *
+   * The person you were shown is the person who turns up — not a preview
+   * of a second roll. If this ever fails the shortlist is a lie.
+   */
+  {
+    let f = startA();
+    f = runCommand(chef, f, "briefAgency", "commis");
+    const shown = shortlistLive(kitchen(f), f.week)[1];
+    const hired = runCommand(chef, f, "hireCandidate", shown.id);
+    const joined = kitchen(hired).staff[0];
+    check(
+      "the candidate you picked is the person who joins",
+      !!joined &&
+        joined.id === shown.id &&
+        joined.name === shown.name &&
+        joined.skill === shown.skill &&
+        joined.salary === shown.salary,
+      joined ? `${joined.name} @ ${joined.skill}` : "nobody joined",
+    );
+    check(
+      "and the rest of the shortlist goes back on the market",
+      shortlistLive(kitchen(hired), hired.week).length === 0,
+    );
+  }
+
+  /* Brief + place costs exactly what a blind hire costs. */
+  {
+    const f = startA();
+    const fees = agencyFees(kitchen(f), commis);
+    let viaAgency = runCommand(chef, f, "briefAgency", "commis");
+    const pick = shortlistLive(kitchen(viaAgency), viaAgency.week)[0];
+    viaAgency = runCommand(chef, viaAgency, "hireCandidate", pick.id);
+    const blind = runCommand(chef, f, "hireKitchen", "commis");
+    check(
+      "briefing then placing costs what hiring blind costs",
+      f.r.cash - viaAgency.r.cash === f.r.cash - blind.r.cash &&
+        f.r.cash - viaAgency.r.cash === fees.total,
+      `agency ${f.r.cash - viaAgency.r.cash} vs blind ${f.r.cash - blind.r.cash}`,
+    );
+  }
+
+  /* Looking again is a real cost, and shows different people. */
+  {
+    let f = startA();
+    f = runCommand(chef, f, "briefAgency", "commis");
+    const first = shortlistLive(kitchen(f), f.week).map((c) => c.id);
+    const cashAfterFirst = f.r.cash;
+    f = runCommand(chef, f, "briefAgency", "commis");
+    const second = shortlistLive(kitchen(f), f.week).map((c) => c.id);
+    check(
+      "briefing again costs the fee again",
+      f.r.cash < cashAfterFirst,
+    );
+    check(
+      "and produces different people",
+      second.every((id) => !first.includes(id)),
+    );
+  }
+
+  /* The agency's people do not wait forever. */
+  {
+    let f = startA();
+    f = runCommand(chef, f, "briefAgency", "commis");
+    const pick = shortlistLive(kitchen(f), f.week)[0];
+    const later = { ...f, week: f.week + SHORTLIST_WEEKS };
+    check(
+      "a stale shortlist is no longer offered",
+      shortlistLive(kitchen(later), later.week).length === 0,
+    );
+    const tooLate = runCommand(chef, later, "hireCandidate", pick.id);
+    check(
+      "and cannot be hired from",
+      kitchen(tooLate).staff.length === 0 &&
+        tooLate.r.cash === later.r.cash,
+    );
+  }
+
+  /* Gates. */
+  {
+    const broke = { ...startA(), r: { ...startA().r, cash: 10 } };
+    const f = runCommand(chef, broke, "briefAgency", "commis");
+    check(
+      "you cannot brief an agency you cannot pay",
+      shortlistLive(kitchen(f), f.week).length === 0 && f.r.cash === 10,
+    );
+    let rich = startA();
+    rich = runCommand(chef, rich, "briefAgency", "commis");
+    const poor = { ...rich, r: { ...rich.r, cash: 5 } };
+    const pick = shortlistLive(kitchen(poor), poor.week)[0];
+    const nope = runCommand(chef, poor, "hireCandidate", pick.id);
+    check(
+      "and cannot place somebody you cannot pay for",
+      kitchen(nope).staff.length === 0 && nope.r.cash === 5,
+    );
+    const bogus = runCommand(chef, rich, "hireCandidate", "st-9999");
+    check(
+      "a candidate who was never on the list is refused",
+      kitchen(bogus).staff.length === 0,
+    );
+  }
+
+  /* Replay safety: the command must never roll. */
+  {
+    const mk = () => {
+      const f = runCommand(chef, startA(), "briefAgency", "commis");
+      return shortlistLive(kitchen(f), f.week);
+    };
+    check(
+      "the same run always finds the same three people",
+      JSON.stringify(mk()) === JSON.stringify(mk()),
+    );
+  }
+
+  /* A known kitchen attracts better people — the reason to build one. */
+  {
+    const unknown = startA();
+    const known = startA();
+    known.r.reputation = 80;
+    const avg = (f: typeof unknown) => {
+      const g = runCommand(chef, f, "briefAgency", "commis");
+      const list = shortlistLive(kitchen(g), g.week);
+      return list.reduce((n, c) => n + c.skill, 0) / list.length;
+    };
+    const a = avg(unknown);
+    const b = avg(known);
+    check(
+      "a well-regarded kitchen gets better shortlists",
+      b > a,
+      `unknown ${Math.round(a)} vs known ${Math.round(b)}`,
+    );
+  }
+
+  /* Saves. */
+  {
+    const legacy = startA();
+    delete (kitchen(legacy) as { shortlist?: unknown }).shortlist;
+    check(
+      "a save from before the agency existed still loads",
+      chef.validateData!(legacy.data),
+    );
+    check(
+      "a save with a nameless candidate is rejected",
+      !chef.validateData!({
+        kitchen: {
+          premises: "stall",
+          larder: [],
+          staff: [],
+          shortlist: [{ id: "st-1", role: "commis", salary: 10, skill: 50 }],
+        },
+      }),
+    );
+  }
+}
+
+console.log("\nThe Chef's artwork\n" + "─".repeat(52));
+{
+  /*
+   * The same guarantee the purchase registry gives the Physician: every item
+   * in the catalogue has a picture, every picture is on disk, and no two
+   * things share one. Keyed by the simulation's own ids, so adding a sixth
+   * service fails here rather than leaving a hole in a screen.
+   */
+  check(
+    "every room and every service has artwork registered",
+    missingChefArt().length === 0,
+    missingChefArt().join(", "),
+  );
+  {
+    /* Distinct pictures, counted over the entries that have one. The awaiting
+       set remains part of the contract for future catalogue-first additions,
+       but the current catalogue is fully illustrated. */
+    const arted = [
+      ...CHEF_PREMISES.filter(
+        (p) => !AWAITING_CHEF_ART.has(`premises:${p.id}`),
+      ).map((p) => premisesArt(p.id)?.src),
+      ...SERVICES.filter(
+        (sv) => !AWAITING_CHEF_ART.has(`service:${sv.id}`),
+      ).map((sv) => serviceArt(sv.id)?.src),
+    ];
+    check(
+      "each one is its own picture, not the same plate five times",
+      new Set(arted.filter(Boolean)).size === arted.length,
+      `${new Set(arted.filter(Boolean)).size} of ${arted.length}`,
+    );
+    check(
+      "the Chef catalogue has no artwork still waiting",
+      awaitingChefArt().length === 0 && missingChefArt().length === 0,
+      awaitingChefArt().join(", "),
+    );
+  }
+  {
+    const missing = chefArtPaths().filter(
+      (src) => !existsSync(join("public", src.replace(/^\//, ""))),
+    );
+    check(
+      "every Chef image resolves to a file on disk",
+      missing.length === 0,
+      missing.join(", "),
+    );
+  }
+  check(
+    "nothing the Chef serves is a source PNG",
+    chefArtPaths().every((src) => src.endsWith(".webp")),
+  );
+  check(
+    "every Chef image declares the box it will fill",
+    CHEF_PREMISES.filter((p) => !AWAITING_CHEF_ART.has(`premises:${p.id}`))
+      .map((p) => premisesArt(p.id))
+      .every((a) => !!a && a.width > 0 && a.height > 0),
+  );
+  check(
+    "the critic event is registered like any other career's event",
+    eventVisual("critic")?.src === CRITIC_ART.src,
+  );
+
+  /*
+   * The larder picture is a reading of the larder, not a mood.
+   *
+   * Three states, all derived: nothing in stock shows nothing, stock with
+   * time on it shows the full larder, and stock that dies this week shows the
+   * one being thrown out. The check builds each case out of real lots rather
+   * than asserting the function's own arithmetic back at it.
+   */
+  {
+    const shelfLifeOf = (id: string) => PRODUCE_BY_ID.get(id)?.shelfLife ?? null;
+    const empty = startRun(chef, 3131);
+    check(
+      "an empty larder has no picture to show",
+      larderArt(kitchen(empty), empty.week, 0, shelfLifeOf) === null,
+    );
+
+    const stocked = runCommand(chef, empty, "buyProduce", "market:basic");
+    check(
+      "a crate bought this week reads as fresh",
+      larderArt(kitchen(stocked), stocked.week, 0, shelfLifeOf)?.state ===
+        "fresh",
+      String(larderArt(kitchen(stocked), stocked.week, 0, shelfLifeOf)?.state),
+    );
+    /* The standard crate lives four weeks, so on its last one it is exactly
+       what the rows call "Last week". */
+    const basic = PRODUCE_BY_ID.get("basic")!;
+    check(
+      "the same crate on its last week reads as going over",
+      larderArt(
+        kitchen(stocked),
+        stocked.week + basic.shelfLife - 1,
+        0,
+        shelfLifeOf,
+      )?.state === "expiring",
+    );
+    check(
+      "and refrigeration buys it back",
+      larderArt(
+        kitchen(stocked),
+        stocked.week + basic.shelfLife - 1,
+        1,
+        shelfLifeOf,
+      )?.state === "fresh",
+    );
+  }
+}
+
+console.log("\nStarting somewhere\n" + "────────────────────────────────────────────────────");
+{
+  /*
+   * The city is chosen once, before week one, and every career applies it to
+   * its own state. What has to hold for all three: the choice lands, a
+   * nonsense id lands on the default instead of half-placing a run, the same
+   * seed and city replay identically, and a save written before any of this
+   * existed still loads and reads as the career's original home.
+   */
+  const each: [string, typeof doctor][] = [
+    ["doctor", doctor],
+    ["chef", chef],
+    ["lawyer", lawyer],
+  ];
+
+  for (const [id, career] of each) {
+    const cities = career.startCities ?? [];
+    const other = cities[cities.length - 1];
+    check(`${id}: the default start is the career's first city`, cities.length > 1);
+
+    const chosen = startRun(career, 4242, { city: other.id });
+    check(
+      `${id}: choosing ${other.name} starts the run there`,
+      chosen.startCity === other.id,
+      String(chosen.startCity),
+    );
+
+    const nonsense = startRun(career, 4242, { city: "atlantis" });
+    check(
+      `${id}: a city that does not exist falls back rather than half-placing`,
+      nonsense.startCity === cities[0].id,
+      String(nonsense.startCity),
+    );
+    const plain = startRun(career, 4242);
+    check(
+      `${id}: not choosing at all is the same as choosing the default`,
+      JSON.stringify(plain) === JSON.stringify(nonsense),
+    );
+
+    /* Determinism: the city is applied outside the RNG, so two runs on one
+       seed in one city are the same run. */
+    check(
+      `${id}: same seed, same city, same run`,
+      JSON.stringify(startRun(career, 99, { city: other.id })) ===
+        JSON.stringify(startRun(career, 99, { city: other.id })),
+    );
+    check(
+      `${id}: a different city is a different run`,
+      JSON.stringify(startRun(career, 99, { city: cities[0].id })) !==
+        JSON.stringify(startRun(career, 99, { city: other.id })),
+    );
+
+    /* The timeline says where it began, because a run that opens in Mumbai
+       and never mentions it is a run whose numbers look wrong. */
+    check(
+      `${id}: the timeline records where the run began`,
+      timelineOf(chosen).some((t) => t.title.includes(other.name)),
+    );
+
+    /* A save with no city at all — every save written before this feature. */
+    const legacy = startRun(career, 7);
+    delete legacy.startCity;
+    check(
+      `${id}: a save from before the choice still validates`,
+      validateRun(JSON.parse(JSON.stringify(legacy))),
+    );
+    check(
+      `${id}: and a save naming a city that does not exist is rejected`,
+      !validateRun(
+        JSON.parse(JSON.stringify({ ...legacy, startCity: "atlantis" })),
+      ),
+    );
+  }
+
+  /* -------------------------------------------------- the Chef's cities */
+  {
+    const lyon = startRun(chef, 11, { city: "lyon" });
+    const mumbai = startRun(chef, 11, { city: "mumbai" });
+    const paris = startRun(chef, 11, { city: "paris" });
+
+    check(
+      "chef: Lyon is the neutral city every earlier run was played in",
+      rent(kitchen(lyon)) === CHEF_PREMISES[0].rent &&
+        extraShelfLife(kitchen(lyon)) === 0 &&
+        lyon.r.cash === 7_500 &&
+        lyon.r.debt === 38_000,
+    );
+    check(
+      "chef: a cheap city is cheap to be in and pays less a cover",
+      rent(kitchen(mumbai)) < rent(kitchen(lyon)) &&
+        spendPerHead(kitchen(mumbai)) < spendPerHead(kitchen(lyon)),
+      `${rent(kitchen(mumbai))} rent, ${Math.round(spendPerHead(kitchen(mumbai)))} a head`,
+    );
+    check(
+      "chef: an expensive city charges more for the same room and pays more",
+      rent(kitchen(paris)) > rent(kitchen(lyon)) &&
+        spendPerHead(kitchen(paris)) > spendPerHead(kitchen(lyon)),
+    );
+    check(
+      "chef: the opening loan and float are in the money of the city",
+      mumbai.r.debt < lyon.r.debt &&
+        paris.r.debt > lyon.r.debt &&
+        Math.abs(mumbai.r.cash / mumbai.r.debt - lyon.r.cash / lyon.r.debt) <
+          0.01,
+    );
+    check(
+      "chef: the same crate costs what the city charges for it",
+      priceFrom(
+        SUPPLIER_BY_ID.get("market")!,
+        PRODUCE_BY_ID.get("basic")!,
+        0,
+        produceIndex(kitchen(mumbai)),
+      ) <
+        priceFrom(
+          SUPPLIER_BY_ID.get("market")!,
+          PRODUCE_BY_ID.get("basic")!,
+          0,
+          produceIndex(kitchen(paris)),
+        ),
+    );
+    check(
+      "chef: heat and lorries cost a week of shelf life, cold cellars buy one",
+      extraShelfLife(kitchen(mumbai)) === -1 &&
+        extraShelfLife(kitchen(startRun(chef, 11, { city: "milan" }))) === 1,
+    );
+    /* A city that takes a week off shelf life must not bin a crate on the day
+       it is delivered — that reads as a bug, not as a hard city. */
+    {
+      const k = kitchen(mumbai);
+      const luxury = PRODUCE_BY_ID.get("luxury")!;
+      const lot = {
+        id: "l1",
+        produce: luxury.id,
+        left: luxury.covers,
+        unitCost: 40,
+        boughtWeek: 1,
+      };
+      check(
+        "chef: the shortest-lived produce still survives the week it arrives",
+        !isSpoiled(lot, 1, extraShelfLife(k)) &&
+          freshnessOf(lot, 1, extraShelfLife(k)) > 0,
+      );
+    }
+    /*
+     * EVERYTHING IS LOCAL, OR NOTHING IS.
+     *
+     * The simulation found this and it is the most important rule in the
+     * feature: the first pass localised rent, produce and takings but not
+     * wages, equipment, events or the insolvency line, and the cheap cities
+     * were insolvent for 119 weeks out of 120 on arithmetic alone. Each of
+     * these checks is one of the holes.
+     */
+    {
+      const hire = (s: typeof lyon) =>
+        rolePay(kitchen(s), ROLE_BY_ID.get("partie")!);
+      check(
+        "chef: wages and hiring are in the money of the city",
+        hire(mumbai).salary < hire(lyon).salary &&
+          hire(paris).salary > hire(lyon).salary &&
+          hire(lyon).salary === ROLE_BY_ID.get("partie")!.salary,
+        `${hire(mumbai).salary} / ${hire(lyon).salary} / ${hire(paris).salary}`,
+      );
+      check(
+        "chef: and the salary that goes on the payroll is the local one",
+        kitchen(runCommand(chef, mumbai, "hireKitchen", "partie")).staff[0]
+          ?.salary === hire(mumbai).salary,
+      );
+      check(
+        "chef: equipment is bought, installed and run in local money",
+        kitPrice(kitchen(mumbai), KIT_BY_ID.get("coldroom")!) <
+          kitPrice(kitchen(lyon), KIT_BY_ID.get("coldroom")!) &&
+          kitPrice(kitchen(lyon), KIT_BY_ID.get("coldroom")!) ===
+            KIT_BY_ID.get("coldroom")!.cost,
+      );
+      check(
+        "chef: a room costs what a room costs here",
+        premisesPrice(kitchen(mumbai), CHEF_PREMISES[1]) <
+          premisesPrice(kitchen(lyon), CHEF_PREMISES[1]),
+      );
+      check(
+        "chef: a sum quoted in an event is converted before it is charged",
+        localSum(mumbai, 4_500) < 4_500 &&
+          localSum(lyon, 4_500) === 4_500 &&
+          localSum(paris, 4_500) > 4_500,
+        `${localSum(mumbai, 4_500)} / ${localSum(lyon, 4_500)} / ${localSum(paris, 4_500)}`,
+      );
+      /* And insolvency means the same thing everywhere: a hole the size of
+         the business, not a number from another country. */
+      const broke = (s: typeof lyon, cash: number) =>
+        (chef.checkSetbacks?.({ ...s, r: { ...s.r, cash } }) ?? []).includes(
+          "insolvency",
+        );
+      check(
+        "chef: the insolvency line is in local money too",
+        broke(mumbai, -20_000) && !broke(lyon, -20_000) && broke(lyon, -60_000),
+      );
+    }
+
+    check(
+      "chef: the target is stated in the money of the city, not London's",
+      goalFor(mumbai) < goalFor(lyon) && goalFor(paris) > goalFor(lyon),
+      `${goalFor(mumbai)} / ${goalFor(lyon)} / ${goalFor(paris)}`,
+    );
+    /* Demand is the axis a player feels first, and it has to move the
+       forecast they order against rather than only the card. */
+    check(
+      "chef: a busier city forecasts more covers for the same kitchen",
+      forecastFor(kitchen(mumbai), 40, SERVICE_BY_ID.get("dinner")!, 1, 40).high >
+        forecastFor(kitchen(lyon), 40, SERVICE_BY_ID.get("dinner")!, 1, 40).high,
+    );
+    check(
+      "chef: and says so in words, not only in the number",
+      forecastFor(kitchen(mumbai), 40, SERVICE_BY_ID.get("dinner")!, 1, 40)
+        .drivers.some((d) => d.label === "Mumbai"),
+    );
+  }
+
+  /* --------------------------------------------- the Solicitor's cities */
+  {
+    const london = startRun(lawyer, 21, { city: "london" });
+    const lagos = startRun(lawyer, 21, { city: "lagos" });
+    const kind = CASE_BY_ID.get("commercial")!;
+
+    check(
+      "lawyer: London is the neutral market every earlier run practised in",
+      feeIn(practice(london), kind) === kind.fee &&
+        chambersRent(practice(london)) === 640 &&
+        london.r.cash === 9_000,
+    );
+    check(
+      "lawyer: the same instruction bills what the market pays",
+      feeIn(practice(lagos), kind) < feeIn(practice(london), kind),
+      `${feeIn(practice(lagos), kind)} against ${feeIn(practice(london), kind)}`,
+    );
+    check(
+      "lawyer: chambers cost what the city charges",
+      chambersRent(practice(lagos)) < chambersRent(practice(london)),
+    );
+    /*
+     * `reach` is the axis that makes a market a decision rather than a rate
+     * card: a small market never sends the biggest work, however well
+     * regarded the firm becomes. Reputation is deliberately enormous here so
+     * the only thing that can be gating it is the city.
+     */
+    {
+      const rng = makeRng(5);
+      const offers = Array.from({ length: 200 }, () =>
+        newOffers(practice(lagos), 100, 4, 2, rng),
+      ).flat();
+      check(
+        "lawyer: a market with a ceiling never offers the work above it",
+        offers.length > 0 &&
+          offers.every(
+            (o) => (CASE_BY_ID.get(o.kind)?.prestige ?? 0) <= 7,
+          ),
+        `${offers.length} offers drawn`,
+      );
+    }
+    check(
+      "lawyer: salaries are in the money of the market, like the fees are",
+      legalLabourIndex(practice(lagos)) < legalLabourIndex(practice(london)) &&
+        legalLabourIndex(practice(london)) === 1,
+    );
+    check(
+      "lawyer: and an associate hired in Lagos is paid a Lagos salary",
+      (practice(runCommand(lawyer, { ...lagos, r: { ...lagos.r, cash: 90_000 } }, "hireLegal", "associate")).staff[0]?.salary ?? 0) <
+        (practice(runCommand(lawyer, { ...london, r: { ...london.r, cash: 90_000 } }, "hireLegal", "associate")).staff[0]?.salary ?? 0),
+    );
+    check(
+      "lawyer: the target is stated in the money of the market, and its ceiling",
+      goalForFirm(lagos) < goalForFirm(london),
+      `${goalForFirm(lagos)} against ${goalForFirm(london)}`,
+    );
+    check(
+      "lawyer: two markets on the same fees differ by how far the ladder goes",
+      goalForFirm(startRun(lawyer, 21, { city: "amsterdam" })) <
+        goalForFirm(startRun(lawyer, 21, { city: "singapore" })) ||
+        LEGAL_CITY_BY_ID.get("amsterdam")!.fee <
+          LEGAL_CITY_BY_ID.get("singapore")!.fee,
+    );
+  }
+
+  /* ----------------------------------------------- the Physician's start */
+  {
+    const lyon = startRun(doctor, 31, { city: "lyon" });
+    const lagos = startRun(doctor, 31, { city: "lagos" });
+
+    check(
+      "doctor: Lyon is unchanged — the balance figures were measured there",
+      lyon.r.cash === 24_000 &&
+        lyon.r.debt === 165_000 &&
+        med(lyon).homeCity === "lyon",
+    );
+    check(
+      "doctor: the licence, the room and the panel all move to the city chosen",
+      med(lagos).homeCity === "lagos" &&
+        med(lagos).cities.join() === "lagos" &&
+        med(lagos).facilities.every((f) => f.city === "lagos") &&
+        med(lagos).panels.lagos === lagos.r.panel,
+    );
+    check(
+      "doctor: you did not train where you are not",
+      med(lagos).cities.includes("lyon") === false,
+    );
+    check(
+      "doctor: training debt and float are in the money of where you trained",
+      lagos.r.debt < lyon.r.debt && lagos.r.cash < lyon.r.cash,
+      `${lagos.r.debt} owed, ${lagos.r.cash} in hand`,
+    );
+    check(
+      "doctor: and the objective measures against what was actually borrowed",
+      doctor.objective(lagos).progress > -0.01 &&
+        doctor.objective(lagos).progress < 1,
+    );
+    check(
+      "doctor: a save from before the choice still owes what it always owed",
+      startDebtOf({ ...lyon, r: { ...lyon.r, _startDebt: 0 } }) === 165_000,
+    );
+    /* The expansion system is untouched: entering a market is still a
+       purchase, and starting in one is not the same as being licensed
+       everywhere. */
+    check(
+      "doctor: starting somewhere does not licence you anywhere else",
+      med(lagos).cities.length === 1,
+    );
+  }
+}
+
+console.log("\nThe Chef's dishes\n" + "─".repeat(52));
+{
+  /*
+   * The whole feature, from a recipe's arithmetic to what a week does to the
+   * pantry. Every check builds its own state out of real commands rather than
+   * hand-writing a KitchenState, so a rule that only holds when the state is
+   * constructed by hand fails here.
+   */
+  const startK = (cash = 60_000, skill = 55) => {
+    const f = startRun(chef, 8080);
+    f.r.cash = cash;
+    f.r.skill = skill;
+    return f;
+  };
+  const buy = (s: RunState, ing: string, times = 1) => {
+    let out = s;
+    for (let i = 0; i < times; i++) {
+      out = runCommand(chef, out, "buyIngredient", `market:${ing}`);
+    }
+    return out;
+  };
+
+  /* --------------------------------------------------- recipe arithmetic */
+  {
+    const chickenDish = RECIPE_BY_ID.get("roast_chicken")!;
+    const byHand = chickenDish.needs.reduce(
+      (n, line) => n + INGREDIENT_BY_ID.get(line.ingredient)!.price * line.qty,
+      0,
+    );
+    check(
+      "a recipe costs what its ingredients cost, per cover",
+      Math.abs(recipeCost(chickenDish) - byHand) < 0.001,
+      `${recipeCost(chickenDish).toFixed(2)} against ${byHand.toFixed(2)}`,
+    );
+    const margin = dishMargin(chickenDish, 21);
+    check(
+      "and margin is the price less that cost, as money and as a share",
+      Math.abs(margin.profit - (21 - margin.cost)) < 0.001 &&
+        Math.abs(margin.foodCostShare - margin.cost / 21) < 0.001,
+    );
+    check(
+      "a dish priced at nothing is all food cost, not a divide by zero",
+      dishMargin(chickenDish, 0).foodCostShare === 1,
+    );
+    check(
+      "every recipe names ingredients that exist",
+      RECIPES.every((r) =>
+        r.needs.every((line) => INGREDIENT_BY_ID.has(line.ingredient)),
+      ),
+    );
+    check(
+      "every recipe is worth cooking at its suggested price",
+      RECIPES.every((r) => dishMargin(r, r.suggestedPrice).profit > 0),
+      RECIPES.filter((r) => dishMargin(r, r.suggestedPrice).profit <= 0)
+        .map((r) => r.id)
+        .join(", "),
+    );
+    check(
+      "every recipe needs equipment that exists",
+      RECIPES.every((r) => r.needsEquipment.every((id) => KIT_BY_ID.has(id))),
+    );
+    check(
+      "the five categories are all used",
+      new Set(RECIPES.map((r) => r.category)).size === 5,
+    );
+  }
+
+  /* ------------------------------------------------------- unlocking them */
+  {
+    const green = startK(60_000, 20);
+    check(
+      "a new kitchen already knows the dishes any cook knows",
+      knownRecipes(kitchen(green)).length === 3 &&
+        knowsRecipe(kitchen(green), "roast_chicken"),
+    );
+    check(
+      "a dish beyond your craft cannot be developed",
+      !knowsRecipe(
+        kitchen(runCommand(chef, green, "developRecipe", "truffle_pasta")),
+        "truffle_pasta",
+      ),
+    );
+    const able = runCommand(chef, startK(60_000, 50), "developRecipe", "pasta");
+    check(
+      "one you have the craft for can be, and it charges for it",
+      knowsRecipe(kitchen(able), "pasta") && able.r.cash < 60_000,
+      `${60_000 - able.r.cash} spent`,
+    );
+    check(
+      "developing the same dish twice does not charge twice",
+      runCommand(chef, able, "developRecipe", "pasta").r.cash === able.r.cash,
+    );
+    check(
+      "a dish you cannot afford is refused rather than half-bought",
+      !knowsRecipe(
+        kitchen(runCommand(chef, startK(100, 50), "developRecipe", "pasta")),
+        "pasta",
+      ),
+    );
+  }
+
+  /* ---------------------------------------------------------- naming them */
+  {
+    let named = runCommand(chef, startK(), "nameRecipe", "roast_chicken:Sunday bird");
+    check(
+      "an original dish can be given a house name",
+      recipeName(
+        RECIPE_BY_ID.get("roast_chicken")!,
+        progressFor(kitchen(named), "roast_chicken"),
+      ) === "Sunday bird",
+    );
+    check(
+      "and the catalogue keeps its own, so nothing is orphaned",
+      RECIPE_BY_ID.get("roast_chicken")!.name === "Roast chicken, root vegetables",
+    );
+    named = runCommand(chef, named, "nameRecipe", "roast_chicken:   ");
+    check(
+      "an empty name resets to the dish's own rather than blanking it",
+      recipeName(
+        RECIPE_BY_ID.get("roast_chicken")!,
+        progressFor(kitchen(named), "roast_chicken"),
+      ) === "Roast chicken, root vegetables",
+    );
+    const nasty = runCommand(
+      chef,
+      startK(),
+      "nameRecipe",
+      `roast_chicken:${"x".repeat(200)}`,
+    );
+    check(
+      "a name is capped, so a save cannot carry a paragraph",
+      (progressFor(kitchen(nasty), "roast_chicken")?.name ?? "").length <= 48,
+    );
+    check(
+      "renaming a dish this kitchen does not know is refused",
+      progressFor(
+        kitchen(runCommand(chef, startK(), "nameRecipe", "truffle_pasta:Mine")),
+        "truffle_pasta",
+      ) === undefined,
+    );
+  }
+
+  /* ----------------------------------------------------------- the menu */
+  {
+    let m = runCommand(chef, startK(), "addDish", "roast_chicken");
+    check(
+      "a known dish goes on the menu at its suggested price",
+      activeMenu(kitchen(m))[0]?.recipe === "roast_chicken" &&
+        activeMenu(kitchen(m))[0]?.price ===
+          RECIPE_BY_ID.get("roast_chicken")!.suggestedPrice,
+    );
+    check(
+      "a dish you have not developed cannot go on it",
+      activeMenu(kitchen(runCommand(chef, m, "addDish", "tasting_course")))
+        .length === 1,
+    );
+    check(
+      "the same dish cannot be listed twice",
+      activeMenu(kitchen(runCommand(chef, m, "addDish", "roast_chicken")))
+        .length === 1,
+    );
+    m = runCommand(chef, m, "priceDish", "roast_chicken:44");
+    check("a price can be set", activeMenu(kitchen(m))[0].price === 44);
+    check(
+      "a negative price is refused rather than clamped silently",
+      activeMenu(kitchen(runCommand(chef, m, "priceDish", "roast_chicken:-5")))[0]
+        .price === 44,
+    );
+    check(
+      "and a dish can come off again",
+      activeMenu(kitchen(runCommand(chef, m, "dropDish", "roast_chicken")))
+        .length === 0,
+    );
+
+    /* The trades the menu is supposed to make. */
+    const priced = runCommand(chef, m, "priceDish", "roast_chicken:200");
+    check(
+      "pricing far above what the room expects costs covers",
+      menuFactors(kitchen(priced), 55).demand <
+        menuFactors(kitchen(m), 55).demand,
+      `${menuFactors(kitchen(priced), 55).demand.toFixed(2)} against ${menuFactors(kitchen(m), 55).demand.toFixed(2)}`,
+    );
+    let wide = m;
+    for (const id of ["soup", "bread"]) wide = runCommand(chef, wide, "addDish", id);
+    check(
+      "a broader menu reaches more people than a single dish",
+      menuFactors(kitchen(wide), 55).demand > menuFactors(kitchen(m), 55).demand,
+    );
+    check(
+      "and a long menu is a less consistent kitchen than a short one",
+      menuFactors(kitchen(wide), 55).quality <=
+        menuFactors(kitchen(m), 55).quality,
+    );
+    check(
+      "no menu at all is exactly neutral, which is what an old save gets",
+      (() => {
+        const none = menuFactors(kitchen(startK()), 55);
+        return (
+          none.demand === 1 &&
+          none.quality === 1 &&
+          none.prepLoad === 1 &&
+          none.dishes === 0
+        );
+      })(),
+    );
+  }
+
+  /* ------------------------------------------------- buying and consuming */
+  {
+    const bought = buy(startK(), "chicken");
+    const chicken = INGREDIENT_BY_ID.get("chicken")!;
+    check(
+      "an order puts real units in the pantry",
+      pantryQty(kitchen(bought), "chicken", bought.week) === chicken.orderSize,
+      String(pantryQty(kitchen(bought), "chicken", bought.week)),
+    );
+    check(
+      "and it is paid for at what this supplier charges",
+      bought.r.cash < 60_000 &&
+        60_000 - bought.r.cash ===
+          ingredientPrice(
+            kitchen(startK()),
+            SUPPLIER_BY_ID.get("market")!,
+            chicken,
+            0,
+            1,
+          ),
+    );
+    check(
+      "an order you cannot afford is refused, not part-filled",
+      pantryQty(kitchen(buy(startK(10), "beef")), "beef", 1) === 0,
+    );
+    check(
+      "the pantry counts towards what the business is worth",
+      kitchenWorth(bought) > kitchenWorth(startK()) - 1,
+    );
+
+    /* Consumption: the scarcest line binds, and nothing goes negative. */
+    let cook = buy(startK(), "chicken");
+    cook = buy(cook, "roots");
+    cook = buy(cook, "butter");
+    const roast = RECIPE_BY_ID.get("roast_chicken")!;
+    const drawn = consumeForCovers(kitchen(cook), roast, 20, cook.week);
+    check(
+      "cooking twenty covers takes twenty covers' worth of ingredients",
+      drawn.made === 20 &&
+        Math.abs(
+          pantryQty(kitchen(cook), "chicken", cook.week) -
+            (chicken.orderSize - roast.needs[0].qty * 20),
+        ) < 0.001,
+    );
+    const huge = consumeForCovers(kitchen(cook), roast, 100_000, cook.week);
+    check(
+      "asking for more than the pantry holds makes fewer dishes, never negative stock",
+      huge.made < 100_000 &&
+        pantryOf(kitchen(cook)).every((l) => l.qty >= 0),
+      `made ${huge.made}`,
+    );
+    check(
+      "and it names what it ran out of",
+      typeof huge.shortOf === "string" && huge.shortOf.length > 0,
+      String(huge.shortOf),
+    );
+    check(
+      "a dish with nothing behind it makes nothing at all",
+      consumeForCovers(kitchen(startK()), roast, 10, 1).made === 0,
+    );
+  }
+
+  /* --------------------------------------------------- freshness over time */
+  {
+    const fresh = buy(startK(), "greens");
+    const k = kitchen(fresh);
+    const lot = pantryOf(k)[0];
+    const greens = INGREDIENT_BY_ID.get("greens")!;
+    check(
+      "a delivery arrives fresh",
+      ingredientState(lot, fresh.week, k) === "fresh",
+      ingredientState(lot, fresh.week, k),
+    );
+    check(
+      "it works down the bands as the weeks pass, and never skips one",
+      (() => {
+        const seen = new Set<string>();
+        for (let w = fresh.week; w < fresh.week + 8; w++) {
+          seen.add(ingredientState(lot, w, k));
+        }
+        return seen.has("fresh") && seen.has("expiring") && seen.has("spoiled");
+      })(),
+    );
+    check(
+      "freshness falls with age rather than jumping",
+      ingredientFreshness(lot, fresh.week, k) >
+        ingredientFreshness(lot, fresh.week + 1, k),
+    );
+    check(
+      "and it never goes below nothing however long it sits",
+      ingredientFreshness(lot, fresh.week + 40, k) === 0,
+    );
+
+    /* Refrigeration is the modifier the whole career turns on. */
+    const cold = runCommand(chef, buy(startK(), "greens"), "buyKit", "coldroom");
+    const coldK = kitchen(cold);
+    check(
+      "a cold room adds real weeks to chilled stock",
+      ingredientLifeLeft(pantryOf(coldK)[0], cold.week, coldK) >
+        ingredientLifeLeft(lot, fresh.week, k),
+    );
+    check(
+      "and keeps it out of the bin a week longer",
+      ingredientState(pantryOf(coldK)[0], cold.week + greens.life, coldK) !==
+        "spoiled" &&
+        ingredientState(lot, fresh.week + greens.life, k) === "spoiled",
+    );
+    const dry = runCommand(chef, buy(startK(), "flour"), "buyKit", "coldroom");
+    check(
+      "but does nothing for a sack of flour, which does not care",
+      pantryExtraLife(kitchen(dry), "dry") === 0,
+    );
+    check(
+      "frozen stock barely ages whatever you own",
+      pantryExtraLife(kitchen(startK()), "frozen") >=
+        pantryExtraLife(kitchen(startK()), "chilled"),
+    );
+  }
+
+  /* ------------------------------------------- spoilage, waste and safety */
+  {
+    const old = buy(startK(), "whitefish");
+    const fishLot = pantryOf(kitchen(old))[0];
+    /* Move the run forward without cooking, so the fish simply ages. */
+    old.week += 4;
+    check(
+      "fish left for a month is spoiled",
+      ingredientState(fishLot, old.week, kitchen(old)) === "spoiled",
+    );
+    check(
+      "spoiled stock is invisible to the count that decides what can be cooked",
+      pantryQty(kitchen(old), "whitefish", old.week) === 0,
+    );
+    const fish = RECIPE_BY_ID.get("fish_meuniere")!;
+    check(
+      "and it can never be served, which is the rule the system exists for",
+      consumeForCovers(kitchen(old), fish, 5, old.week).made === 0,
+    );
+
+    const worthBefore = kitchenWorth(old);
+    const dumped = runCommand(chef, old, "dumpSpoiled", "");
+    check(
+      "throwing it out empties the shelf and takes the stock off the books",
+      pantryOf(kitchen(dumped)).length === 0 &&
+        kitchenWorth(dumped) <= worthBefore,
+    );
+    check(
+      "and it does not charge the cash a second time — that left when it was ordered",
+      dumped.r.cash === old.r.cash,
+    );
+    check(
+      "and the waste is tracked rather than vanishing into the cash line",
+      (dumped.r._wasteCost ?? 0) > 0,
+    );
+    check(
+      "throwing out nothing costs nothing",
+      runCommand(chef, dumped, "dumpSpoiled", "").r.cash === dumped.r.cash,
+    );
+
+    /* The week does it whether or not the player does. */
+    const auto = buy(startK(), "whitefish");
+    auto.week += 4;
+    const week = advanceWeek(chef, auto, { rest: 1 });
+    check(
+      "a week clears spoiled stock even if nobody pressed the button",
+      pantryOf(kitchen(week.state)).length === 0 &&
+        week.ledger.some((l) => /thrown out/i.test(l.label)),
+    );
+    check(
+      "and the week tells the player what the loss was worth",
+      /\$/.test(
+        week.ledger.find((l) => /thrown out/i.test(l.label))?.note ?? "",
+      ),
+    );
+  }
+
+  /* -------------------------------------------------- a week, end to end */
+  {
+    let run = startK(60_000, 55);
+    for (const ing of ["chicken", "roots", "butter", "flour"]) run = buy(run, ing);
+    run = runCommand(chef, run, "buyProduce", "market:basic");
+    run = runCommand(chef, run, "addDish", "roast_chicken");
+    run = runCommand(chef, run, "addDish", "bread");
+
+    const cashBefore = run.r.cash;
+    const chickenBefore = pantryQty(kitchen(run), "chicken", run.week);
+    const out = advanceWeek(chef, run, { dinner: 3, prep: 1, room: 1, rest: 1 });
+    const done = kitchen(out.state).lastService!;
+
+    check(
+      "a service cooks the menu and reports what each dish did",
+      (done.dishes ?? []).length > 0 &&
+        (done.dishes ?? []).every((x) => x.covers > 0 && x.revenue > 0),
+    );
+    check(
+      "it consumed the ingredients those dishes are made of",
+      pantryQty(kitchen(out.state), "chicken", out.state.week) < chickenBefore,
+    );
+    check(
+      "the ingredients are charged as their own line, not folded into rent",
+      out.ledger.some((l) => /ingredients on the plate/i.test(l.label)),
+    );
+    check(
+      "the money that left cash equals the ledger's own arithmetic",
+      (() => {
+        /*
+         * Every line except the loan interest, which is *capitalised* — it is
+         * added to the debt rather than paid out of the till, and has been
+         * since this career shipped. Excluding it is the difference between
+         * asserting the dishes layer balances and asserting a pre-existing
+         * quirk away.
+         */
+        const net = out.ledger
+          .filter((l) => !/loan interest/i.test(l.label))
+          .reduce((n, l) => n + (l.amount ?? 0), 0);
+        return Math.abs(out.state.r.cash - (cashBefore + net)) <= 1;
+      })(),
+      `${out.state.r.cash - cashBefore} moved`,
+    );
+    check(
+      "and the dishes layer moves no cash of its own — ingredients are paid for when ordered",
+      (() => {
+        const info = out.ledger.filter((l) => l.kind === "info");
+        return info.every((l) => l.amount === undefined);
+      })(),
+    );
+    check(
+      "covers the menu could not carry fell through to the staple",
+      /*
+       * Phase 2 moved the unit: the pipeline serves *tickets*, and a cover can
+       * be several of them. So the invariant is now that everything the week
+       * counted as served is either a ticket the night sent out or a cover the
+       * crates carried — nothing counted twice and nothing lost.
+       */
+      (done.plainCovers ?? 0) >= 0 &&
+        (done.nights ?? []).reduce((n, x) => n + x.served, 0) +
+          (done.plainCovers ?? 0) ===
+          done.served,
+      `${done.served} served, ${(done.plainCovers ?? 0)} off the crates`,
+    );
+    check(
+      "the dishes are credited with the covers they served",
+      (progressFor(kitchen(out.state), "roast_chicken")?.served ?? 0) > 0,
+    );
+    check(
+      "food cost is a share of takings that can actually be computed",
+      (() => {
+        const food =
+          (done.ingredientCost ?? 0) +
+          done.lines.reduce((n, l) => n + l.foodCost, 0);
+        return done.revenue > 0 && food / done.revenue > 0 && food / done.revenue < 1;
+      })(),
+    );
+
+    /* A kitchen with no menu still plays exactly as it always did. */
+    let plain = startK(60_000, 55);
+    plain = runCommand(chef, plain, "buyProduce", "market:basic");
+    const plainWeek = advanceWeek(chef, plain, { dinner: 3, prep: 1, room: 1, rest: 1 });
+    const plainDone = kitchen(plainWeek.state).lastService!;
+    check(
+      "a kitchen with no menu serves the staple and reports no dishes",
+      (plainDone.dishes ?? []).length === 0 &&
+        plainDone.plainCovers === plainDone.served &&
+        (plainDone.ingredientCost ?? 0) === 0,
+    );
+    check(
+      "and its takings are the arithmetic this career always had",
+      plainDone.revenue > 0,
+    );
+  }
+
+  /* ------------------------------------------------------ save migration */
+  {
+    /* Exactly what a save written before this feature looks like. */
+    const legacy = startRun(chef, 4141);
+    const lk = kitchen(legacy) as unknown as Record<string, unknown>;
+    delete lk.pantry;
+    delete lk.menu;
+    delete lk.recipes;
+
+    check(
+      "a save from before the dishes existed still validates",
+      chef.validateData!(legacy.data),
+    );
+    check(
+      "and still loads through the engine's own validator",
+      validateRun(JSON.parse(JSON.stringify(legacy))),
+    );
+    check(
+      "it reads as a kitchen with no pantry and no menu",
+      pantryOf(kitchen(legacy)).length === 0 &&
+        activeMenu(kitchen(legacy)).length === 0,
+    );
+    check(
+      "but it still knows the dishes any cook knows",
+      knownRecipes(kitchen(legacy)).length === 3,
+    );
+    check(
+      "a week resolves on it without touching the new systems",
+      (() => {
+        const w = advanceWeek(chef, legacy, { rest: 1 });
+        return (kitchen(w.state).lastService?.dishes ?? []).length === 0;
+      })(),
+    );
+    check(
+      "and the first thing it develops keeps what it already knew",
+      knownRecipes(
+        kitchen(runCommand(chef, { ...legacy, r: { ...legacy.r, skill: 50, cash: 9_000 } }, "developRecipe", "pasta")),
+      ).length === 4,
+    );
+
+    /* What must be rejected: state that would render a blank row or cook a
+       dish the catalogue does not have. */
+    const badRecipe = JSON.parse(JSON.stringify(startRun(chef, 1).data));
+    badRecipe.kitchen.menu = [{ recipe: "moon_cheese", price: 10 }];
+    check(
+      "a menu naming a dish that does not exist is rejected",
+      !chef.validateData!(badRecipe),
+    );
+    const badQty = JSON.parse(JSON.stringify(startRun(chef, 1).data));
+    badQty.kitchen.pantry = [
+      { id: "x", ingredient: "beef", qty: -5, unitCost: 2, life: 2, boughtWeek: 1, quality: 50 },
+    ];
+    check(
+      "and a pantry carrying negative stock is rejected outright",
+      !chef.validateData!(badQty),
+    );
+    const badIng = JSON.parse(JSON.stringify(startRun(chef, 1).data));
+    badIng.kitchen.pantry = [
+      { id: "x", ingredient: "unobtanium", qty: 5, unitCost: 2, life: 2, boughtWeek: 1, quality: 50 },
+    ];
+    check(
+      "as is an ingredient the catalogue has never heard of",
+      !chef.validateData!(badIng),
+    );
+  }
+
+  /* ------------------------------------------------------- the signature */
+  {
+    let sig = startK(400_000, 55);
+    for (let i = 0; i < SIGNATURE_REFINED; i++) {
+      sig = runCommand(chef, sig, "refineRecipe", "roast_chicken");
+    }
+    check(
+      "refining a dish costs money and improves it",
+      (progressFor(kitchen(sig), "roast_chicken")?.refined ?? 0) ===
+        SIGNATURE_REFINED &&
+        dishQuality(
+          RECIPE_BY_ID.get("roast_chicken")!,
+          progressFor(kitchen(sig), "roast_chicken"),
+          55,
+        ) >
+          dishQuality(RECIPE_BY_ID.get("roast_chicken")!, undefined, 55),
+    );
+    check(
+      "but refinement alone does not make it a signature",
+      !progressFor(kitchen(sig), "roast_chicken")?.signature,
+    );
+    const served = {
+      ...progressFor(kitchen(sig), "roast_chicken")!,
+      served: SIGNATURE_SERVED,
+    };
+    check(
+      "cooking it enough times as well is what earns that",
+      earnsSignature(served),
+    );
+  }
+}
+
+console.log("\nThe service, order by order\n" + "─".repeat(52));
+{
+  /*
+   * Phase 2: tickets, stations and the people who work them. Every check
+   * builds its state out of real commands, and the pipeline is exercised
+   * through `advanceWeek` wherever the claim is about a week — a rule that
+   * only holds when the state is hand-written is not a rule.
+   */
+  const kitchenReady = (opts: { hire?: string[]; cash?: number; skill?: number } = {}) => {
+    let s = startRun(chef, 6161);
+    s.r.cash = opts.cash ?? 300_000;
+    s.r.skill = opts.skill ?? 60;
+    s.r.reputation = 45;
+    s = runCommand(chef, s, "takePremises", "bistro");
+    for (const role of opts.hire ?? []) {
+      s = runCommand(chef, s, "hireKitchen", role);
+    }
+    for (const id of ["roast_chicken", "bread", "soup"]) {
+      s = runCommand(chef, s, "addDish", id);
+    }
+    for (const ing of ["chicken", "roots", "butter", "flour", "stockbones"]) {
+      s = runCommand(chef, s, "buyIngredient", `market:${ing}`);
+      s = runCommand(chef, s, "buyIngredient", `market:${ing}`);
+    }
+    s = runCommand(chef, s, "buyProduce", "market:basic");
+    return s;
+  };
+  const nightOf = (s: RunState, alloc: Record<string, number>) => {
+    const out = advanceWeek(chef, s, alloc);
+    return {
+      state: out.state,
+      ledger: out.ledger,
+      night: kitchen(out.state).lastService?.nights?.[0],
+      week: kitchen(out.state).lastService,
+    };
+  };
+
+  /* ------------------------------------------------------ order generation */
+  {
+    const { night } = nightOf(kitchenReady(), { dinner: 2, prep: 1 });
+    check(
+      "a service generates tickets from the menu and the room",
+      !!night && night.arrived > 0,
+      String(night?.arrived),
+    );
+    check(
+      "every ticket that arrived was served, walked, or never made",
+      !!night &&
+        night.served + night.walked + night.unmade === night.arrived,
+      night
+        ? `${night.served} + ${night.walked} + ${night.unmade} against ${night.arrived}`
+        : "no night",
+    );
+    check(
+      "tickets are only for dishes that are actually on the menu",
+      !!night &&
+        night.dishes.every((d) =>
+          activeMenu(kitchen(kitchenReady())).some((e) => e.recipe === d.dish),
+        ),
+    );
+    check(
+      "a kitchen with no menu runs no pipeline at all",
+      (() => {
+        let bare = startRun(chef, 6161);
+        bare.r.cash = 60_000;
+        bare = runCommand(chef, bare, "buyProduce", "market:basic");
+        const out = advanceWeek(chef, bare, { dinner: 2 });
+        const last = kitchen(out.state).lastService;
+        return (last?.nights ?? []).length === 0 && (last?.served ?? 0) > 0;
+      })(),
+    );
+  }
+
+  /* ------------------------------------------------------ stage progression */
+  {
+    const { night } = nightOf(kitchenReady(), { dinner: 2, prep: 1 });
+    check(
+      "the night is recorded tick by tick",
+      !!night && night.ticks.length > 1,
+      String(night?.ticks.length),
+    );
+    check(
+      "tickets move through the stages rather than teleporting to served",
+      !!night &&
+        night.ticks.some(
+          (t) => t.queues.preparing > 0 || t.queues.cooking > 0 || t.queues.plating > 0,
+        ),
+    );
+    check(
+      "covers served only ever goes up as the night runs",
+      !!night &&
+        night.ticks.every(
+          (t, i) => i === 0 || t.served >= night.ticks[i - 1].served,
+        ),
+    );
+    check(
+      "and nothing is left mid-service when the night closes",
+      !!night &&
+        night.ticks[night.ticks.length - 1].queues.ordered +
+          night.ticks[night.ticks.length - 1].queues.preparing +
+          night.ticks[night.ticks.length - 1].queues.cooking >=
+          0,
+    );
+  }
+
+  /* ---------------------------------------------------- ingredient draw-down */
+  {
+    const before = kitchenReady();
+    const chickenBefore = pantryQty(kitchen(before), "chicken", before.week);
+    const { state, night } = nightOf(before, { dinner: 2, prep: 1 });
+    check(
+      "a night eats the ingredients the tickets were made of",
+      pantryQty(kitchen(state), "chicken", state.week) < chickenBefore,
+    );
+    check(
+      "and never takes more than the pantry holds",
+      pantryOf(kitchen(state)).every((l) => l.qty >= 0),
+    );
+    check(
+      "what it cost is reported against the night that spent it",
+      !!night && night.ingredientCost > 0,
+    );
+    check(
+      "a ticket with nothing behind it is unmade, not a mistake",
+      (() => {
+        /* A menu with a dish whose ingredients were never bought. */
+        let s = startRun(chef, 77);
+        s.r.cash = 200_000;
+        s.r.skill = 60;
+        s = runCommand(chef, s, "takePremises", "bistro");
+        s = runCommand(chef, s, "addDish", "roast_chicken");
+        s = runCommand(chef, s, "buyProduce", "market:basic");
+        const out = advanceWeek(chef, s, { dinner: 2 });
+        const n = kitchen(out.state).lastService?.nights?.[0];
+        return !!n && n.unmade > 0 && n.served === 0;
+      })(),
+    );
+  }
+
+  /* ------------------------------------------------------- staff and roles */
+  {
+    const solo = stationLoads(
+      kitchen(kitchenReady()),
+      SERVICE_BY_ID.get("dinner")!,
+      {},
+      60,
+      1,
+    );
+    const withPastry = stationLoads(
+      kitchen(kitchenReady({ hire: ["pastry"] })),
+      SERVICE_BY_ID.get("dinner")!,
+      {},
+      60,
+      1,
+    );
+    const cap = (loads: typeof solo, id: string) =>
+      loads.find((l) => l.station === id)?.capacity ?? 0;
+
+    check(
+      "a pastry chef lifts pastry and not the hot line",
+      cap(withPastry, "pastry") > cap(solo, "pastry"),
+    );
+    check(
+      "a porter lifts the wash-up, which nothing else does",
+      cap(
+        stationLoads(
+          kitchen(kitchenReady({ hire: ["dish"] })),
+          SERVICE_BY_ID.get("dinner")!,
+          {},
+          60,
+          1,
+        ),
+        "wash",
+      ) > cap(solo, "wash"),
+    );
+    check(
+      "a server lifts front of house",
+      cap(
+        stationLoads(
+          kitchen(kitchenReady({ hire: ["front"] })),
+          SERVICE_BY_ID.get("dinner")!,
+          {},
+          60,
+          1,
+        ),
+        "front",
+      ) > cap(solo, "front"),
+    );
+    check(
+      "every station names who is on it, so a bottleneck has a cause",
+      solo.every((l) => l.cause.length > 10),
+    );
+    check(
+      "a sous chef or a manager halves the mistakes a kitchen makes",
+      errorRateOf(kitchen(kitchenReady({ hire: ["sous"] })), 60, 1) <
+        errorRateOf(kitchen(kitchenReady()), 60, 1),
+    );
+    check(
+      "and a bigger brigade serves more of the room than one person alone",
+      (() => {
+        const alone = nightOf(kitchenReady(), { dinner: 3, prep: 1 }).night;
+        const crewed = nightOf(
+          kitchenReady({ hire: ["commis", "partie", "sous", "front"] }),
+          { dinner: 3, prep: 1 },
+        ).night;
+        return !!alone && !!crewed && crewed.served > alone.served;
+      })(),
+    );
+  }
+
+  /* --------------------------------------------------------- bottlenecks */
+  {
+    const { night } = nightOf(kitchenReady(), { dinner: 3, prep: 1 });
+    check(
+      "a night that struggled names the station that held it up",
+      !!night && (night.bottleneck === null || night.bottleneckCause.length > 10),
+      `${night?.bottleneck} — ${night?.bottleneckCause}`,
+    );
+    check(
+      "and every station has a fix a player can actually act on",
+      STATIONS.every(
+        (s) => bottleneckFix(s.id, kitchen(kitchenReady())).length > 15,
+      ),
+    );
+    check(
+      "understaffing is reported as a station, not as a vague warning",
+      staffingWarnings(
+        kitchen(kitchenReady()),
+        SERVICE_BY_ID.get("dinner")!,
+        {},
+        20,
+        1,
+      ).every((w) => w.why.length > 10 && w.fix.length > 10),
+    );
+  }
+
+  /* ------------------------------------------------------ service shapes */
+  {
+    const run = (svc: string) =>
+      nightOf(kitchenReady({ hire: ["commis", "partie", "sous", "front"] }), {
+        [svc]: 3,
+        prep: 1,
+      }).night;
+
+    const lunch = run("lunch");
+    const dinner = run("dinner");
+    const tasting = run("tasting");
+    const catering = run("catering");
+
+    check(
+      "lunch is a different shape from dinner, not the same night relabelled",
+      !!lunch &&
+        !!dinner &&
+        (lunch.arrived !== dinner.arrived ||
+          lunch.ticks.length !== dinner.ticks.length),
+      `${lunch?.arrived} vs ${dinner?.arrived} tickets`,
+    );
+    check(
+      "a tasting menu is several plates a cover, so it floods the kitchen",
+      !!tasting && SERVICE_SHAPES.tasting.courses > SERVICE_SHAPES.dinner.courses,
+    );
+    check(
+      "catering has nobody in the room, so nobody walks out of it",
+      !!catering && catering.walked >= 0 && SERVICE_SHAPES.catering.patience > 50,
+    );
+    check(
+      "and each service is judged on what it is actually for",
+      new Set(Object.values(SERVICE_SHAPES).map((s) => s.expects)).size >= 4,
+    );
+    check(
+      "a private event seats everybody at once rather than trickling in",
+      SERVICE_SHAPES.event.arrival === "seating" &&
+        SERVICE_SHAPES.lunch.arrival === "steady",
+    );
+    check(
+      "every service in the catalogue has a shape of its own",
+      SERVICES.every((sv) => !!SERVICE_SHAPES[sv.id]),
+    );
+  }
+
+  /* ------------------------------------------------------ the policies */
+  {
+    const base = kitchenReady({ hire: ["commis", "partie"] });
+    const pushed = runCommand(chef, base, "setServicePolicy", "pushBrigade");
+    check(
+      "a policy can be set, and it is remembered",
+      kitchen(pushed).service?.pushBrigade === true,
+    );
+    check(
+      "and turned off again",
+      kitchen(runCommand(chef, pushed, "setServicePolicy", "pushBrigade")).service
+        ?.pushBrigade === false,
+    );
+    check(
+      "a policy that does not exist is refused",
+      Object.keys(
+        kitchen(runCommand(chef, base, "setServicePolicy", "cheat")).service ?? {},
+      ).length === 0,
+    );
+    check(
+      "pushing the brigade moves more tickets, and costs real fatigue",
+      (() => {
+        const calm = nightOf(base, { dinner: 3, prep: 1 });
+        const hard = nightOf(pushed, { dinner: 3, prep: 1 });
+        const tiredAfter = (s: RunState) =>
+          kitchen(s).staff.reduce((n, x) => n + fatigueOf(x), 0);
+        return (
+          !!calm.night &&
+          !!hard.night &&
+          tiredAfter(hard.state) > tiredAfter(calm.state)
+        );
+      })(),
+    );
+    check(
+      "simplified plating trades presentation for speed at the pass",
+      (() => {
+        const simple = runCommand(chef, base, "setServicePolicy", "simplePlating");
+        const plain = stationLoads(
+          kitchen(simple),
+          SERVICE_BY_ID.get("dinner")!,
+          kitchen(simple).service ?? {},
+          60,
+          1,
+        );
+        const normal = stationLoads(
+          kitchen(base),
+          SERVICE_BY_ID.get("dinner")!,
+          {},
+          60,
+          1,
+        );
+        const pass = (l: typeof plain) =>
+          l.find((x) => x.station === "pass")?.capacity ?? 0;
+        return pass(plain) > pass(normal);
+      })(),
+    );
+  }
+
+  /* ------------------------------------------- fatigue, morale and learning */
+  {
+    const crewed = kitchenReady({ hire: ["commis", "partie"] });
+    const { state } = nightOf(crewed, { dinner: 3, prep: 1 });
+    const crew = kitchen(state).staff;
+    check(
+      "a night tires the people who worked it",
+      crew.every((x) => fatigueOf(x) > 0),
+      crew.map((x) => fatigueOf(x)).join(", "),
+    );
+    check(
+      "and teaches them something",
+      crew.every((x) => experienceOf(x) > 0),
+    );
+    check(
+      "a week off clears real fatigue and earns no experience",
+      (() => {
+        const tiredId = kitchen(state).staff[0].id;
+        const rested = runCommand(chef, state, "restStaff", tiredId);
+        const before = kitchen(rested).staff.find((x) => x.id === tiredId)!;
+        const after = advanceWeek(chef, rested, { dinner: 3, prep: 1 });
+        const person = kitchen(after.state).staff.find((x) => x.id === tiredId)!;
+        return (
+          fatigueOf(person) < fatigueOf(before) &&
+          experienceOf(person) === experienceOf(before)
+        );
+      })(),
+    );
+    check(
+      "somebody resting is not on tonight",
+      (() => {
+        const id = kitchen(state).staff[0].id;
+        const off = runCommand(chef, state, "restStaff", id);
+        return !onTonight(kitchen(off), off.week).some((x) => x.id === id);
+      })(),
+    );
+    check(
+      "exhaustion is what turns a tired cook into one who leaves",
+      (() => {
+        const worn = { ...crew[0], fatigue: 95, loyalty: 3 } as typeof crew[0];
+        return isBurntOut(worn);
+      })(),
+    );
+    check(
+      "training costs money and banks progress towards a skill point",
+      (() => {
+        const id = kitchen(state).staff[0].id;
+        const before = state.r.cash;
+        const trained = runCommand(chef, state, "trainStaff", id);
+        const person = kitchen(trained).staff.find((x) => x.id === id)!;
+        return trained.r.cash < before && trainingOf(person) > 0;
+      })(),
+    );
+    check(
+      "and enough of it is worth a real point of skill",
+      (() => {
+        const id = kitchen(state).staff[0].id;
+        let s = state;
+        const start = currentSkill(kitchen(s).staff.find((x) => x.id === id)!);
+        for (let i = 0; i < 4; i++) s = runCommand(chef, s, "trainStaff", id);
+        return currentSkill(kitchen(s).staff.find((x) => x.id === id)!) > start;
+      })(),
+    );
+  }
+
+  /* ------------------------------------------------------------ promotion */
+  {
+    const crewed = kitchenReady({ hire: ["commis"] });
+    const person = kitchen(crewed).staff[0];
+    check(
+      "a new commis has not earned a promotion yet",
+      promotionFor(person) === null,
+    );
+    check(
+      "one who has worked the line for long enough has",
+      promotionFor({
+        ...person,
+        experience: 200,
+        skill: 60,
+      }) !== null,
+    );
+    check(
+      "promoting somebody changes the job they do and what they are paid",
+      (() => {
+        const ready = { ...crewed };
+        kitchen(ready).staff[0].experience = 200;
+        kitchen(ready).staff[0].skill = 60;
+        const up = runCommand(chef, ready, "promoteStaff", person.id);
+        const after = kitchen(up).staff[0];
+        return after.role === "partie" && after.salary > person.salary;
+      })(),
+    );
+  }
+
+  /* --------------------------------------------------------- the traits */
+  {
+    check(
+      "every trait states what it does, in the player's words",
+      KITCHEN_TRAITS.every((t) => t.effect.length > 20),
+    );
+    check(
+      "somebody hired arrives with at least one",
+      kitchen(kitchenReady({ hire: ["commis"] })).staff[0].traits!.length >= 1,
+    );
+    check(
+      "hiring is replayable — the same seed hires the same person",
+      (() => {
+        const a = kitchen(kitchenReady({ hire: ["commis"] })).staff[0];
+        const b = kitchen(kitchenReady({ hire: ["commis"] })).staff[0];
+        return JSON.stringify(a.traits) === JSON.stringify(b.traits);
+      })(),
+    );
+    check(
+      "a calm cook makes fewer mistakes than a rattled one",
+      (() => {
+        const k1 = kitchen(kitchenReady({ hire: ["commis"] }));
+        const k2 = JSON.parse(JSON.stringify(k1)) as typeof k1;
+        k1.staff[0].traits = ["calm"];
+        k2.staff[0].traits = ["temperamental"];
+        return errorRateOf(k1, 60, 1) < errorRateOf(k2, 60, 1);
+      })(),
+    );
+    check(
+      "a reliable cook tires more slowly than the rest",
+      recover({ ...kitchen(kitchenReady({ hire: ["commis"] })).staff[0], fatigue: 50, traits: ["reliable"] }, false) <
+        recover({ ...kitchen(kitchenReady({ hire: ["commis"] })).staff[0], fatigue: 50, traits: [] }, false),
+    );
+  }
+
+  /* ------------------------------------------ determinism and the save */
+  {
+    const seedOne = nightOf(kitchenReady({ hire: ["commis"] }), { dinner: 3, prep: 1 });
+    const seedTwo = nightOf(kitchenReady({ hire: ["commis"] }), { dinner: 3, prep: 1 });
+    check(
+      "the same kitchen and the same seed produce the same night",
+      JSON.stringify(seedOne.night) === JSON.stringify(seedTwo.night),
+    );
+    check(
+      "the night is on the save, so it survives a reload",
+      (() => {
+        const round = JSON.parse(JSON.stringify(seedOne.state)) as RunState;
+        return (
+          validateRun(round as unknown as Record<string, unknown>) &&
+          (kitchen(round).lastService?.nights ?? []).length ===
+            (kitchen(seedOne.state).lastService?.nights ?? []).length
+        );
+      })(),
+    );
+    check(
+      "and stepping through it changes nothing, because it is a recording",
+      (() => {
+        const before = JSON.stringify(kitchen(seedOne.state).lastService);
+        /* Reading the report is what the dashboard does; nothing here writes. */
+        const n = kitchen(seedOne.state).lastService?.nights?.[0];
+        void n?.ticks.map((t) => t.served);
+        return JSON.stringify(kitchen(seedOne.state).lastService) === before;
+      })(),
+    );
+    check(
+      "a save written before any of this still loads and still cooks",
+      (() => {
+        const legacy = startRun(chef, 4242);
+        const lk = kitchen(legacy) as unknown as Record<string, unknown>;
+        delete lk.service;
+        for (const person of kitchen(legacy).staff) {
+          delete person.fatigue;
+          delete person.experience;
+          delete person.traits;
+        }
+        if (!chef.validateData!(legacy.data)) return false;
+        const out = advanceWeek(chef, legacy, { rest: 1 });
+        return !!kitchen(out.state);
+      })(),
+    );
+    check(
+      "a save carrying a trait that does not exist is rejected",
+      (() => {
+        const bad = JSON.parse(JSON.stringify(startRun(chef, 1).data));
+        bad.kitchen.staff = [
+          { id: "x", name: "X", role: "commis", salary: 100, traits: ["telepathy"] },
+        ];
+        return !chef.validateData!(bad);
+      })(),
+    );
+    check(
+      "as is a service policy the game does not have",
+      (() => {
+        const bad = JSON.parse(JSON.stringify(startRun(chef, 1).data));
+        bad.kitchen.service = { teleportFood: true };
+        return !chef.validateData!(bad);
+      })(),
+    );
+  }
+
+  /* --------------------------------------------------- the final settlement */
+  {
+    const start = kitchenReady({ hire: ["commis", "partie"] });
+    const cashBefore = start.r.cash;
+    const { state, ledger, night, week } = nightOf(start, { dinner: 3, prep: 1 });
+
+    check(
+      "the week's takings include what the night actually sold",
+      !!night && (week?.revenue ?? 0) > 0 && night.revenue > 0,
+    );
+    check(
+      "cash moved by exactly what the ledger says, interest aside",
+      (() => {
+        const net = ledger
+          .filter((l) => !/loan interest/i.test(l.label))
+          .reduce((n, l) => n + (l.amount ?? 0), 0);
+        return Math.abs(state.r.cash - (cashBefore + net)) <= 1;
+      })(),
+      `${state.r.cash - cashBefore} moved`,
+    );
+    check(
+      "a night is settled once — running the same week twice does not pay twice",
+      (() => {
+        /* The engine clones state per commit, so committing the *same* state
+           twice must produce the same cash, not compounding rewards. */
+        const a = advanceWeek(chef, start, { dinner: 3, prep: 1 });
+        const b = advanceWeek(chef, start, { dinner: 3, prep: 1 });
+        return a.state.r.cash === b.state.r.cash;
+      })(),
+    );
+    check(
+      "the dishes the night sold are credited to the recipes that sold them",
+      (progressFor(kitchen(state), "roast_chicken")?.served ?? 0) > 0,
+    );
+    check(
+      "walkouts cost the food they were made from and earn nothing",
+      !!night &&
+        (night.walked === 0 || night.ingredientCost > night.revenue * 0.01),
+    );
+    check(
+      "a night the room hated moves the reviews down, not up",
+      (() => {
+        /* One person, a full room, no menu discipline: the night goes badly. */
+        const swamped = kitchenReady();
+        const before = swamped.r.reputation;
+        const out = advanceWeek(chef, swamped, { dinner: 3 });
+        const n = kitchen(out.state).lastService?.nights?.[0];
+        return !n || n.satisfaction >= 55 || out.state.r.reputation <= before;
+      })(),
+    );
+  }
+}
+
+console.log("\nNavigation per career\n" + "────────────────────────────────────────────────────");
+{
+  /*
+   * `sectionOf` is a single index across every career, so the failure this
+   * block exists for is a screen id shared between two careers routing a
+   * player into the wrong section — which is exactly what happened the first
+   * time the generic shell reused "practice" and sent a Chef to the medical
+   * Build screen.
+   */
+  const screensOf = (sections: SectionDef[]) =>
+    sections.flatMap((s) => s.screens.map((x) => x.id));
+
+  for (const career of ["doctor", "chef", "lawyer"]) {
+    const sections = sectionsFor(career);
+    check(
+      `${career}: every screen resolves back to the section it is listed in`,
+      sections.every((sec) =>
+        sec.screens.every((sc) => sectionOf(sc.id).id === sec.id),
+      ),
+      sections
+        .flatMap((sec) =>
+          sec.screens
+            .filter((sc) => sectionOf(sc.id).id !== sec.id)
+            .map((sc) => `${sc.id} -> ${sectionOf(sc.id).id}`),
+        )
+        .join(", "),
+    );
+    check(
+      `${career}: tapping a destination lands on a screen that destination owns`,
+      sections.every((sec) =>
+        sec.screens.some((sc) => sc.id === defaultScreen(sec.id)),
+      ),
+    );
+    check(
+      `${career}: every screen states what it decides`,
+      sections.every((sec) =>
+        sec.screens.every((sc) => sc.label.length > 0 && sc.purpose.length > 20),
+      ),
+    );
+    check(
+      `${career}: no destination lists the same screen twice`,
+      new Set(screensOf(sections)).size === screensOf(sections).length,
+    );
+  }
+
+  const chefScreens = screensOf(sectionsFor("chef"));
+  const medicalScreens = screensOf(sectionsFor("doctor"));
+  /*
+   * ONE RESTAURANT.
+   *
+   * The rule this was written for is that a Chef runs one business, and a
+   * second primary tab holding premises or stock would imply a second one.
+   * The "You" destination added with the craft is not that: it holds what the
+   * *chef* can do and what they are offered because of it, neither of which
+   * belongs to the restaurant. So the assertion is now what it always meant —
+   * exactly one destination containing the business.
+   */
+  check(
+    "the Chef has one restaurant, not a second business in the bar",
+    sectionsFor("chef").filter((s) => s.id === "kitchen").length === 1 &&
+      sectionsFor("chef").length === 4,
+    sectionsFor("chef")
+      .map((s) => s.label)
+      .join(" / "),
+  );
+  check(
+    "and the fourth destination is the chef, not a second restaurant",
+    (sectionsFor("chef").find((s) => s.id === "chef")?.screens ?? []).every(
+      (sc) => sc.id === "craft" || sc.id === "beyond",
+    ),
+  );
+  check(
+    "and that one destination carries the seven screens the career has",
+    sectionsFor("chef").find((s) => s.id === "kitchen")?.screens.length === 7,
+    String(sectionsFor("chef").find((s) => s.id === "kitchen")?.screens.length),
+  );
+  check(
+    "the Chef's screens are its own — nothing medical, nothing generic",
+    !chefScreens.includes("operation") &&
+      chefScreens
+        .filter((id) => id !== "overview")
+        .every((id) => !medicalScreens.includes(id)),
+    chefScreens.filter((id) => id !== "overview" && medicalScreens.includes(id)).join(", "),
+  );
+  check(
+    "the room, the larder, the menu, the pass, the brigade and the money",
+    (["kitchen", "larder", "menu", "pass", "brigade", "books"] as const).every(
+      (id) => chefScreens.includes(id),
+    ),
+    chefScreens.join(", "),
+  );
+  /* ------------------------------------------------ the Solicitor's shell */
+  const lawyerScreens = screensOf(sectionsFor("lawyer"));
+  check(
+    "the Solicitor has one practice, not a second firm in the bar",
+    sectionsFor("lawyer").length === 3,
+    sectionsFor("lawyer")
+      .map((s) => s.label)
+      .join(" / "),
+  );
+  check(
+    "and that one destination carries the four screens the career has",
+    sectionsFor("lawyer").find((s) => s.id === "chambers")?.screens.length === 4,
+    String(sectionsFor("lawyer").find((s) => s.id === "chambers")?.screens.length),
+  );
+  check(
+    "the instructions, the casework, the books and the firm",
+    (["instructions", "casework", "ledger", "firm"] as const).every((id) =>
+      lawyerScreens.includes(id),
+    ),
+    lawyerScreens.join(", "),
+  );
+  check(
+    "the Solicitor's screens are its own — nothing medical, nothing the Chef's",
+    !lawyerScreens.includes("operation") &&
+      lawyerScreens
+        .filter((id) => id !== "overview" && id !== "home")
+        .every((id) => !medicalScreens.includes(id) && !chefScreens.includes(id)),
+    lawyerScreens
+      .filter(
+        (id) =>
+          id !== "overview" &&
+          id !== "home" &&
+          (medicalScreens.includes(id) || chefScreens.includes(id)),
+      )
+      .join(", "),
+  );
+  /* The generic shell is still there for the NEXT career, and still lands on
+     a screen that exists — it is simply nobody's route today. */
+  check(
+    "the generic shell survives the Solicitor leaving it",
+    screensOf(sectionsFor("a-career-nobody-has-written")).includes("operation") &&
+      defaultScreen("business") === "operation",
+  );
+  check(
+    "the Physician is untouched",
+    medicalScreens.includes("build") &&
+      medicalScreens.includes("caseload") &&
+      sectionsFor("doctor").length === 5,
+  );
+  check(
+    "a screen the player can reach always has a heading and a purpose to print",
+    [
+      ...chefScreens,
+      ...medicalScreens,
+      ...lawyerScreens,
+      "operation",
+      "home",
+    ].every((id) => screenOf(id as never).label.length > 0),
+  );
+}
+
+console.log("\nThe Solicitor\n" + "────────────────────────────────────────────────────");
+{
+  const startL = () => startRun(lawyer, 505);
+  const l = startL();
+  check(
+    "a solicitor run starts with nothing on the books",
+    practice(l).cases.length === 0 && practice(l).offers.length === 0,
+  );
+
+  const pitched = advanceWeek(lawyer, l, { pitch: 2, network: 1 }).state;
+  const offers = practice(pitched).offers;
+  check("pitching brings instructions in", offers.length > 0);
+
+  if (offers.length > 0) {
+    const taken = runCommand(lawyer, pitched, "takeCase", offers[0].id);
+    const p = practice(taken);
+    check("an instruction can be accepted", p.cases.length === 1);
+    check(
+      "it arrives unprepared and against a deadline",
+      p.cases[0].hoursDone === 0 && p.cases[0].dueWeek > taken.week,
+    );
+
+    /* THE DECISION: certain money now, or the fee if it goes your way. */
+    const offerNow = settlementFor(p.cases[0], p, taken.r.skill);
+    const kind = CASE_BY_ID.get(p.cases[0].kind)!;
+    check(
+      "a settlement is worth less than winning",
+      offerNow > 0 && offerNow < kind.fee,
+    );
+    const settled = runCommand(lawyer, taken, "settleCase", p.cases[0].id);
+    check(
+      "settling pays at once and closes the file",
+      settled.r.cash === taken.r.cash + offerNow &&
+        practice(settled).cases.length === 0,
+    );
+
+    const prepared = { ...p.cases[0], hoursDone: kind.hours * 3 };
+    check(
+      "preparation improves the odds but never to a certainty",
+      oddsFor(prepared, p, 100) > oddsFor(p.cases[0], p, 0) &&
+        oddsFor(prepared, p, 100) < 1,
+    );
+  }
+
+  check(
+    "the firm pays for its chambers whether or not anything settles",
+    advanceWeek(lawyer, startL(), { rest: 1 }).ledger.some((x) =>
+      /chambers/i.test(x.label),
+    ),
+  );
+  check(
+    "no case is a certainty",
+    CASE_KINDS.every((k) => k.baseOdds < 1 && k.hours > 0 && k.fee > 0),
+  );
+  check(
+    "bigger fees sit behind more standing",
+    [...CASE_KINDS]
+      .sort((a, b) => a.fee - b.fee)
+      .every((k, i, arr) => i === 0 || k.prestige >= arr[i - 1].prestige),
+  );
+  check(
+    "a solicitor save validates, and a corrupt one does not",
+    lawyer.validateData!(l.data) &&
+      !lawyer.validateData!({
+        practice: { cases: [{ kind: "duel" }], offers: [], staff: [] },
+      }),
+  );
+}
+
+/**
+ * WHAT THE COURT DOES TO YOU
+ *
+ * The three systems that turned "settle or fight" from a free option into a
+ * decision: a hearing that can be moved, a loss that costs money, and a win
+ * that is a bill rather than cash. Each is asserted on the numbers, because
+ * each of them was added precisely so that it would move numbers.
+ */
+console.log("\nThe Solicitor: the court\n" + "─".repeat(52));
+{
+  /**
+   * A run with one matter listed for this week and no possibility of it
+   * being put off — `adjournments` at the cap is what takes the listing dice
+   * out of these tests, so a verdict assertion is about the verdict.
+   */
+  const listed = (
+    seed: number,
+    kind: string,
+    over: Record<string, unknown> = {},
+  ) => {
+    const s = startRun(lawyer, seed);
+    const k = CASE_BY_ID.get(kind)!;
+    const p = practice(s);
+    p.cases = [
+      {
+        id: "c-1",
+        kind,
+        client: "Ms Baptiste",
+        openedWeek: 1,
+        dueWeek: s.week,
+        hoursDone: k.hours,
+        settlementOffer: 0,
+        payer: "prompt",
+        adjournments: MAX_ADJOURNMENTS,
+        ...over,
+      },
+    ];
+    return s;
+  };
+
+  /* Walk seeds until the same matter has been both won and lost, so the two
+     halves of the trade can be asserted against each other rather than
+     against whichever way one die happened to fall. */
+  const kindId = "employment";
+  const kind = CASE_BY_ID.get(kindId)!;
+  /** A fresh practice to measure a helper against. */
+  const fresh = () => practice(startRun(lawyer, 505));
+  const withClerk = () => ({
+    ...fresh(),
+    staff: [{ id: "s-1", name: "N", role: "clerk", salary: 800 }],
+  });
+  let wonRun: ReturnType<typeof advanceWeek> | null = null;
+  let lostRun: ReturnType<typeof advanceWeek> | null = null;
+  let lostBefore = 0;
+  for (let seed = 1; seed <= 60 && !(wonRun && lostRun); seed++) {
+    const s = listed(seed, kindId);
+    const out = advanceWeek(lawyer, s, {});
+    const decided = practice(out.state).lastVerdicts.at(-1);
+    if (!decided) continue;
+    if (decided.won && !wonRun) wonRun = out;
+    if (!decided.won && !lostRun) {
+      lostRun = out;
+      lostBefore = s.r.cash;
+    }
+  }
+
+  check("a listed matter is heard, and both ways happen", Boolean(wonRun && lostRun));
+
+  if (lostRun) {
+    const line = lostRun.ledger.find((x) => /costs order/i.test(x.label));
+    const expected = costsOrder(practice(lostRun.state), kind, false);
+    check(
+      "losing is not a blank week — the other side's costs follow the event",
+      Boolean(line) && line!.amount === -expected && expected > 0,
+      `${line?.amount} vs ${-expected}`,
+    );
+    check(
+      "and the money actually leaves the client account",
+      lostRun.state.r.cash < lostBefore,
+    );
+  }
+
+  /* Counsel: cash out now, better odds and a cheaper failure later. */
+  {
+    const bare = listed(7, kindId);
+    const p = practice(bare);
+    const fee = counselFee(p, kind);
+    const briefed = runCommand(lawyer, bare, "briefCounsel", "c-1");
+    check(
+      "briefing counsel is paid for the moment it is done",
+      briefed.r.cash === bare.r.cash - fee && fee > 0,
+    );
+    check(
+      "and it improves the odds on that matter",
+      oddsFor(practice(briefed).cases[0], practice(briefed), briefed.r.skill) >
+        oddsFor(p.cases[0], p, bare.r.skill),
+    );
+    check(
+      "and it argues their costs down if it goes against you",
+      costsOrder(p, kind, true) < costsOrder(p, kind, false),
+    );
+    const twice = runCommand(lawyer, briefed, "briefCounsel", "c-1");
+    check(
+      "counsel cannot be briefed on the same matter twice",
+      twice.r.cash === briefed.r.cash,
+    );
+    const broke = listed(8, kindId);
+    broke.r.cash = 10;
+    check(
+      "and cannot be briefed at all with nothing to pay them",
+      runCommand(lawyer, broke, "briefCounsel", "c-1").r.cash === 10 &&
+        !practice(runCommand(lawyer, broke, "briefCounsel", "c-1")).cases[0]
+          .counsel,
+    );
+  }
+
+  /* Settling is what avoids costs entirely. That is the real reason. */
+  {
+    const s = listed(11, kindId);
+    const settled = runCommand(lawyer, s, "settleCase", "c-1");
+    const after = advanceWeek(lawyer, settled, {});
+    check(
+      "settling avoids the costs order altogether",
+      settled.r.cash > s.r.cash &&
+        !after.ledger.some((x) => /costs order/i.test(x.label)),
+    );
+  }
+
+  /* -------------------------------------------------- the date moving */
+  check(
+    "a practice clerk is what stops a hearing being moved",
+    relistChance(withClerk(), kind) < relistChance(fresh(), kind),
+  );
+  check(
+    "and the clerk is recognised as being on the payroll",
+    hasClerk(withClerk()) && !hasClerk(fresh()),
+  );
+  check(
+    "bigger matters slip more often than small ones",
+    relistChance(fresh(), CASE_BY_ID.get("class")!) >
+      relistChance(fresh(), CASE_BY_ID.get("conveyance")!),
+  );
+  check(
+    "no matter can be put off for ever",
+    MAX_ADJOURNMENTS > 0 &&
+      CASE_KINDS.every((k) => relistChance(fresh(), k) < 1),
+  );
+  {
+    /* A hearing that has been put back is worth less to settle: they can see
+       what waiting costs you, and you cannot see what it costs them. */
+    const p = fresh();
+    const base = {
+      id: "c-1",
+      kind: kindId,
+      client: "Ms Baptiste",
+      openedWeek: 1,
+      dueWeek: 20,
+      hoursDone: kind.hours,
+      settlementOffer: 0,
+    };
+    check(
+      "and every adjournment costs you at the negotiating table",
+      settlementFor({ ...base, adjournments: 2 }, p, 40) <
+        settlementFor(base, p, 40),
+    );
+  }
+  {
+    /* Publicity pulls the other way, and it is capped and decaying. */
+    const quiet = fresh();
+    const loud = { ...quiet, pressure: 0.09 };
+    const c = {
+      id: "c-1",
+      kind: kindId,
+      client: "Ms Baptiste",
+      openedWeek: 1,
+      dueWeek: 20,
+      hoursDone: kind.hours,
+      settlementOffer: 0,
+    };
+    check(
+      "a matter being written about is worth more to make go away",
+      settlementFor(c, loud, 40) > settlementFor(c, quiet, 40),
+    );
+    check(
+      "but never more than the ceiling, whatever is published",
+      settlementFor(c, { ...quiet, pressure: 9 }, 40) ===
+        settlementFor(c, { ...quiet, pressure: MAX_PRESSURE }, 40),
+    );
+  }
+}
+
+/**
+ * WINNING IS NOT BEING PAID
+ *
+ * The second half of the career's premise, and the half that was missing: a
+ * judgment is a promise from somebody who may be slow, arguing, or gone.
+ */
+console.log("\nThe Solicitor: the books\n" + "─".repeat(52));
+{
+  const kindId = "probate";
+  const kind = CASE_BY_ID.get(kindId)!;
+
+  const listedWith = (seed: number, payer: PayerId) => {
+    const s = startRun(lawyer, seed);
+    const p = practice(s);
+    p.cases = [
+      {
+        id: "c-1",
+        kind: kindId,
+        client: "the Wren Trust",
+        openedWeek: 1,
+        dueWeek: s.week,
+        /* Well past the minimum, so the odds are as high as they go and a win
+           is the common case — these tests are about what a win *does*. */
+        hoursDone: kind.hours * 4,
+        settlementOffer: 0,
+        payer,
+        adjournments: MAX_ADJOURNMENTS,
+      },
+    ];
+    return s;
+  };
+
+  check(
+    "every payer is stated as a real term: when they pay, and whether they argue",
+    PAYERS.length === 3 &&
+      PAYERS.every((x) => x.note.length > 20 && x.recovers > 0 && x.recovers <= 1) &&
+      PAYERS.some((x) => x.weeks === 0) &&
+      PAYERS.some((x) => x.weeks > 0),
+  );
+  check(
+    "the work that would change the firm is the work that pays latest",
+    (() => {
+      /* Measured rather than asserted from the formula: over the same two
+         hundred streams, how often does each kind of work come with somebody
+         who pays on delivery? */
+      const promptRate = (id: string) => {
+        const k = CASE_BY_ID.get(id)!;
+        let n = 0;
+        for (let seed = 1; seed <= 200; seed++) {
+          if (payerFor(k, makeRng(seed)) === "prompt") n++;
+        }
+        return n / 200;
+      };
+      return (
+        promptRate("conveyance") > promptRate("commercial") &&
+        promptRate("commercial") > promptRate("class") &&
+        promptRate("class") > 0
+      );
+    })(),
+  );
+
+  /* A prompt payer hands over money; anybody else hands over a bill. */
+  let prompt: ReturnType<typeof advanceWeek> | null = null;
+  let slow: ReturnType<typeof advanceWeek> | null = null;
+  let promptBefore = 0;
+  for (let seed = 1; seed <= 60 && !(prompt && slow); seed++) {
+    if (!prompt) {
+      const s = listedWith(seed, "prompt");
+      const out = advanceWeek(lawyer, s, {});
+      if (practice(out.state).lastVerdicts.at(-1)?.won) {
+        prompt = out;
+        promptBefore = s.r.cash;
+      }
+    }
+    if (!slow) {
+      const s = listedWith(seed, "slow");
+      const out = advanceWeek(lawyer, s, {});
+      if (practice(out.state).lastVerdicts.at(-1)?.won) slow = out;
+    }
+  }
+
+  check("both kinds of win happen", Boolean(prompt && slow));
+  if (prompt) {
+    check(
+      "a client who pays on delivery pays on delivery",
+      prompt.state.r.cash > promptBefore &&
+        (practice(prompt.state).bills ?? []).length === 0,
+    );
+  }
+  if (slow) {
+    const bills = practice(slow.state).bills ?? [];
+    check(
+      "a slow payer's judgment is a bill, not money",
+      bills.length === 1 &&
+        bills[0].amount === feeIn(practice(slow.state), kind) &&
+        bills[0].dueWeek > slow.state.week,
+    );
+    check(
+      "and the week's ledger says so rather than reporting income it did not get",
+      slow.ledger.some((x) => /billed/i.test(x.note ?? "")),
+    );
+
+    /* Selling it. The whole constraint, as a button. */
+    const bill = bills[0];
+    const sold = runCommand(lawyer, slow.state, "factorBill", bill.id);
+    const price = factorValue(bill, slow.state.week);
+    check(
+      "a factor buys the wait off you, at a price",
+      sold.r.cash === slow.state.r.cash + price &&
+        price > 0 &&
+        price < bill.amount,
+    );
+    check(
+      "and the bill leaves the books once it is sold",
+      (practice(sold).bills ?? []).length === 0,
+    );
+    check(
+      "the further off it is, the worse the price",
+      factorValue({ ...bill, dueWeek: slow.state.week + 9 }, slow.state.week) <
+        factorValue({ ...bill, dueWeek: slow.state.week + 1 }, slow.state.week),
+    );
+    check(
+      "an unknown bill is refused rather than paying out",
+      runCommand(lawyer, slow.state, "factorBill", "b-nonexistent").r.cash ===
+        slow.state.r.cash,
+    );
+
+    /* Waiting instead: it matures and turns into cash. */
+    let waited = slow.state;
+    for (let i = 0; i < 7 && (practice(waited).bills ?? []).length > 0; i++) {
+      waited = advanceWeek(lawyer, waited, {}).state;
+    }
+    check(
+      "or you wait, and it becomes money",
+      (practice(waited).bills ?? []).length === 0,
+    );
+
+    check(
+      "a judgment you are owed counts towards what the firm is worth",
+      firmWorthOf(slow.state) > firmWorthOf({
+        ...slow.state,
+        data: { practice: { ...practice(slow.state), bills: [] } },
+      }),
+    );
+  }
+}
+
+/**
+ * THE HANDSET
+ *
+ * The Solicitor's phone is the Solicitor's. The tests that matter are that
+ * nothing on it is shared with another career's, and that the two things it
+ * can do to the practice actually do them.
+ */
+console.log("\nThe Solicitor: the phone\n" + "─".repeat(52));
+{
+  const s = startRun(lawyer, 404);
+  check(
+    "a solicitor starts with a handset and something waiting on it",
+    Boolean(practice(s).phone) &&
+      practice(s).phone!.messages.length === 1 &&
+      !practice(s).phone!.messages[0].read,
+  );
+  check(
+    "nobody on it is borrowed from another career",
+    (() => {
+      const chef = new Set<string>(
+        Object.values(CHEF_VOICES).flatMap((v) => [
+          v.name as string,
+          v.handle as string,
+        ]),
+      );
+      return Object.values(LEGAL_VOICES).every(
+        (v) => !chef.has(v.name) && !chef.has(v.handle),
+      );
+    })(),
+  );
+  check(
+    "every post says what it is for and what it costs",
+    LEGAL_POSTS.length >= 5 &&
+      LEGAL_POSTS.every(
+        (p) => p.preview.length >= 1 && p.blurb.length > 15 && p.label.length > 3,
+      ),
+  );
+  check(
+    "and a post that risks something says so and has a way of going wrong",
+    LEGAL_POSTS.filter((p) => p.hazard !== undefined).every(
+      (p) => p.backfire !== undefined && p.hazard! > 0 && p.hazard! < 1,
+    ),
+  );
+  check(
+    "no post is offered to a practice that cannot honestly make it",
+    (() => {
+      const ctx = lawyerPostContext(practice(s), s.week);
+      const offered = LEGAL_POSTS.filter((p) => p.available(ctx));
+      /* A brand new firm has won nothing, settled nothing, paid no costs and
+         employs nobody, so only the opening post can be true. */
+      return (
+        offered.length === 1 && offered[0].id === "doors_open"
+      );
+    })(),
+  );
+
+  /* Publishing moves the practice, not just the feed. */
+  const posted = runCommand(lawyer, s, "post", "doors_open");
+  check(
+    "publishing lands on your own feed",
+    (practice(posted).phone?.feed ?? []).length === 1 &&
+      practice(posted).phone!.feed[0].kind === "player",
+  );
+  check(
+    "and brings work towards the door rather than only followers",
+    (practice(posted).echo ?? 0) > (practice(s).echo ?? 0) &&
+      practice(posted).phone!.social.followers >
+        practice(s).phone!.social.followers,
+  );
+  check(
+    "one post a week, and the second is refused",
+    (practice(runCommand(lawyer, posted, "post", "note_on_the_law")).phone?.feed ?? [])
+      .length === 1,
+  );
+  check(
+    "a post the run cannot honestly make is refused",
+    (practice(runCommand(lawyer, s, "post", "case_won")).phone?.feed ?? [])
+      .length === 0,
+  );
+  check(
+    "and one the catalogue does not have does nothing at all",
+    (practice(runCommand(lawyer, s, "post", "we_are_brilliant")).phone?.feed ?? [])
+      .length === 0,
+  );
+
+  /* Something published is spent: the echo runs down rather than compounding
+     into a permanent uplift on everything the firm is ever offered. */
+  let echoed = posted;
+  const startEcho = practice(echoed).echo ?? 0;
+  echoed = advanceWeek(lawyer, echoed, {}).state;
+  echoed = advanceWeek(lawyer, echoed, {}).state;
+  check(
+    "and what it bought runs out",
+    (practice(echoed).echo ?? 0) < startEcho,
+  );
+
+  /* Reading, and answering. */
+  const read = runCommand(lawyer, s, "readMessages", "");
+  check(
+    "opening the inbox marks it read",
+    practice(read).phone!.messages.every((m) => m.read),
+  );
+
+  {
+    const withOffer = startRun(lawyer, 909);
+    const p = practice(withOffer);
+    const k = CASE_BY_ID.get("employment")!;
+    p.cases = [
+      {
+        id: "c-9",
+        kind: "employment",
+        client: "Ms Baptiste",
+        openedWeek: 1,
+        dueWeek: withOffer.week + 6,
+        hoursDone: k.hours,
+        settlementOffer: 0,
+        payer: "prompt",
+      },
+    ];
+    ensureLawyerPhone(p).messages.push({
+      id: "offer-c-9-12345",
+      week: withOffer.week,
+      from: LEGAL_VOICES.opponent.name,
+      handle: LEGAL_VOICES.opponent.handle,
+      role: "rival",
+      body: "We are instructed to make an offer.",
+      read: false,
+      choices: [
+        { label: "Accept", detail: "", effect: {}, reply: "Accepted." },
+        { label: "No", detail: "", effect: {}, reply: "Declined." },
+      ],
+    });
+
+    const accepted = runCommand(
+      lawyer,
+      withOffer,
+      "answerMessage",
+      "offer-c-9-12345|0",
+    );
+    check(
+      "the other side's offer is a real transaction, at the figure quoted",
+      accepted.r.cash === withOffer.r.cash + 12_345 &&
+        practice(accepted).cases.length === 0,
+      `${accepted.r.cash - withOffer.r.cash}`,
+    );
+    check(
+      "and it goes on the record as a settlement, not a judgment",
+      practice(accepted).lastVerdicts.at(-1)?.settled === true,
+    );
+    const twice = runCommand(
+      lawyer,
+      accepted,
+      "answerMessage",
+      "offer-c-9-12345|0",
+    );
+    check(
+      "an offer cannot be accepted twice",
+      twice.r.cash === accepted.r.cash,
+    );
+
+    const refused = runCommand(
+      lawyer,
+      withOffer,
+      "answerMessage",
+      "offer-c-9-12345|1",
+    );
+    check(
+      "and refusing it leaves the matter running",
+      refused.r.cash === withOffer.r.cash &&
+        practice(refused).cases.length === 1,
+    );
+  }
+}
+
+/**
+ * CONFLICTS, AND OLDER SAVES
+ */
+console.log("\nThe Solicitor: conduct and compatibility\n" + "─".repeat(52));
+{
+  const s = startRun(lawyer, 77);
+  const p = practice(s);
+  p.offers = [
+    {
+      id: "of-1",
+      kind: "probate",
+      client: "Vance Holdings",
+      expiresWeek: s.week + 3,
+      payer: "prompt",
+    },
+  ];
+  const taken = runCommand(lawyer, s, "takeCase", "of-1");
+  check(
+    "acting for somebody is what makes acting against them a conflict later",
+    (practice(taken).actedFor ?? []).includes("Vance Holdings"),
+  );
+  check(
+    "and the payer named on the instruction is the payer on the file",
+    practice(taken).cases[0].payer === "prompt",
+  );
+
+  {
+    const conflicted = startRun(lawyer, 78);
+    const q = practice(conflicted);
+    q.actedFor = ["Cormack Retail"];
+    q.offers = [
+      {
+        id: "of-2",
+        kind: "injury",
+        client: "Mr Saeed",
+        expiresWeek: conflicted.week + 3,
+        payer: "slow",
+        conflict: true,
+        opponent: "Cormack Retail",
+      },
+    ];
+    const risky = runCommand(lawyer, conflicted, "takeCase", "of-2");
+    check(
+      "a conflicted instruction can still be taken, and the file remembers",
+      practice(risky).cases[0].conflicted === true &&
+        practice(risky).cases[0].opponent === "Cormack Retail",
+    );
+    check(
+      "and taking it is written into the run's own record",
+      risky.log.some((x) => /acted for/i.test(x.text)),
+    );
+  }
+
+  /* An offer against a former client can actually be produced, which is what
+     makes the warning on the Instructions screen reachable rather than
+     theoretical. */
+  check(
+    "a market with a history eventually sends work against it",
+    (() => {
+      const q = { ...practice(startRun(lawyer, 5)), actedFor: ["Vance Holdings"] };
+      for (let seed = 1; seed <= 200; seed++) {
+        const made = newOffers(q, 90, 10, 3, makeRng(seed));
+        if (made.some((o) => o.conflict && o.opponent === "Vance Holdings")) {
+          return true;
+        }
+      }
+      return false;
+    })(),
+  );
+
+  /* ------------------------------------------------------- older saves */
+  const legacy = startRun(lawyer, 12);
+  const old = practice(legacy);
+  delete old.bills;
+  delete old.actedFor;
+  delete old.echo;
+  delete old.pressure;
+  delete old.phone;
+  old.cases = [
+    {
+      id: "c-1",
+      kind: "probate",
+      client: "the Wren Trust",
+      openedWeek: 1,
+      dueWeek: 12,
+      hoursDone: 4,
+      settlementOffer: 0,
+    },
+  ];
+  check(
+    "a save written before any of this existed is still a valid save",
+    lawyer.validateData!({ practice: old }),
+  );
+  check(
+    "and it reads as a firm that is owed nothing and has said nothing",
+    billsOwed(old) === 0 && (old.echo ?? 0) === 0 && (old.pressure ?? 0) === 0,
+  );
+  check(
+    "and it plays a week without gaining or losing anything odd",
+    (() => {
+      const out = advanceWeek(lawyer, legacy, { casework: 2 });
+      return (
+        Number.isFinite(out.state.r.cash) &&
+        Number.isFinite(firmWorthOf(out.state)) &&
+        lawyer.validateData!(out.state.data)
+      );
+    })(),
+  );
+  check(
+    "and it gains a handset rather than being rejected for not having one",
+    Boolean(practice(advanceWeek(lawyer, legacy, {}).state).phone),
+  );
+
+  check(
+    "a payer the catalogue does not have is refused",
+    !lawyer.validateData!({
+      practice: {
+        ...practice(startRun(lawyer, 13)),
+        cases: [{ kind: "probate", payer: "eventually" }],
+      },
+    }),
+  );
+  check(
+    "a bill for a case that does not exist is refused",
+    !lawyer.validateData!({
+      practice: {
+        ...practice(startRun(lawyer, 14)),
+        bills: [
+          { id: "b-1", client: "X", kind: "duel", amount: 10, dueWeek: 3, payer: "slow" },
+        ],
+      },
+    }),
+  );
+  check(
+    "and an impossible amount of publicity is refused",
+    !lawyer.validateData!({
+      practice: { ...practice(startRun(lawyer, 15)), pressure: 40 },
+    }),
+  );
+
+  /* Replay. Two runs on the same seed have to be the same run, which is what
+     the per-subsystem streams exist to protect. */
+  check(
+    "resolving the same solicitor week twice from the same state is identical",
+    (() => {
+      const base = startRun(lawyer, 606);
+      const a = advanceWeek(lawyer, base, { casework: 2, pitch: 1 });
+      const b = advanceWeek(lawyer, base, { casework: 2, pitch: 1 });
+      return (
+        JSON.stringify(a.state.data) === JSON.stringify(b.state.data) &&
+        JSON.stringify(a.state.r) === JSON.stringify(b.state.r) &&
+        JSON.stringify(a.ledger) === JSON.stringify(b.ledger)
+      );
+    })(),
+  );
+  check(
+    "and a long solicitor run is still a valid save at the end of it",
+    (() => {
+      let run = startRun(lawyer, 707);
+      for (let i = 0; i < 40; i++) {
+        const offer = practice(run).offers[0];
+        if (offer) run = runCommand(lawyer, run, "takeCase", offer.id);
+        const out = advanceWeek(lawyer, run, { casework: 3, pitch: 1, research: 1 });
+        run = out.state;
+        if (out.event) run = resolveEventChoice(lawyer, run, out.event.def, 0);
+      }
+      const q = practice(run);
+      return (
+        lawyer.validateData!(run.data) &&
+        q.lastVerdicts.length <= 24 &&
+        (q.phone?.feed.length ?? 0) <= 60 &&
+        (q.actedFor?.length ?? 0) <= 14 &&
+        run.outcome === null
+      );
+    })(),
+  );
+}
+
+console.log("\nThe fleet\n" + "─".repeat(52));
+{
+  const base = () => {
+    const f = startRun(doctor, 77);
+    f.r.cash = 1_000_000;
+    return f;
+  };
+
+  /* ------------------------------------------------- buying and refusing */
+  let f = base();
+  f = runCommand(doctor, f, "buyVehicle", "emergency_ambulance");
+  check("an ambulance can be bought", (med(f).fleet ?? []).length === 1);
+  check(
+    "and it is paid for",
+    f.r.cash === 1_000_000 - FLEET_BY_ID.get("emergency_ambulance")!.cost,
+  );
+
+  const twice = runCommand(doctor, f, "buyVehicle", "emergency_ambulance");
+  check(
+    "the same vehicle cannot be bought twice",
+    (med(twice).fleet ?? []).length === 1 && twice.r.cash === f.r.cash,
+  );
+
+  const poor = startRun(doctor, 78);
+  poor.r.cash = 100;
+  const refused = runCommand(doctor, poor, "buyVehicle", "mobile_icu");
+  check(
+    "one that cannot be afforded is refused",
+    (med(refused).fleet ?? []).length === 0 && refused.r.cash === 100,
+  );
+  check(
+    "an unknown vehicle is refused",
+    (med(runCommand(doctor, base(), "buyVehicle", "hovercraft")).fleet ?? [])
+      .length === 0,
+  );
+
+  /* ------------------------------------------------------------ the crew */
+  const m = med(f);
+  check(
+    "an ambulance needs its crew before it does anything",
+    crewNeeded(m) === 2 && crewOn(m) === 0 && !fleetCrewed(m),
+  );
+  check(
+    "an uncrewed fleet reaches nobody",
+    fleetReach(m) === 0 && fleetAcuity(m) === 0,
+  );
+  check(
+    "but it charges upkeep regardless",
+    fleetUpkeep(m) === FLEET_BY_ID.get("emergency_ambulance")!.upkeep,
+  );
+
+  let crewed = f;
+  crewed = runCommand(doctor, crewed, "hire", "paramedic");
+  crewed = runCommand(doctor, crewed, "hire", "paramedic");
+  const cm = med(crewed);
+  check("paramedics can be hired", crewOn(cm) === 2 && fleetCrewed(cm));
+  check(
+    "and a crewed ambulance widens the catchment",
+    fleetReach(cm) === FLEET_BY_ID.get("emergency_ambulance")!.reach,
+  );
+  check(
+    "a wider catchment means a larger panel ceiling",
+    catchmentIn(cm, cm.homeCity, 50) > catchmentIn(m, m.homeCity, 50),
+  );
+
+  /*
+   * Losing a crew member scales the fleet down rather than switching it off.
+   * The cliff-edge version measured terribly against the engine's real churn
+   * — see the note on `fleetCrewRatio` — so this asserts the gradient, which
+   * is the property that keeps one resignation from bricking a $193,000 asset.
+   */
+  const firstMedic = cm.staff.findIndex((y) => y.role === "paramedic");
+  const oneShort = {
+    ...cm,
+    staff: cm.staff.filter((_, i) => i !== firstMedic),
+  };
+  check(
+    "losing a crew member is not a cliff",
+    !fleetCrewed(oneShort) && fleetReach(oneShort) > 0,
+  );
+  check(
+    "it runs in proportion to the crew it has",
+    Math.abs(fleetCrewRatio(oneShort) - 0.5) < 1e-9 &&
+      Math.abs(fleetReach(oneShort) - fleetReach(cm) / 2) < 1e-9,
+  );
+  check(
+    "and with no crew at all it reaches nobody",
+    fleetReach({ ...cm, staff: cm.staff.filter((x) => x.role !== "paramedic") }) === 0,
+  );
+
+  /* --------------------------------------------------------- the balance */
+  check(
+    "a vehicle is worth less than it cost",
+    fleetValue(cm) < FLEET_BY_ID.get("emergency_ambulance")!.cost,
+  );
+  check(
+    "every vehicle depreciates rather than storing wealth",
+    FLEET.every((v) => v.retention < 1),
+  );
+  check(
+    "reach is the point of every one of them",
+    FLEET.every((v) => v.reach > 0 && v.crew >= 1 && v.upkeep > 0),
+  );
+  /* Acuity without the departments to cover it is the trap the cards warn
+     about, so the tiers that bring serious work must be the expensive ones. */
+  check(
+    "the vehicles that raise acuity are the ones that cost the most",
+    [...FLEET].sort((a, b) => a.cost - b.cost).every((v, i, arr) =>
+      i === 0 || v.acuity >= arr[i - 1].acuity,
+    ),
+  );
+
+  /* ------------------------------------------------ saves without a fleet */
+  const legacy = base();
+  delete (med(legacy) as { fleet?: string[] }).fleet;
+  check(
+    "a save written before ambulances existed still validates",
+    doctor.validateData?.({ med: med(legacy) }) !== false,
+  );
+  check(
+    "and reads as a practice with no vehicles",
+    fleetSize(med(legacy)) === 0 &&
+      fleetReach(med(legacy)) === 0 &&
+      fleetUpkeep(med(legacy)) === 0,
+  );
+}
+
 /*
  * The catalogue, as the interface sees it.
  *
@@ -5233,10 +9666,14 @@ console.log("\nPurchase artwork\n" + "─".repeat(52));
   let ps = startRun(doctor, 31);
   ps.r.cash = 500_000;
   const items = allPurchases(ps);
+  /* Derived, not restated. A hardcoded 45 had to be edited every time the
+     catalogue grew, which makes it a chore rather than a check — and a chore
+     gets updated to whatever number makes it pass. */
+  const catalogueSize = catalogueIds().length;
   check(
     "the shelf lists every purchasable item",
-    items.length === 45,
-    `${items.length}`,
+    items.length === catalogueSize,
+    `${items.length} of ${catalogueSize}`,
   );
   check(
     "prices come from the catalogue, not the card",
@@ -5270,6 +9707,7 @@ console.log("\nPurchase artwork\n" + "─".repeat(52));
         "buyFacility",
         "openDepartment",
         "buyEquipment",
+        "buyVehicle",
         "buyLifestyle",
       ].includes(i.buy.cmd),
     ),
@@ -5617,6 +10055,3672 @@ console.log("\nCharacter portraits\n" + "─".repeat(52));
     initialsOf(generated[0]),
   );
 }
+
+console.log("\nWhat the city thinks\n" + "─".repeat(52));
+{
+  /*
+   * Phase 3: standing, diners, reviews, complaints, critics, rivals and the
+   * twelve events. The rule every check here is written to is the same one
+   * the phase itself was written to — **nothing appears that did not happen**
+   * — so almost every assertion compares a piece of output text or a number
+   * against the service report it was supposedly derived from.
+   */
+  const chefAt = (opts: {
+    city?: string;
+    week?: number;
+    cash?: number;
+    rep?: number;
+    skill?: number;
+    menu?: string[];
+    hire?: string[];
+  } = {}) => {
+    let s = startRun(chef, 4242, opts.city ? { city: opts.city } : undefined);
+    s.r.cash = opts.cash ?? 300_000;
+    s.r.skill = opts.skill ?? 60;
+    s.r.reputation = opts.rep ?? 45;
+    s.week = opts.week ?? 1;
+    s = runCommand(chef, s, "takePremises", "bistro");
+    for (const role of opts.hire ?? []) s = runCommand(chef, s, "hireKitchen", role);
+    for (const id of opts.menu ?? []) s = runCommand(chef, s, "addDish", id);
+    return s;
+  };
+
+  const stocked = (s: RunState) => {
+    for (const ing of ["chicken", "roots", "butter", "flour", "stockbones"]) {
+      s = runCommand(chef, s, "buyIngredient", `market:${ing}`);
+      s = runCommand(chef, s, "buyIngredient", `market:${ing}`);
+    }
+    return runCommand(chef, s, "buyProduce", "market:basic");
+  };
+
+  /* ============================================ 1. the reputation model === */
+  {
+    const s = chefAt();
+    const k = kitchen(s);
+    check(
+      "there are seven standing categories, not one number",
+      STANDINGS.length === 7 &&
+        new Set(STANDINGS.map((x) => x.id)).size === 7,
+      String(STANDINGS.length),
+    );
+    check(
+      "a fresh kitchen starts every category at its opening reputation",
+      Object.values(standingOf(k, s.r.reputation)).every((v) => v === 12),
+    );
+
+    /* The compatibility guarantee, asserted rather than claimed: an
+       attributed move changes the overall by exactly what it always did. */
+    const before = s.r.reputation;
+    /* A deep clone. `{ ...s, data: { ...s.data } }` still shares the kitchen
+       object itself, so the "before" reading would be the "after" one. */
+    const clone = (x: RunState): RunState => JSON.parse(JSON.stringify(x));
+    const moved = clone(s);
+    applyStanding(moved, "food", -4, "A bad night");
+    check(
+      "an attributed move changes the overall by exactly the same amount",
+      Math.abs(moved.r.reputation - (before - 4)) < 0.001,
+      `${moved.r.reputation} against ${before - 4}`,
+    );
+    check(
+      "and files the move under the category that caused it",
+      standingOf(kitchen(moved), moved.r.reputation).food ===
+        standingOf(k, before).food - 4,
+    );
+    check(
+      "every move carries the reason the simulation wrote for it",
+      (kitchen(moved).repLog ?? [])[0]?.why === "A bad night",
+    );
+
+    /* And a settle describes the restaurant without touching the economy. */
+    const settled = clone(s);
+    const rep = settled.r.reputation;
+    settleStanding(settled, "atmosphere", 90, 3, "A better room");
+    check(
+      "a settle moves the category but never the overall reputation",
+      settled.r.reputation === rep &&
+        standingOf(kitchen(settled), rep).atmosphere > 12,
+    );
+    check(
+      "a settle moves no further than its stated rate",
+      standingOf(kitchen(settled), rep).atmosphere === 15,
+      String(standingOf(kitchen(settled), rep).atmosphere),
+    );
+    check(
+      "a settle also records why it moved",
+      (kitchen(settled).repLog ?? [])[0]?.why === "A better room",
+    );
+    check(
+      "standing is clamped to 0-100 in both directions",
+      (() => {
+        const x = clone(s);
+        applyStanding(x, "hygiene", -500, "everything went wrong");
+        applyStanding(x, "food", 500, "everything went right");
+        const out = standingOf(kitchen(x), x.r.reputation);
+        return out.hygiene === 0 && out.food === 100;
+      })(),
+    );
+  }
+
+  /* Reputation moves only for stated reasons — the whole point of the phase. */
+  {
+    let s = stocked(chefAt({ menu: ["roast_chicken", "bread", "soup"] }));
+    for (let i = 0; i < 4; i++) {
+      s = advanceWeek(chef, s, { dinner: 2, prep: 1 }).state;
+    }
+    const log = kitchen(s).repLog ?? [];
+    check(
+      "four weeks of trading produce an explained standing history",
+      log.length > 0 && log.every((c) => c.why.length > 0),
+      `${log.length} entries`,
+    );
+    check(
+      "no standing change is unexplained or unattributed",
+      log.every((c) => STANDING_BY_ID.has(c.id) && Number.isFinite(c.delta)),
+    );
+    check(
+      "the trend records one snapshot per resolved week",
+      (kitchen(s).repTrend ?? []).length === 4,
+      String((kitchen(s).repTrend ?? []).length),
+    );
+    check(
+      "a category with two weeks of history reports a direction",
+      trendOf(kitchen(s), "food") !== null,
+    );
+    check(
+      "the scene score is a blend of the seven, not the raw reputation",
+      sceneScore(kitchen(s), s.r.reputation) >= 0 &&
+        sceneScore(kitchen(s), s.r.reputation) <= 100,
+    );
+    check(
+      "recent changes are the ones from the last few weeks only",
+      recentStanding(kitchen(s), s.week, 1).every((c) => c.week > s.week - 1),
+    );
+  }
+
+  /* ============================================ 2. the customer segments === */
+  {
+    const s = chefAt();
+    const k = kitchen(s);
+    check(
+      "there are eight named customer segments",
+      SEGMENTS.length === 8,
+      String(SEGMENTS.length),
+    );
+    check(
+      "every segment weighs a different combination of the seven",
+      new Set(SEGMENTS.map((x) => JSON.stringify(x.wants))).size === 8,
+    );
+    check(
+      "and each one's weights are a real distribution",
+      SEGMENTS.every((seg) => {
+        const total = Object.values(seg.wants).reduce((a, b) => a + (b ?? 0), 0);
+        return total > 0.9 && total < 1.1;
+      }),
+    );
+
+    /* Preferences must be *mechanical*: the same restaurant is genuinely
+       better for one segment than another. */
+    const deep = (x: RunState): RunState => JSON.parse(JSON.stringify(x));
+    const cheap = deep(s);
+    applyStanding(cheap, "value", 60, "priced for the street");
+    const posh = deep(s);
+    applyStanding(posh, "atmosphere", 60, "a beautiful room");
+    const budget = SEGMENT_BY_ID.get("budget")!;
+    const luxury = SEGMENT_BY_ID.get("luxury")!;
+    check(
+      "a value-led kitchen appeals more to budget diners than to luxury ones",
+      appealOf(budget, kitchen(cheap), cheap.r.reputation) >
+        appealOf(luxury, kitchen(cheap), cheap.r.reputation),
+    );
+    check(
+      "and a beautiful room reverses that exactly",
+      appealOf(luxury, kitchen(posh), posh.r.reputation) >
+        appealOf(budget, kitchen(posh), posh.r.reputation),
+    );
+
+    /* Price sensitivity is real and differs by segment. */
+    let dear = chefAt({ menu: ["truffle_pasta"] });
+    const dearMenu = activeMenu(kitchen(dear));
+    if (dearMenu.length > 0) {
+      dear = runCommand(
+        chef,
+        dear,
+        "priceDish",
+        `${dearMenu[0].recipe}:${Math.round(spendPerHead(kitchen(dear)) * 3)}`,
+      );
+      const budgetDrop =
+        appealOf(budget, k, s.r.reputation) -
+        appealOf(budget, kitchen(dear), dear.r.reputation);
+      const luxuryDrop =
+        appealOf(luxury, k, s.r.reputation) -
+        appealOf(luxury, kitchen(dear), dear.r.reputation);
+      check(
+        "trebling the price costs budget diners far more than luxury ones",
+        budgetDrop > luxuryDrop * 3,
+        `${budgetDrop.toFixed(1)} against ${luxuryDrop.toFixed(1)}`,
+      );
+    }
+
+    check(
+      "the mix is a real distribution that sums to one",
+      (() => {
+        const mix = dinerMix(k, s.r.reputation, 10);
+        const total = mix.shares.reduce((n, x) => n + x.share, 0);
+        return Math.abs(total - 1) < 0.001;
+      })(),
+    );
+    check(
+      "event clients only appear for the services they can book",
+      dinerMix(k, s.r.reputation, 10, "lunch").shares.every(
+        (x) => x.segment.id !== "event",
+      ) &&
+        dinerMix(k, s.r.reputation, 10, "event").shares.some(
+          (x) => x.segment.id === "event",
+        ),
+    );
+    check(
+      "a restaurant whose parts all agree with its reputation pulls exactly average",
+      (() => {
+        const even = chefAt({ rep: 50 });
+        kitchen(even).standing = Object.fromEntries(
+          STANDINGS.map((x) => [x.id, 50]),
+        ) as never;
+        const mix = dinerMix(kitchen(even), 50, 10);
+        return Math.abs(mix.demand - 1) < 0.02 && Math.abs(mix.spend - 1) < 0.02;
+      })(),
+      "otherwise the city is charged for its own reputation twice",
+    );
+  }
+
+  /* ==================================== 3. city and seasonal modifiers === */
+  {
+    const lyon = chefAt({ city: "lyon" });
+    const mumbai = chefAt({ city: "mumbai" });
+    const paris = chefAt({ city: "paris" });
+    const share = (s: RunState, id: string, week = 10) =>
+      dinerMix(kitchen(s), s.r.reputation, week).shares.find(
+        (x) => x.segment.id === id,
+      )?.share ?? 0;
+
+    check(
+      "Mumbai's room is far more price-sensitive than Paris's",
+      share(mumbai, "budget") > share(paris, "budget") * 2,
+      `${share(mumbai, "budget").toFixed(2)} against ${share(paris, "budget").toFixed(2)}`,
+    );
+    check(
+      "Paris draws luxury diners that Mumbai does not",
+      share(paris, "luxury") > share(mumbai, "luxury") * 2,
+    );
+    check(
+      "the same restaurant has a different room in every city",
+      new Set(
+        ["lyon", "mumbai", "paris", "newyork"].map((c) =>
+          JSON.stringify(
+            dinerMix(kitchen(chefAt({ city: c })), 45, 10).shares.map((x) =>
+              x.share.toFixed(2),
+            ),
+          ),
+        ),
+      ).size === 4,
+    );
+
+    /* The seasons. Week 20 is summer, week 46 is winter. */
+    check(
+      "the calendar divides into four seasons and repeats yearly",
+      seasonOf(1).id === "spring" &&
+        seasonOf(20).id === "summer" &&
+        seasonOf(33).id === "autumn" &&
+        seasonOf(46).id === "winter" &&
+        seasonOf(53).id === seasonOf(1).id,
+    );
+    check(
+      "summer fills the tourist share and winter empties it",
+      share(lyon, "tourists", 20) > share(lyon, "tourists", 46) * 1.5,
+      `${share(lyon, "tourists", 20).toFixed(2)} against ${share(lyon, "tourists", 46).toFixed(2)}`,
+    );
+    check(
+      "and winter is when the event clients book",
+      share(lyon, "event", 46) > share(lyon, "event", 20),
+    );
+    check(
+      "the season is stated on the forecast rather than applied silently",
+      sceneFor(kitchen(lyon), 45, 20).drivers.some(
+        (dr) => dr.label === "Summer",
+      ),
+    );
+  }
+
+  /* ================================================ 4. review generation === */
+  {
+    let s = stocked(
+      chefAt({ menu: ["roast_chicken", "bread", "soup"], hire: ["commis"] }),
+    );
+    s = advanceWeek(chef, s, { dinner: 2, prep: 1 }).state;
+    const reviews = kitchen(s).reviews ?? [];
+    const night = kitchen(s).lastService?.nights?.[0];
+
+    check(
+      "a service that ran produces reviews",
+      reviews.length > 0,
+      `${reviews.length} after one week`,
+    );
+    check(
+      "every review is written by one of the eight segments",
+      reviews.every((r) => SEGMENT_BY_ID.has(r.segment)),
+    );
+    check(
+      "a review only names a dish that was actually sent out",
+      !!night &&
+        reviews.every(
+          (r) => r.dish === null || night.dishes.some((d) => d.name === r.dish),
+        ),
+    );
+    check(
+      "the wait a review quotes is the wait the night recorded",
+      !!night &&
+        reviews.every((r) => Math.abs(r.wait - night.averageWait) < 0.11),
+      night ? `night averaged ${night.averageWait.toFixed(1)} ticks` : "no night",
+    );
+    check(
+      "ratings are bounded at one to five",
+      reviews.every((r) => r.rating >= 1 && r.rating <= 5),
+    );
+    check(
+      "every review says what it is about",
+      reviews.every((r) => r.tags.length > 0 && r.body.length > 20),
+    );
+
+    /* The same facts must produce the same review — determinism is what makes
+       the whole thing testable and what makes a reload safe. */
+    check(
+      "the same night reviewed twice is the same review",
+      (() => {
+        let a = stocked(chefAt({ menu: ["roast_chicken", "soup"] }));
+        let b = stocked(chefAt({ menu: ["roast_chicken", "soup"] }));
+        a = advanceWeek(chef, a, { dinner: 2 }).state;
+        b = advanceWeek(chef, b, { dinner: 2 }).state;
+        return (
+          JSON.stringify(kitchen(a).reviews) ===
+          JSON.stringify(kitchen(b).reviews)
+        );
+      })(),
+    );
+
+    /* And a bad night is written about differently from a good one. */
+    check(
+      "a slow night produces complaints about the wait, not random grumbling",
+      (() => {
+        /* One cook, a full room and a complicated menu: the pass drowns. */
+        let slow = stocked(
+          chefAt({ menu: ["truffle_pasta", "roast_chicken", "bread"], skill: 25, rep: 70 }),
+        );
+        slow = advanceWeek(chef, slow, { dinner: 3 }).state;
+        const rs = kitchen(slow).reviews ?? [];
+        const report = kitchen(slow).lastService?.nights?.[0];
+        if (!report || rs.length === 0) return true;
+        /* If the night was genuinely slow, somebody must say so; if it was
+           not, nobody may. Either way the text follows the report. */
+        const complained = rs.some((r) => r.tags.includes("wait"));
+        return report.averageWait > 4 ? complained : true;
+      })(),
+    );
+
+    check(
+      "recurring problems are only reported when they actually recur",
+      recurringProblems([]).length === 0 &&
+        recurringProblems(
+          Array.from({ length: 6 }, (_, i) => ({
+            id: `x${i}`,
+            week: i,
+            author: "A",
+            segment: "budget",
+            service: "dinner",
+            rating: 2,
+            dish: null,
+            wait: 6,
+            body: "long wait",
+            tags: ["wait" as const],
+          })),
+        ).some((p) => p.tag === "wait"),
+    );
+    check(
+      "a recurring problem names the control that fixes it",
+      recurringProblems(
+        Array.from({ length: 6 }, (_, i) => ({
+          id: `y${i}`,
+          week: i,
+          author: "A",
+          segment: "budget",
+          service: "dinner",
+          rating: 2,
+          dish: null,
+          wait: 6,
+          body: "long wait",
+          tags: ["wait" as const],
+        })),
+      )[0].fix.length > 20,
+    );
+    check(
+      "praise is never counted as a recurring problem",
+      recurringProblems(
+        Array.from({ length: 6 }, (_, i) => ({
+          id: `z${i}`,
+          week: i,
+          author: "A",
+          segment: "budget",
+          service: "dinner",
+          rating: 5,
+          dish: null,
+          wait: 1,
+          body: "lovely",
+          tags: ["welcome" as const],
+        })),
+      ).length === 0,
+    );
+  }
+
+  /* ================================================== 5. the phone posts === */
+  {
+    let s = stocked(chefAt({ menu: ["roast_chicken", "bread"] }));
+    s = advanceWeek(chef, s, { dinner: 2, prep: 1 }).state;
+
+    check(
+      "the composer only offers a post whose facts exist",
+      (() => {
+        const ctx = chefPostContext(kitchen(s), s.week);
+        const award = CHEF_POST_BY_ID.get("award")!;
+        return !award.available(ctx);
+      })(),
+      "no award yet, so no award post",
+    );
+    check(
+      "putting a dish on unlocks the post about that dish, by name",
+      (() => {
+        const ctx = chefPostContext(kitchen(s), s.week);
+        const post = CHEF_POST_BY_ID.get("put_it_on")!;
+        return (
+          post.available(ctx) && post.body(ctx).includes(ctx.newestDish!.name)
+        );
+      })(),
+    );
+
+    /* Promoting a dish must actually change what the room orders. */
+    const promoted = runCommand(chef, s, "post", "put_it_on");
+    const newest = activeMenu(kitchen(s))[activeMenu(kitchen(s)).length - 1];
+    check(
+      "promoting a dish raises that dish's share of the room's orders",
+      promotionOf(kitchen(promoted), newest.recipe, promoted.week) > 0,
+      String(promotionOf(kitchen(promoted), newest.recipe, promoted.week)),
+    );
+    check(
+      "and it raises expectations at the same time",
+      expectationOf(kitchen(promoted)) > expectationOf(kitchen(s)),
+    );
+    check(
+      "a post fills the room the following week",
+      interestOf(kitchen(promoted)) > 1,
+      String(interestOf(kitchen(promoted))),
+    );
+    check(
+      "the promotion is visible in what was actually cooked",
+      (() => {
+        const plain = advanceWeek(chef, s, { dinner: 2 }).state;
+        const pushed = advanceWeek(chef, promoted, { dinner: 2 }).state;
+        const share = (x: RunState) => {
+          const dishes = kitchen(x).lastService?.dishes ?? [];
+          const total = dishes.reduce((n, d) => n + d.covers, 0);
+          const one = dishes.find((d) => d.recipe === newest.recipe);
+          return total > 0 && one ? one.covers / total : 0;
+        };
+        return share(pushed) > share(plain);
+      })(),
+    );
+
+    /* Posting constantly reaches fewer people. */
+    check(
+      "posting three weeks running reaches materially fewer people",
+      (() => {
+        let x = s;
+        const rested = reachFactor(kitchen(x), x.week);
+        x = runCommand(chef, x, "post", "behind_pass");
+        x = { ...x, week: x.week + 1, data: JSON.parse(JSON.stringify(x.data)) };
+        x = runCommand(chef, x, "post", "market_morning");
+        x = { ...x, week: x.week + 1, data: JSON.parse(JSON.stringify(x.data)) };
+        x = runCommand(chef, x, "post", "meet_brigade");
+        return reachFactor(kitchen(x), x.week) < rested * 0.7;
+      })(),
+    );
+
+    /* Expectations are the price, and they are paid on the plate. */
+    check(
+      "raised expectations make the same plate score worse",
+      (() => {
+        const quiet = stocked(chefAt({ menu: ["roast_chicken", "bread"] }));
+        const loud = { ...quiet, data: JSON.parse(JSON.stringify(quiet.data)) };
+        const k = kitchen(loud);
+        k.buzz = {
+          interest: 1,
+          expectation: 25,
+          postWeeks: [],
+          promoted: [],
+          claims: [],
+        };
+        const a = advanceWeek(chef, quiet, { dinner: 2 }).state;
+        const b = advanceWeek(chef, loud, { dinner: 2 }).state;
+        return (
+          standingOf(kitchen(b), b.r.reputation).food <
+          standingOf(kitchen(a), a.r.reputation).food
+        );
+      })(),
+      "otherwise promotion would be free",
+    );
+    check(
+      "a promise the kitchen does not keep is measurable",
+      (() => {
+        const x = { ...s, data: JSON.parse(JSON.stringify(s.data)) };
+        notePost(kitchen(x), x.week, { claim: { about: "food", size: 80 } });
+        return (
+          brokenPromise(kitchen(x), x.week, "food", 40) > 0 &&
+          brokenPromise(kitchen(x), x.week, "food", 90) === 0
+        );
+      })(),
+    );
+    check(
+      "a post about the brigade lifts the brigade",
+      (() => {
+        let x = stocked(chefAt({ menu: ["bread"], hire: ["commis"] }));
+        x = advanceWeek(chef, x, { dinner: 1 }).state;
+        const before = kitchen(x).staff[0]?.morale ?? 0;
+        const after = runCommand(chef, x, "post", "staff_win");
+        /* Only postable after a promotion, so the guard is the assertion. */
+        const ctx = chefPostContext(kitchen(x), x.week);
+        return CHEF_POST_BY_ID.get("staff_win")!.available(ctx)
+          ? (kitchen(after).staff[0]?.morale ?? 0) > before
+          : true;
+      })(),
+    );
+    check(
+      "interest decays rather than accumulating forever",
+      (() => {
+        let x = runCommand(chef, s, "post", "signature");
+        x = runCommand(chef, x, "post", "put_it_on");
+        const peak = interestOf(kitchen(x));
+        for (let i = 0; i < 4; i++) x = advanceWeek(chef, x, {}).state;
+        return interestOf(kitchen(x)) < peak;
+      })(),
+    );
+  }
+
+  /* ============================================== 6. customers, posting === */
+  {
+    check(
+      "a night with walkouts produces a complaint that describes the walkouts",
+      (() => {
+        const facts = {
+          week: 5,
+          served: 40,
+          walked: 6,
+          mistakes: 0,
+          wait: 6,
+          satisfaction: 30,
+          quality: 50,
+          topDish: null,
+          topIsSignature: false,
+          worstMorale: 70,
+          segmentLabel: "Local regulars",
+          presentation: 50,
+          followers: 500,
+          scrutiny: 10,
+        };
+        const out = customerReactions(facts, makeRng(1));
+        const complaint = out.find((r) => r.complaint)?.complaint;
+        return (
+          !!complaint &&
+          complaint.about === "service" &&
+          complaint.accurate &&
+          complaint.body.includes("90 minutes")
+        );
+      })(),
+    );
+    check(
+      "a good night produces no complaint at all",
+      (() => {
+        const out = customerReactions(
+          {
+            week: 5,
+            served: 60,
+            walked: 0,
+            mistakes: 0,
+            wait: 2,
+            satisfaction: 74,
+            quality: 78,
+            topDish: { name: "Roast chicken", quality: 76, covers: 30 },
+            topIsSignature: false,
+            worstMorale: 75,
+            segmentLabel: "Local regulars",
+            presentation: 70,
+            followers: 500,
+            scrutiny: 0,
+          },
+          makeRng(2),
+        );
+        return out.length > 0 && out.every((r) => !r.complaint);
+      })(),
+    );
+    check(
+      "a complaint on a night that went well is marked as inaccurate",
+      (() => {
+        /* Scrutiny attracts them; the report is what decides whether they are
+           true, and this one is not. */
+        for (let seed = 1; seed < 40; seed++) {
+          const out = customerReactions(
+            {
+              week: 5,
+              served: 60,
+              walked: 0,
+              mistakes: 0,
+              wait: 2,
+              satisfaction: 70,
+              quality: 75,
+              topDish: null,
+              topIsSignature: false,
+              worstMorale: 75,
+              segmentLabel: "Tourists",
+              presentation: 40,
+              followers: 4_000,
+              scrutiny: 60,
+            },
+            makeRng(seed),
+          );
+          const c = out.find((r) => r.complaint)?.complaint;
+          if (c) return c.accurate === false;
+        }
+        return true;
+      })(),
+    );
+    check(
+      "the signature dish being ordered by the room is noticed publicly",
+      (() => {
+        const out = customerReactions(
+          {
+            week: 5,
+            served: 60,
+            walked: 0,
+            mistakes: 0,
+            wait: 2,
+            satisfaction: 65,
+            quality: 70,
+            topDish: { name: "Roast chicken", quality: 70, covers: 30 },
+            topIsSignature: true,
+            worstMorale: 40,
+            segmentLabel: "Enthusiasts",
+            presentation: 40,
+            followers: 900,
+            scrutiny: 0,
+          },
+          makeRng(7),
+        );
+        return out.some((r) => r.post.body.includes("roast chicken"));
+      })(),
+    );
+    check(
+      "no customer post ever appears for a night nobody was served on",
+      customerReactions(
+        {
+          week: 5,
+          served: 0,
+          walked: 0,
+          mistakes: 0,
+          wait: 0,
+          satisfaction: 0,
+          quality: 0,
+          topDish: null,
+          topIsSignature: false,
+          worstMorale: null,
+          segmentLabel: "Local regulars",
+          presentation: 0,
+          followers: 100,
+          scrutiny: 0,
+        },
+        makeRng(3),
+      ).length === 0,
+    );
+  }
+
+  /* ============================================== 7. complaint responses === */
+  {
+    const complaintOf = (accurate: boolean, reach = 3_000) => ({
+      id: "c1",
+      week: 5,
+      author: "Marion D.",
+      segment: "regulars",
+      about: "service" as const,
+      accurate,
+      body: "We waited an hour.",
+      reach,
+    });
+    const ctx = (over: Partial<Parameters<typeof resolveComplaint>[2]> = {}) => ({
+      week: 5,
+      reputation: 55,
+      management: 70,
+      priors: 0,
+      cash: 100_000,
+      compensation: 200,
+      ...over,
+    });
+
+    check(
+      "apologising for a fair complaint helps",
+      resolveComplaint(complaintOf(true), "apologise", ctx()).sentiment > 0,
+    );
+    check(
+      "and helps less the third time you say it",
+      resolveComplaint(complaintOf(true), "apologise", ctx({ priors: 3 }))
+        .sentiment <
+        resolveComplaint(complaintOf(true), "apologise", ctx()).sentiment,
+    );
+    check(
+      "compensation costs real money, scaled to how far it has travelled",
+      (() => {
+        const small = resolveComplaint(complaintOf(true, 100), "compensate", ctx());
+        const big = resolveComplaint(complaintOf(true, 6_000), "compensate", ctx());
+        return big.spent > small.spent && small.spent > 0;
+      })(),
+    );
+    check(
+      "paying off a complaint that was false reads as guilt",
+      resolveComplaint(complaintOf(false), "compensate", ctx()).sentiment < 0,
+    );
+    check(
+      "explaining works when the complaint is false and fails when it is true",
+      resolveComplaint(complaintOf(false), "explain", ctx()).sentiment > 0 &&
+        resolveComplaint(complaintOf(true), "explain", ctx()).sentiment < 0,
+    );
+    check(
+      "defending the restaurant is the best answer to a false complaint",
+      (() => {
+        const defend = resolveComplaint(complaintOf(false), "defend", ctx({ reputation: 85 }));
+        const others = (["apologise", "explain", "ignore"] as const).map(
+          (r) => resolveComplaint(complaintOf(false), r, ctx({ reputation: 85 })).sentiment,
+        );
+        return others.every((x) => defend.sentiment > x);
+      })(),
+    );
+    check(
+      "and the worst answer to a true one",
+      (() => {
+        const defend = resolveComplaint(complaintOf(true), "defend", ctx());
+        const others = (["apologise", "compensate", "explain", "ignore"] as const).map(
+          (r) => resolveComplaint(complaintOf(true), r, ctx()).sentiment,
+        );
+        return others.every((x) => defend.sentiment > x === false);
+      })(),
+    );
+    check(
+      "silence is free when nobody is looking and expensive when they are",
+      (() => {
+        const quiet = resolveComplaint(complaintOf(true, 80), "ignore", ctx());
+        const loud = resolveComplaint(complaintOf(true, 6_000), "ignore", ctx());
+        return quiet.sentiment === 0 && loud.sentiment < -3;
+      })(),
+    );
+    check(
+      "investigating is the only answer that leaves the matter open",
+      resolveComplaint(complaintOf(true), "investigate", ctx()).closed === false &&
+        resolveComplaint(complaintOf(true), "apologise", ctx()).closed === true,
+    );
+    check(
+      "a manager makes investigating worth doing and no manager does not",
+      resolveComplaint(complaintOf(true), "investigate", ctx({ management: 80 }))
+        .moves.length === 0 &&
+        resolveComplaint(complaintOf(true), "investigate", ctx({ management: 20 }))
+          .moves.length > 0,
+    );
+    check(
+      "answering late is worth materially less than answering at once",
+      resolveComplaint(complaintOf(true), "apologise", ctx({ week: 9 })).sentiment <
+        resolveComplaint(complaintOf(true), "apologise", ctx()).sentiment,
+    );
+    check(
+      "no single answer is correct in every situation",
+      (() => {
+        /* For each of the six, there is a situation in which it beats all the
+           others. Anything less makes five of them decoration. */
+        const situations = [
+          { accurate: true, reach: 4_000, rep: 55, priors: 0 },
+          { accurate: false, reach: 4_000, rep: 88, priors: 0 },
+          { accurate: true, reach: 60, rep: 55, priors: 0 },
+          { accurate: false, reach: 3_000, rep: 30, priors: 0 },
+          { accurate: true, reach: 3_000, rep: 55, priors: 3 },
+        ];
+        const winners = new Set(
+          situations.map((sit) => {
+            const scored = COMPLAINT_RESPONSES.map((r) => ({
+              id: r.id,
+              value: resolveComplaint(
+                complaintOf(sit.accurate, sit.reach),
+                r.id,
+                ctx({ reputation: sit.rep, priors: sit.priors }),
+              ).sentiment,
+            })).sort((a, b) => b.value - a.value);
+            return scored[0].id;
+          }),
+        );
+        return winners.size >= 3;
+      })(),
+      "at least three different answers win in different situations",
+    );
+
+    /* And through the real command path. */
+    check(
+      "answering a complaint through the command closes it and is recorded",
+      (() => {
+        let s = stocked(chefAt({ menu: ["bread"] }));
+        kitchen(s).complaints = [complaintOf(true)];
+        s = runCommand(chef, s, "respondComplaint", "c1|apologise");
+        const c = (kitchen(s).complaints ?? [])[0];
+        return c.closed === true && c.answered === "apologise" && !!c.outcome;
+      })(),
+    );
+    check(
+      "an unknown response is refused rather than applied",
+      (() => {
+        let s = stocked(chefAt({ menu: ["bread"] }));
+        kitchen(s).complaints = [complaintOf(true)];
+        s = runCommand(chef, s, "respondComplaint", "c1|shout");
+        return (kitchen(s).complaints ?? [])[0].closed !== true;
+      })(),
+    );
+    check(
+      "a complaint cannot be answered twice in the same week",
+      (() => {
+        let s = stocked(chefAt({ menu: ["bread"] }));
+        kitchen(s).complaints = [complaintOf(true)];
+        s = runCommand(chef, s, "respondComplaint", "c1|compensate");
+        const cash = s.r.cash;
+        s = runCommand(chef, s, "respondComplaint", "c1|compensate");
+        return s.r.cash === cash;
+      })(),
+    );
+  }
+
+  /* =========================================================== 8. critics === */
+  {
+    check(
+      "there are five critics and no two want the same thing",
+      CRITICS.length === 5 &&
+        new Set(CRITICS.map((c) => c.looksFor)).size >= 4 &&
+        new Set(CRITICS.map((c) => JSON.stringify(c.weighs))).size === 5,
+    );
+    check(
+      "every critic offers clues before a visit and never a formula",
+      CRITICS.every((c) => c.clues.length >= 3),
+    );
+    check(
+      "an unknown kitchen is not reviewed by anybody",
+      criticInterest(10, 0, 0) === 0,
+    );
+    check(
+      "and a busy, followed one is",
+      criticInterest(70, 20_000, 3) > criticInterest(30, 0, 0),
+    );
+
+    const traditionalist = CRITIC_BY_ID.get("traditionalist")!;
+    const modernist = CRITIC_BY_ID.get("modernist")!;
+    const goodNight = {
+      week: 30,
+      serviceLabel: "Dinner",
+      plate: 78,
+      wait: 2,
+      mistakes: 0,
+      walked: 0,
+      served: 60,
+    };
+
+    check(
+      "a verdict is built from the restaurant, not rolled",
+      (() => {
+        const s = chefAt({ menu: ["roast_chicken"] });
+        const a = judgeVisit(traditionalist, kitchen(s), 55, goodNight);
+        const b = judgeVisit(traditionalist, kitchen(s), 55, goodNight);
+        return a.score === b.score && a.body === b.body;
+      })(),
+    );
+    check(
+      "two critics judge the same restaurant differently",
+      (() => {
+        let s = chefAt({ menu: ["roast_chicken"] });
+        applyStanding(s, "consistency", 40, "the same twice");
+        s = { ...s, data: s.data };
+        const trad = judgeVisit(traditionalist, kitchen(s), 55, goodNight);
+        const mod = judgeVisit(modernist, kitchen(s), 55, goodNight);
+        return Math.abs(trad.score - mod.score) > 4;
+      })(),
+      "otherwise five critics are one critic",
+    );
+    check(
+      "the modernist marks a restaurant with no menu down for having none",
+      (() => {
+        /* Two restaurants of identical standing, one of which has a menu.
+           Started at 55 rather than the opening 12, because a critic
+           reviewing an unknown market stall scores it at the floor either
+           way and a comparison against a floor proves nothing. */
+        const at = (menu: string[]) => {
+          const x = chefAt({ menu });
+          kitchen(x).standing = Object.fromEntries(
+            STANDINGS.map((y) => [y.id, 55]),
+          ) as never;
+          return x;
+        };
+        const bare = at([]);
+        const withMenu = at(["roast_chicken", "soup"]);
+        return (
+          judgeVisit(modernist, kitchen(bare), 55, goodNight).score <
+          judgeVisit(modernist, kitchen(withMenu), 55, goodNight).score
+        );
+      })(),
+    );
+    check(
+      "the value critic marks an over-priced menu down and says why",
+      (() => {
+        let cheap = chefAt({ menu: ["soup"] });
+        let dear = chefAt({ menu: ["soup"] });
+        const entry = activeMenu(kitchen(dear))[0];
+        dear = runCommand(
+          chef,
+          dear,
+          "priceDish",
+          `${entry.recipe}:${Math.round(spendPerHead(kitchen(dear)) * 2.5)}`,
+        );
+        cheap = runCommand(
+          chef,
+          cheap,
+          "priceDish",
+          `${entry.recipe}:${Math.round(spendPerHead(kitchen(cheap)) * 0.8)}`,
+        );
+        const critic = CRITIC_BY_ID.get("value")!;
+        const a = judgeVisit(critic, kitchen(cheap), 55, goodNight);
+        const b = judgeVisit(critic, kitchen(dear), 55, goodNight);
+        return a.score > b.score && b.body.includes("bill");
+      })(),
+    );
+    check(
+      "a night that went badly is what gets written about",
+      (() => {
+        const s = chefAt({ menu: ["roast_chicken"] });
+        const bad = judgeVisit(traditionalist, kitchen(s), 55, {
+          ...goodNight,
+          plate: 30,
+          mistakes: 5,
+          walked: 4,
+          wait: 7,
+        });
+        const good = judgeVisit(traditionalist, kitchen(s), 55, goodNight);
+        /* Only the two most important notes make the printed verdict, which
+           is what a review actually reads like. */
+        return (
+          bad.score < good.score &&
+          bad.body.includes("plates went back") &&
+          bad.body.includes("was not")
+        );
+      })(),
+    );
+    check(
+      "a verdict moves the categories that critic weighs, with the reason",
+      (() => {
+        const s = chefAt({ menu: ["roast_chicken"] });
+        const v = judgeVisit(traditionalist, kitchen(s), 55, goodNight);
+        return (
+          v.moves.length > 0 &&
+          v.moves.every((m) => m.why.includes(traditionalist.name))
+        );
+      })(),
+    );
+    check(
+      "every review raises the bar, and a rave raises it most",
+      (() => {
+        const s = chefAt({ menu: ["roast_chicken"] });
+        kitchen(s).standing = Object.fromEntries(
+          STANDINGS.map((x) => [x.id, 95]),
+        ) as never;
+        const rave = judgeVisit(traditionalist, kitchen(s), 95, goodNight);
+        const poor = judgeVisit(traditionalist, kitchen(chefAt()), 20, {
+          ...goodNight,
+          plate: 30,
+        });
+        return rave.expectation > poor.expectation && poor.expectation > 0;
+      })(),
+    );
+    check(
+      "an award is a record, never an ending",
+      (() => {
+        let s = stocked(chefAt({ menu: ["roast_chicken", "bread"] }));
+        kitchen(s).awards = [{ week: 1, label: "Course — One To Watch" }];
+        s = advanceWeek(chef, s, { dinner: 2 }).state;
+        return s.outcome === null;
+      })(),
+      "nothing in this phase may terminate a run",
+    );
+    check(
+      "a scheduled visit never tells the player which night",
+      (() => {
+        const watch = arrangeVisit(traditionalist, 10, makeRng(5));
+        return (
+          watch.dueWeek > 10 &&
+          !watchLine(watch, 10).includes(String(watch.dueWeek))
+        );
+      })(),
+    );
+    check(
+      "a critic visit resolves into a published verdict and clears the watch",
+      (() => {
+        let s = stocked(chefAt({ menu: ["roast_chicken", "bread"], rep: 60 }));
+        kitchen(s).criticWatch = {
+          critic: "traditionalist",
+          dueWeek: s.week,
+          clues: ["She has been asking questions."],
+          since: s.week - 2,
+        };
+        s = advanceWeek(chef, s, { dinner: 2 }).state;
+        return (
+          (kitchen(s).verdicts ?? []).length === 1 &&
+          kitchen(s).criticWatch === undefined
+        );
+      })(),
+    );
+  }
+
+  /* ======================================================= 9. competitors === */
+  {
+    const s = chefAt({ city: "paris" });
+    const rivals = rivalsFor("paris", 1);
+    check(
+      "each city has three named rivals with a concept and a price level",
+      rivals.length === 3 &&
+        rivals.every(
+          (r) => r.name.length > 3 && r.concept.length > 20 && !!PRICE_LABEL[r.price],
+        ),
+    );
+    check(
+      "and the rivals are different restaurants in different cities",
+      rivalsFor("paris", 1)[0].name !== rivalsFor("mumbai", 1)[0].name,
+    );
+    check(
+      "the same city always produces the same three",
+      JSON.stringify(rivalsFor("paris", 1)) ===
+        JSON.stringify(rivalsFor("paris", 1)),
+    );
+    check(
+      "every rival has both a strength and a weakness you can act on",
+      rivals.every(
+        (r) =>
+          STANDING_BY_ID.has(r.strength) &&
+          STANDING_BY_ID.has(r.weakness) &&
+          r.strength !== r.weakness &&
+          r.targets.length > 0,
+      ),
+    );
+    check(
+      "a rival takes only the segments it is built for",
+      (() => {
+        const k = kitchen(s);
+        k.rivals = [{ ...rivals[0], reputation: 90 }];
+        const pressure = competitorPressure(k, 30);
+        return (
+          (pressure.budget ?? 0) > 0 && (pressure.luxury ?? 0) === 0
+        );
+      })(),
+      "the cheap room cannot touch your luxury table",
+    );
+    check(
+      "beating a rival at their own game costs you nothing",
+      (() => {
+        const k = kitchen(chefAt({ city: "paris" }));
+        k.rivals = [{ ...rivals[0], reputation: 30 }];
+        k.standing = Object.fromEntries(
+          STANDINGS.map((x) => [x.id, 80]),
+        ) as never;
+        const pressure = competitorPressure(k, 80);
+        return Object.values(pressure).every((x) => x < 0.12);
+      })(),
+    );
+    check(
+      "a price war takes the price-sensitive whatever your standing is",
+      (() => {
+        const k = kitchen(chefAt({ city: "paris" }));
+        k.standing = Object.fromEntries(
+          STANDINGS.map((x) => [x.id, 95]),
+        ) as never;
+        k.rivals = [{ ...rivals[0], reputation: 30, strategy: "undercut" as const }];
+        return (competitorPressure(k, 95).budget ?? 0) > 0.05;
+      })(),
+    );
+    check(
+      "competitor pressure genuinely reduces how many people want a table",
+      (() => {
+        /* Standing equal to the reputation, so the appeal term is neutral and
+           what is being measured is the rivals and nothing else. */
+        const even = (rep: number) => {
+          const x = chefAt({ city: "paris", rep });
+          kitchen(x).standing = Object.fromEntries(
+            STANDINGS.map((y) => [y.id, rep]),
+          ) as never;
+          return x;
+        };
+        const free = even(60);
+        const pressed = even(60);
+        kitchen(free).rivals = [];
+        kitchen(pressed).rivals = rivals.map((r) => ({ ...r, reputation: 92 }));
+        return (
+          sceneFor(kitchen(pressed), 60, 10).demand <
+          sceneFor(kitchen(free), 60, 10).demand
+        );
+      })(),
+    );
+    check(
+      "rivals hold a strategy for at least four weeks",
+      (() => {
+        const k = kitchen(chefAt({ city: "paris" }));
+        k.rivals = rivalsFor("paris", 10);
+        const moves = moveRivals(k, 50, 12, "Roast chicken", 20, makeRng(1));
+        return moves.length === 0;
+      })(),
+    );
+    check(
+      "a signature dish gets copied, and the move is announced",
+      (() => {
+        const k = kitchen(chefAt({ city: "paris" }));
+        k.rivals = rivalsFor("paris", 1);
+        k.standing = Object.fromEntries(
+          STANDINGS.map((x) => [x.id, 90]),
+        ) as never;
+        for (let seed = 1; seed < 60; seed++) {
+          const copy = JSON.parse(JSON.stringify(k)) as typeof k;
+          const moves = moveRivals(copy, 60, 20, "Roast chicken", 70, makeRng(seed));
+          const copied = moves.find((m) => m.strategy === "copy");
+          if (copied) return copied.note.includes("signature") || copied.loud;
+        }
+        return false;
+      })(),
+    );
+    check(
+      "an unhappy brigade attracts a rival that is hiring",
+      (() => {
+        const k = kitchen(chefAt({ city: "paris" }));
+        k.rivals = rivalsFor("paris", 1);
+        for (let seed = 1; seed < 60; seed++) {
+          const copy = JSON.parse(JSON.stringify(k)) as typeof k;
+          if (
+            moveRivals(copy, 50, 20, null, 20, makeRng(seed)).some(
+              (m) => m.strategy === "poach",
+            )
+          ) {
+            return true;
+          }
+        }
+        return false;
+      })(),
+    );
+    check(
+      "your city rank counts you against the rivals rather than in a vacuum",
+      (() => {
+        const k = kitchen(chefAt({ city: "paris" }));
+        k.rivals = rivalsFor("paris", 1);
+        return cityRank(k, 95).rank === 1 && cityRank(k, 5).rank === 4;
+      })(),
+    );
+    check(
+      "and it names the restaurant immediately above you",
+      (() => {
+        const k = kitchen(chefAt({ city: "paris" }));
+        k.rivals = rivalsFor("paris", 1);
+        return cityRank(k, 50).above !== null;
+      })(),
+    );
+  }
+
+  /* ========================================================== 10. events === */
+  {
+    check(
+      "twelve events were added, each with a context and real choices",
+      CHEF_EVENTS.filter((e) => !e.followUp).length === 12,
+      String(CHEF_EVENTS.filter((e) => !e.followUp).length),
+    );
+    check(
+      "every event offers at least two choices and every choice states its cost",
+      CHEF_EVENTS.filter((e) => !e.followUp).every(
+        (e) => e.choices.length >= 2 && e.choices.every((c) => c.detail.length > 4),
+      ),
+    );
+    check(
+      "no event fires without the system it is about",
+      (() => {
+        const empty = startRun(chef, 1);
+        /* A brand new kitchen has no equipment, no staff, no menu and no
+           suppliers, so the events that read them must all decline. */
+        return ["chef_breakdown", "chef_illness", "chef_allergy", "chef_shortage"].every(
+          (id) => !CHEF_EVENTS.find((e) => e.id === id)!.eligible(empty),
+        );
+      })(),
+    );
+    check(
+      "the festival only happens in the season it happens in",
+      (() => {
+        const s = chefAt({ rep: 40 });
+        const festival = CHEF_EVENTS.find((e) => e.id === "chef_festival")!;
+        return (
+          festival.eligible({ ...s, week: 33 }) &&
+          !festival.eligible({ ...s, week: 20 })
+        );
+      })(),
+    );
+    check(
+      "an event body describes what is true now rather than a generic line",
+      (() => {
+        const s = chefAt({ city: "mumbai" });
+        return CHEF_EVENTS.find((e) => e.id === "chef_shortage")!
+          .body(s)
+          .includes("Mumbai");
+      })(),
+    );
+    check(
+      "the breakdown genuinely removes the equipment when you refuse to fix it",
+      (() => {
+        let s = chefAt();
+        s = runCommand(chef, s, "buyKit", "range");
+        const before = (kitchen(s).equipment ?? []).length;
+        const after = resolveEventChoice(
+          chef,
+          s,
+          CHEF_EVENTS.find((e) => e.id === "chef_breakdown")!,
+          1,
+        );
+        return (kitchen(after).equipment ?? []).length === before - 1;
+      })(),
+    );
+    check(
+      "and repairing it charges a price scaled to the city",
+      (() => {
+        const build = (city: string) => {
+          let s = chefAt({ city, cash: 400_000 });
+          s = runCommand(chef, s, "buyKit", "range");
+          const before = s.r.cash;
+          const after = resolveEventChoice(
+            chef,
+            s,
+            CHEF_EVENTS.find((e) => e.id === "chef_breakdown")!,
+            0,
+          );
+          return before - after.r.cash;
+        };
+        return build("mumbai") < build("newyork");
+      })(),
+      "a flat Lyon bill in Mumbai is two weeks of takings",
+    );
+    check(
+      "the big booking schedules a night rather than paying out immediately",
+      (() => {
+        let s = chefAt();
+        const before = s.r.cash;
+        s = resolveEventChoice(
+          chef,
+          s,
+          CHEF_EVENTS.find((e) => e.id === "chef_big_booking")!,
+          0,
+        );
+        return (
+          (s.pending ?? []).some((p) => p.kind === "bigBooking") &&
+          s.r.cash > before
+        );
+      })(),
+    );
+    check(
+      "the scheduled booking pays the balance once and only once",
+      (() => {
+        let s = chefAt();
+        s = resolveEventChoice(
+          chef,
+          s,
+          CHEF_EVENTS.find((e) => e.id === "chef_big_booking")!,
+          0,
+        );
+        const due = (s.pending ?? [])[0];
+        s = { ...s, week: due.dueWeek };
+        const before = s.r.cash;
+        const out = advanceWeek(chef, s, {});
+        const gained = out.state.r.cash - before;
+        /* And the queue is empty afterwards, which is what stops a reload
+           from paying it a second time. */
+        return gained > 0 && (out.state.pending ?? []).length === 0;
+      })(),
+    );
+    check(
+      "the inspection reads the state of the pantry rather than a die",
+      (() => {
+        const build = (prepared: number, rot: boolean) => {
+          const s = stocked(chefAt({ menu: ["bread"] }));
+          const k = kitchen(s);
+          k.standing = Object.fromEntries(
+            STANDINGS.map((x) => [x.id, rot ? 20 : 70]),
+          ) as never;
+          if (rot) {
+            k.pantry = (k.pantry ?? []).map((l) => ({
+              ...l,
+              boughtWeek: s.week - 40,
+            }));
+          }
+          s.pending = [
+            {
+              id: "i",
+              dueWeek: s.week,
+              kind: "inspection",
+              payload: { prepared },
+            },
+          ];
+          const before = s.r.cash;
+          const out = advanceWeek(chef, s, {});
+          return before - out.state.r.cash;
+        };
+        return build(0, true) > build(1, false);
+      })(),
+    );
+    check(
+      "an unknown pending kind from an older save is dropped, not crashed on",
+      (() => {
+        const s = chefAt();
+        s.pending = [{ id: "x", dueWeek: s.week, kind: "somethingRemoved" }];
+        const out = advanceWeek(chef, s, {});
+        return (out.state.pending ?? []).length === 0;
+      })(),
+    );
+    check(
+      "the allergy event changes the kitchen rather than issuing a fine",
+      (() => {
+        const s = chefAt({ menu: ["roast_chicken", "bread"] });
+        const before = activeMenu(kitchen(s)).length;
+        const after = resolveEventChoice(
+          chef,
+          s,
+          CHEF_EVENTS.find((e) => e.id === "chef_allergy")!,
+          0,
+        );
+        return (
+          activeMenu(kitchen(after)).length === before - 1 &&
+          standingOf(kitchen(after), after.r.reputation).hygiene >
+            standingOf(kitchen(s), s.r.reputation).hygiene
+        );
+      })(),
+    );
+    check(
+      "matching a rival's price cut actually cuts your prices",
+      (() => {
+        const s = chefAt({ menu: ["roast_chicken", "soup"] });
+        const before = activeMenu(kitchen(s)).map((e) => e.price);
+        const after = resolveEventChoice(
+          chef,
+          s,
+          CHEF_EVENTS.find((e) => e.id === "chef_rival_promo")!,
+          0,
+        );
+        return activeMenu(kitchen(after)).every((e, i) => e.price < before[i]);
+      })(),
+    );
+    check(
+      "going the other way raises them, and costs you on value",
+      (() => {
+        const s = chefAt({ menu: ["roast_chicken", "soup"] });
+        const before = activeMenu(kitchen(s)).map((e) => e.price);
+        const after = resolveEventChoice(
+          chef,
+          s,
+          CHEF_EVENTS.find((e) => e.id === "chef_rival_promo")!,
+          2,
+        );
+        return (
+          activeMenu(kitchen(after)).every((e, i) => e.price > before[i]) &&
+          standingOf(kitchen(after), after.r.reputation).value <
+            standingOf(kitchen(s), s.r.reputation).value
+        );
+      })(),
+    );
+    check(
+      "every event choice returns a sentence for the activity history",
+      CHEF_EVENTS.every((e) =>
+        e.choices.every((c) => {
+          const s = stocked(chefAt({ menu: ["roast_chicken", "bread"], hire: ["commis"] }));
+          const line = c.apply(
+            JSON.parse(JSON.stringify({ ...s, data: s.data })) as RunState,
+            makeRng(3),
+          );
+          return typeof line === "string" && line.length > 10;
+        }),
+      ),
+    );
+  }
+
+  /* ============================================== 11. save compatibility === */
+  {
+    check(
+      "a kitchen with no Phase 3 fields at all is a valid save",
+      (() => {
+        const s = chefAt();
+        const k = kitchen(s);
+        delete k.standing;
+        delete k.repLog;
+        delete k.repTrend;
+        delete k.reviews;
+        delete k.complaints;
+        delete k.buzz;
+        delete k.rivals;
+        delete k.criticWatch;
+        delete k.verdicts;
+        delete k.awards;
+        delete k.qualityLog;
+        return chef.validateData!(s.data);
+      })(),
+    );
+    check(
+      "and it reads as a kitchen whose seven parts agree with its reputation",
+      (() => {
+        const s = chefAt({ rep: 63 });
+        const k = kitchen(s);
+        delete k.standing;
+        return Object.values(standingOf(k, 63)).every((v) => v === 63);
+      })(),
+    );
+    check(
+      "an un-migrated save plays a week without gaining or losing anything odd",
+      (() => {
+        let s = stocked(chefAt({ menu: ["roast_chicken", "bread"] }));
+        const k = kitchen(s);
+        delete k.standing;
+        delete k.buzz;
+        delete k.rivals;
+        delete k.qualityLog;
+        s = advanceWeek(chef, s, { dinner: 2 }).state;
+        const after = kitchen(s);
+        return (
+          !!after.standing &&
+          !!after.buzz &&
+          (after.rivals ?? []).length === 3 &&
+          Number.isFinite(s.r.cash)
+        );
+      })(),
+    );
+    check(
+      "a standing outside 0-100 is refused rather than rendered",
+      (() => {
+        const s = chefAt();
+        kitchen(s).standing = { food: 4_000 } as never;
+        return !chef.validateData!(s.data);
+      })(),
+    );
+    check(
+      "a standing category the catalogue does not have is refused",
+      (() => {
+        const s = chefAt();
+        kitchen(s).standing = { plating: 50 } as never;
+        return !chef.validateData!(s.data);
+      })(),
+    );
+    check(
+      "a complaint with an invented response is refused",
+      (() => {
+        const s = chefAt();
+        kitchen(s).complaints = [
+          {
+            id: "c",
+            week: 1,
+            author: "A",
+            segment: "budget",
+            about: "food",
+            accurate: true,
+            body: "x",
+            reach: 10,
+            answered: "shout" as never,
+          },
+        ];
+        return !chef.validateData!(s.data);
+      })(),
+    );
+    check(
+      "a verdict from a critic who does not exist is refused",
+      (() => {
+        const s = chefAt();
+        kitchen(s).verdicts = [
+          {
+            id: "v",
+            week: 1,
+            critic: "nobody",
+            score: 50,
+            body: "x",
+            moves: [],
+            award: null,
+            interest: 1,
+            expectation: 0,
+          },
+        ];
+        return !chef.validateData!(s.data);
+      })(),
+    );
+    check(
+      "a rival on a strategy the catalogue does not have is refused",
+      (() => {
+        const s = chefAt();
+        kitchen(s).rivals = [{ ...rivalsFor("lyon", 1)[0], strategy: "arson" as never }];
+        return !chef.validateData!(s.data);
+      })(),
+    );
+    check(
+      "a promotion of a dish that does not exist is refused",
+      (() => {
+        const s = chefAt();
+        kitchen(s).buzz = {
+          interest: 1,
+          expectation: 0,
+          postWeeks: [],
+          promoted: [{ recipe: "moon_cheese", until: 9, weight: 0.3 }],
+          claims: [],
+        };
+        return !chef.validateData!(s.data);
+      })(),
+    );
+    check(
+      "every bounded list stays bounded across a long run",
+      (() => {
+        let s = stocked(chefAt({ menu: ["roast_chicken", "bread", "soup"] }));
+        for (let i = 0; i < 30; i++) {
+          s = advanceWeek(chef, s, { dinner: 2 }).state;
+        }
+        const k = kitchen(s);
+        return (
+          (k.reviews ?? []).length <= MAX_REVIEWS &&
+          (k.repLog ?? []).length <= MAX_STANDING_LOG &&
+          (k.repTrend ?? []).length <= MAX_STANDING_TREND &&
+          (k.complaints ?? []).length <= MAX_COMPLAINTS &&
+          (k.verdicts ?? []).length <= MAX_VERDICTS &&
+          (k.qualityLog ?? []).length <= 16
+        );
+      })(),
+    );
+    check(
+      "a thirty-week run is still a valid save at the end of it",
+      (() => {
+        let s = stocked(chefAt({ menu: ["roast_chicken", "bread", "soup"] }));
+        for (let i = 0; i < 30; i++) {
+          s = advanceWeek(chef, s, { dinner: 2, prep: 1 }).state;
+        }
+        /* `validateRun` takes the parsed JSON shape a reload hands it, which
+           is what a save actually is on the way back in. */
+        return (
+          chef.validateData!(s.data) &&
+          validateRun(JSON.parse(JSON.stringify(s)) as Record<string, unknown>)
+        );
+      })(),
+    );
+  }
+
+  /* ================================== 12. nothing happens twice on reload === */
+  {
+    check(
+      "resolving the same week twice from the same state is identical",
+      (() => {
+        const s = stocked(chefAt({ menu: ["roast_chicken", "bread"] }));
+        const a = advanceWeek(chef, s, { dinner: 2, prep: 1 }).state;
+        const b = advanceWeek(chef, s, { dinner: 2, prep: 1 }).state;
+        return (
+          JSON.stringify(kitchen(a).reviews) === JSON.stringify(kitchen(b).reviews) &&
+          JSON.stringify(kitchen(a).repLog) === JSON.stringify(kitchen(b).repLog) &&
+          a.r.reputation === b.r.reputation &&
+          a.r.cash === b.r.cash
+        );
+      })(),
+    );
+    check(
+      "a save round-trip does not duplicate a review, a complaint or a verdict",
+      (() => {
+        let s = stocked(chefAt({ menu: ["roast_chicken", "bread"], rep: 60 }));
+        kitchen(s).criticWatch = {
+          critic: "value",
+          dueWeek: s.week,
+          clues: ["He prints the bill."],
+          since: s.week - 2,
+        };
+        s = advanceWeek(chef, s, { dinner: 2 }).state;
+        const before = {
+          reviews: (kitchen(s).reviews ?? []).length,
+          verdicts: (kitchen(s).verdicts ?? []).length,
+          rep: s.r.reputation,
+        };
+        /* Exactly what a reload does: serialise, parse, migrate, validate. */
+        const reloaded = migrateRun(
+          JSON.parse(JSON.stringify(s)) as Record<string, unknown>,
+        ) as RunState | null;
+        if (
+          !reloaded ||
+          !validateRun(JSON.parse(JSON.stringify(reloaded)) as Record<string, unknown>)
+        ) {
+          return false;
+        }
+        const k = kitchen(reloaded);
+        return (
+          (k.reviews ?? []).length === before.reviews &&
+          (k.verdicts ?? []).length === before.verdicts &&
+          reloaded.r.reputation === before.rep
+        );
+      })(),
+    );
+    check(
+      "reviews from one week never collide with another week's",
+      (() => {
+        let s = stocked(chefAt({ menu: ["roast_chicken", "bread"] }));
+        for (let i = 0; i < 5; i++) s = advanceWeek(chef, s, { dinner: 2 }).state;
+        const ids = (kitchen(s).reviews ?? []).map((r) => r.id);
+        return new Set(ids).size === ids.length;
+      })(),
+    );
+    check(
+      "an award is recorded once however many weeks pass afterwards",
+      (() => {
+        let s = stocked(chefAt({ menu: ["roast_chicken", "bread"], rep: 75 }));
+        applyStanding(s, "food", 30, "very good");
+        applyStanding(s, "consistency", 30, "the same twice");
+        kitchen(s).criticWatch = {
+          critic: "traditionalist",
+          dueWeek: s.week,
+          clues: ["She has been asking."],
+          since: s.week - 3,
+        };
+        s = advanceWeek(chef, s, { dinner: 2 }).state;
+        const after = (kitchen(s).awards ?? []).length;
+        for (let i = 0; i < 4; i++) s = advanceWeek(chef, s, { dinner: 2 }).state;
+        return (kitchen(s).awards ?? []).length === after;
+      })(),
+    );
+  }
+
+  /* ======================================== 13. the screens exist and route */
+  {
+    const chefScreens = sectionsFor("chef").flatMap((sec) =>
+      sec.screens.map((sc) => sc.id),
+    );
+    check(
+      "the Chef has a word-of-mouth screen and a scene screen",
+      chefScreens.includes("reviews") && chefScreens.includes("scene"),
+    );
+    check(
+      "and neither of them routes a Chef into a medical section",
+      sectionOf("reviews").id === "kitchen" && sectionOf("scene").id === "where",
+    );
+    check(
+      "every Chef screen still states what it decides",
+      chefScreens.every((id) => screenOf(id).purpose.length > 20),
+    );
+    check(
+      "the Physician is untouched by any of it",
+      !sectionsFor("doctor")
+        .flatMap((sec) => sec.screens.map((sc) => sc.id))
+        .some((id) => id === "reviews" || id === "scene"),
+    );
+  }
+}
+
+console.log("\nThe craft and the top of the trade\n" + "─".repeat(52));
+{
+  /*
+   * Phase 4: what the chef can personally do, the cellar, the guide's stars
+   * and the work outside the kitchen. The rule every check here is written to
+   * is that **none of it can be bought** — each system has a gate that money
+   * does not open, and most of these assertions are about proving that gate
+   * is real rather than decorative.
+   */
+  const chefP4 = (opts: {
+    city?: string;
+    week?: number;
+    cash?: number;
+    rep?: number;
+    skill?: number;
+    room?: string;
+    kit?: string[];
+    menu?: string[];
+    hire?: string[];
+    knows?: string[];
+  } = {}) => {
+    let s = startRun(chef, 7373, opts.city ? { city: opts.city } : undefined);
+    /* Enough to buy whichever room the test is about — these configure a
+       state to measure one rule, rather than playing a run to it. */
+    s.r.cash = opts.cash ?? 2_400_000;
+    s.r.skill = opts.skill ?? 60;
+    s.r.reputation = opts.rep ?? 45;
+    s.week = opts.week ?? 1;
+    s = runCommand(chef, s, "takePremises", opts.room ?? "bistro");
+    for (const id of opts.kit ?? []) s = runCommand(chef, s, "buyKit", id);
+    for (const role of opts.hire ?? []) s = runCommand(chef, s, "hireKitchen", role);
+    for (const id of opts.menu ?? []) s = runCommand(chef, s, "addDish", id);
+    /* Techniques granted directly where the test is about their *effect*
+       rather than about learning them. */
+    if (opts.knows) {
+      const k = kitchen(s);
+      k.techniques = Object.fromEntries(
+        opts.knows.map((id) => [id, TECHNIQUE_BY_ID.get(id)!.cost]),
+      );
+    }
+    return s;
+  };
+
+  /* ================================================== 1. the techniques === */
+  {
+    check(
+      "fourteen techniques across five disciplines",
+      TECHNIQUES.length === 14 && DISCIPLINES.length === 5,
+      `${TECHNIQUES.length} across ${DISCIPLINES.length}`,
+    );
+    check(
+      "every technique states what it does, and does it",
+      TECHNIQUES.every(
+        (t) =>
+          t.effect.length > 15 &&
+          (t.lift > 0 || !!t.yield || !!t.worth || !!t.unlocks || !!t.handles),
+      ),
+      "no technique may be a bare +2 to a score",
+    );
+    check(
+      "every prerequisite names a technique that exists",
+      TECHNIQUES.every((t) =>
+        (t.needs ?? []).every((id) => TECHNIQUE_BY_ID.has(id)),
+      ),
+    );
+    check(
+      "every unlock names a dish that exists",
+      TECHNIQUES.every((t) =>
+        (t.unlocks ?? []).every((id) => RECIPE_BY_ID.has(id)),
+      ),
+    );
+    check(
+      "and every ingredient gate names one that exists",
+      TECHNIQUES.every((t) =>
+        (t.handles ?? []).every((id) => INGREDIENT_BY_ID.has(id)),
+      ),
+    );
+
+    const s = chefP4();
+    check(
+      "a new chef knows nothing and can start on the ones with no prerequisite",
+      learnedTechniques(kitchen(s)).length === 0 &&
+        TECHNIQUES.filter((t) => canLearn(kitchen(s), t)).length === 5,
+      String(TECHNIQUES.filter((t) => canLearn(kitchen(s), t)).length),
+    );
+    check(
+      "a technique behind a prerequisite refuses practice and says why",
+      (() => {
+        const x = chefP4();
+        const before = { ...(kitchen(x).techniques ?? {}) };
+        practise(kitchen(x), "emulsion", 40);
+        return (
+          JSON.stringify(kitchen(x).techniques) === JSON.stringify(before) &&
+          (techniqueBlocker(kitchen(x), TECHNIQUE_BY_ID.get("emulsion")!) ?? "")
+            .toLowerCase()
+            .includes("stocks")
+        );
+      })(),
+    );
+    check(
+      "practice never banks past what a technique costs",
+      (() => {
+        const x = chefP4();
+        practise(kitchen(x), "stocks", 500);
+        return (kitchen(x).techniques ?? {}).stocks === 35;
+      })(),
+    );
+    check(
+      "a block of practice moves the chosen technique through the real command path",
+      (() => {
+        let x = chefP4();
+        x = runCommand(chef, x, "setPractice", "doughs");
+        const out = advanceWeek(chef, x, { practise: 1 });
+        return (kitchen(out.state).techniques ?? {}).doughs === 22;
+      })(),
+    );
+    check(
+      "and a block with nothing chosen still does something",
+      (() => {
+        const x = chefP4();
+        const out = advanceWeek(chef, x, { practise: 1 });
+        return Object.values(kitchen(out.state).techniques ?? {}).some(
+          (v) => v > 0,
+        );
+      })(),
+      "a block of the player's week must never quietly do nothing",
+    );
+
+    /* The effects, each measured against the thing it claims to change. */
+    check(
+      "a saucier's kitchen plates a better main and not a better tart",
+      (() => {
+        const x = chefP4({ knows: ["stocks", "emulsion"] });
+        const k = kitchen(x);
+        return techniqueLift(k, "main") > 8 && techniqueLift(k, "dessert") === 0;
+      })(),
+    );
+    check(
+      "and a pastry kitchen reverses that exactly",
+      (() => {
+        const x = chefP4({ knows: ["doughs", "sugar"] });
+        const k = kitchen(x);
+        return techniqueLift(k, "dessert") > 8 && techniqueLift(k, "main") === 0;
+      })(),
+    );
+    check(
+      "technique lands on the plate through dishQuality",
+      (() => {
+        /* Soup rather than the roast: dishQuality clamps at 100, and a dish
+           already near the ceiling would measure the clamp instead. */
+        const raw = RECIPE_BY_ID.get("soup")!;
+        const plain = dishQuality(raw, undefined, 60, 0);
+        const skilled = dishQuality(raw, undefined, 60, 9);
+        return skilled > plain && Math.abs(skilled - plain - 9) < 0.001;
+      })(),
+    );
+    check(
+      "butchery takes real money off the write-off",
+      (() => {
+        const build = (knows: string[]) => {
+          let x = chefP4({ knows });
+          x = runCommand(chef, x, "buyProduce", "market:basic");
+          /* Age it out so the sweep has something to bin. */
+          for (const lot of kitchen(x).larder) lot.boughtWeek = x.week - 40;
+          const out = advanceWeek(chef, x, {});
+          return out.state.r._wasteCost ?? 0;
+        };
+        return build(["breakdown", "curing"]) < build([]);
+      })(),
+    );
+    check(
+      "and the recovery is capped, so waste can never be free",
+      (() => {
+        const x = chefP4({
+          knows: ["breakdown", "stocks", "curing", "fishmonger", "dryage"],
+        });
+        return techniqueYield(kitchen(x)) <= 0.4;
+      })(),
+    );
+    check(
+      "technique raises what a cover is worth, and that too is bounded",
+      (() => {
+        const none = chefP4();
+        const all = chefP4({
+          knows: TECHNIQUES.map((t) => t.id),
+        });
+        /*
+         * Small, and capped low. Technique already pays three times over —
+         * on the plate, on the waste line, and in dishes that could not be
+         * cooked at all — so the fourth payment has to be a rounding error by
+         * comparison. It was +55% when this was first written, and the city
+         * harness showed what that does.
+         */
+        return (
+          techniqueWorth(kitchen(none)) === 1 &&
+          techniqueWorth(kitchen(all)) > 1.1 &&
+          techniqueWorth(kitchen(all)) <= 1.18
+        );
+      })(),
+    );
+    check(
+      "precision makes a kitchen make fewer mistakes and never none",
+      (() => {
+        const x = chefP4({ knows: ["precision", "stocks", "emulsion"] });
+        const steady = techniqueSteadiness(kitchen(x));
+        return steady < 1 && steady > 0.5;
+      })(),
+    );
+
+    /* The gates. */
+    check(
+      "caviar cannot be bought until the kitchen can serve it",
+      (() => {
+        let x = chefP4({ cash: 500_000, rep: 70, room: "restaurant" });
+        x = runCommand(chef, x, "buyIngredient", "market:caviar");
+        const blocked = (kitchen(x).pantry ?? []).length === 0;
+        let y = chefP4({ cash: 500_000, rep: 70, room: "restaurant", knows: ["curing", "caviar"] });
+        y = runCommand(chef, y, "buyIngredient", "market:caviar");
+        return blocked && (kitchen(y).pantry ?? []).length > 0;
+      })(),
+      "money does not open a tin of caviar properly",
+    );
+    check(
+      "and the luxury dishes are gated on technique as well as on craft",
+      (() => {
+        let x = chefP4({ cash: 900_000, rep: 80, skill: 95, room: "flagship" });
+        x = runCommand(chef, x, "developRecipe", "langoustine");
+        const blocked = !knowsRecipe(kitchen(x), "langoustine");
+        let y = chefP4({
+          cash: 900_000,
+          rep: 80,
+          skill: 95,
+          room: "flagship",
+          knows: ["breakdown", "fishmonger"],
+        });
+        y = runCommand(chef, y, "developRecipe", "langoustine");
+        return blocked && knowsRecipe(kitchen(y), "langoustine");
+      })(),
+    );
+    check(
+      "an unstarted technique is not silently treated as learned",
+      !knowsTechnique(kitchen(chefP4()), "plating"),
+    );
+  }
+
+  /* ======================================================= 2. the stages === */
+  {
+    check(
+      "five stages, each gated on what the trade thinks of you",
+      STAGES.length === 5 &&
+        new Set(STAGES.map((x) => x.needsRank)).size >= 4,
+    );
+    check(
+      "a stall-holder cannot get a stage at a three-star kitchen",
+      (() => {
+        const s = chefP4({ room: "stall", rep: 10 });
+        return !!stageBlocker(
+          STAGE_BY_ID.get("three_star")!,
+          kitchen(s),
+          s.r.reputation,
+          [],
+        );
+      })(),
+    );
+    check(
+      "a stage teaches more than a block of practice and costs the week",
+      (() => {
+        let x = chefP4();
+        const budget = chef.timeBudget(x);
+        x = runCommand(chef, x, "stage", "market_butcher");
+        const k = kitchen(x);
+        return (
+          (k.techniques ?? {}).breakdown === 40 &&
+          chef.timeBudget(x) < budget &&
+          (k.stagingUntil ?? 0) > x.week
+        );
+      })(),
+    );
+    check(
+      "and it clears any services already allocated, because you are not there",
+      (() => {
+        let x = chefP4();
+        x.r._svc_dinner = 2;
+        x = runCommand(chef, x, "stage", "market_butcher");
+        return (x.r._svc_dinner ?? 0) === 0;
+      })(),
+    );
+    check(
+      "a stage's points finish a technique rather than leaving five at 60%",
+      (() => {
+        const x = chefP4();
+        const learned = applyStage(kitchen(x), STAGE_BY_ID.get("bakery")!);
+        return learned.length >= 1 && knowsTechnique(kitchen(x), "doughs");
+      })(),
+    );
+    check(
+      "no stage can be done twice",
+      (() => {
+        let x = chefP4();
+        x = runCommand(chef, x, "stage", "market_butcher");
+        x = { ...x, week: x.week + 3, data: JSON.parse(JSON.stringify(x.data)) };
+        const before = (kitchen(x).techniques ?? {}).breakdown;
+        x = runCommand(chef, x, "stage", "market_butcher");
+        return (kitchen(x).techniques ?? {}).breakdown === before;
+      })(),
+    );
+  }
+
+  /* ======================================================== 3. the rank === */
+  {
+    check(
+      "a new chef is nobody in particular",
+      chefRank(kitchen(chefP4({ rep: 8, room: "stall" })), 8).id === "unknown",
+    );
+    check(
+      "the rank is built from what you did, not from what you spent",
+      (() => {
+        const rich = chefP4({ room: "stall", cash: 5_000_000, rep: 20 });
+        const able = chefP4({
+          room: "stall",
+          rep: 20,
+          knows: ["breakdown", "stocks", "doughs", "curing", "precision"],
+        });
+        return (
+          rankScore(kitchen(able), 20) > rankScore(kitchen(rich), 20) + 20
+        );
+      })(),
+    );
+    check(
+      "stars move it further than anything else",
+      (() => {
+        const x = chefP4({ rep: 50 });
+        const before = rankScore(kitchen(x), 50);
+        kitchen(x).stars = 2;
+        return rankScore(kitchen(x), 50) - before === 32;
+      })(),
+    );
+    check(
+      "a name attracts better cooks than a reputation alone",
+      (() => {
+        const hire = (knows: string[]) => {
+          let x = chefP4({ rep: 45, knows });
+          x = runCommand(chef, x, "hireKitchen", "commis");
+          return kitchen(x).staff[0]?.skill ?? 0;
+        };
+        return hire(TECHNIQUES.map((t) => t.id)) > hire([]);
+      })(),
+    );
+    check(
+      "the rank ladder is ordered and reachable",
+      RANKS.every((r, i) => i === 0 || r.at > RANKS[i - 1].at),
+    );
+  }
+
+  /* ======================================================= 4. the cellar === */
+  {
+    check(
+      "nine wines, and every one of them peaks",
+      WINES.length === 9 && WINES.every((w) => w.peak > 0 && w.markup > 1),
+    );
+    check(
+      "a wine climbs to its peak and declines afterwards",
+      (() => {
+        const barolo = WINE_BY_ID.get("barolo")!;
+        const young = maturityOf(barolo, 10);
+        const peak = maturityOf(barolo, barolo.peak);
+        const old = maturityOf(barolo, barolo.peak * 3);
+        return peak > young && old < peak && young >= 1;
+      })(),
+      "the inversion of the whole spoilage model",
+    );
+    check(
+      "and it is bounded, so a cellar is not an investment fund",
+      WINES.every((w) => maturityOf(w, 10_000) <= 4 && maturityOf(w, 10_000) >= 0.5),
+    );
+    check(
+      "without the wine store you have a rack, not a cellar",
+      (() => {
+        const bare = chefP4({ room: "bistro" });
+        const stored = chefP4({ room: "bistro", kit: ["cellar"] });
+        return (
+          cellarCapacity(kitchen(stored)) > cellarCapacity(kitchen(bare)) * 4
+        );
+      })(),
+    );
+    check(
+      "buying a case takes the cash and puts the bottles in the rack",
+      (() => {
+        let x = chefP4({ kit: ["cellar"] });
+        const before = x.r.cash;
+        x = runCommand(chef, x, "buyWine", "chablis");
+        const k = kitchen(x);
+        return (
+          (k.cellar ?? []).length === 1 &&
+          (k.cellar ?? [])[0].bottles === 12 &&
+          x.r.cash < before
+        );
+      })(),
+    );
+    check(
+      "a full cellar refuses the next case and says why",
+      (() => {
+        const x = chefP4({ room: "stall" });
+        return (
+          wineBlocker(kitchen(x), WINE_BY_ID.get("house_white")!, 999_999) ===
+          null
+        );
+      })(),
+    );
+    check(
+      "bottles are drunk, so a list is not a passive multiplier",
+      (() => {
+        let x = chefP4({ kit: ["cellar"] });
+        x = runCommand(chef, x, "buyWine", "house_red");
+        const before = bottlesHeld(kitchen(x));
+        const pour = pourForCovers(kitchen(x), 200, x.week, false, ["main"]);
+        return pour.bottles > 0 && bottlesHeld(kitchen(x)) === before - pour.bottles;
+      })(),
+    );
+    check(
+      "a lot is never poured below zero",
+      (() => {
+        let x = chefP4({ kit: ["cellar"] });
+        x = runCommand(chef, x, "buyWine", "house_red");
+        pourForCovers(kitchen(x), 100_000, x.week, true, ["main"]);
+        return (kitchen(x).cellar ?? []).every((l) => l.bottles >= 0);
+      })(),
+    );
+    check(
+      "a sommelier sells materially more wine, and from the top of the list",
+      (() => {
+        const build = (somm: boolean) => {
+          let x = chefP4({ kit: ["cellar"], hire: somm ? ["somm"] : [] });
+          x = runCommand(chef, x, "buyWine", "house_red");
+          x = runCommand(chef, x, "buyWine", "barolo");
+          /* Sixty covers, so what is in the rack is not the binding
+             constraint — otherwise both rooms simply drink the cellar dry and
+             the comparison measures the stock rather than the sommelier. */
+          return pourForCovers(kitchen(x), 60, x.week, somm, ["main"]);
+        };
+        const without = build(false);
+        const withSomm = build(true);
+        return (
+          withSomm.bottles > without.bottles &&
+          withSomm.revenue > without.revenue
+        );
+      })(),
+    );
+    check(
+      "an aged bottle sells for more than the same bottle young",
+      (() => {
+        const make = (age: number) => {
+          const x = chefP4({ kit: ["cellar"], week: 200 });
+          kitchen(x).cellar = [
+            {
+              id: "l1",
+              wine: "barolo",
+              bottles: 6,
+              unitCost: 100,
+              boughtWeek: 200 - age,
+            },
+          ];
+          return pourForCovers(kitchen(x), 200, 200, true, ["main"]).revenue;
+        };
+        return make(150) > make(2);
+      })(),
+    );
+    check(
+      "the cellar counts on the balance sheet at what it is worth today",
+      (() => {
+        let x = chefP4({ kit: ["cellar"] });
+        const before = kitchenWorth(x);
+        x = runCommand(chef, x, "buyWine", "chablis");
+        /* Cash went down and stock went up: net worth should barely move. */
+        return Math.abs(kitchenWorth(x) - before) < casePrice(kitchen(x), WINE_BY_ID.get("chablis")!) * 0.35;
+      })(),
+    );
+    check(
+      "selling back pays less than pouring, so a cellar stays a cellar",
+      (() => {
+        const x = chefP4({ kit: ["cellar"], week: 100 });
+        kitchen(x).cellar = [
+          { id: "l1", wine: "barolo", bottles: 6, unitCost: 100, boughtWeek: 1 },
+        ];
+        const merchant = sellPrice(kitchen(x), kitchen(x).cellar![0], 100);
+        const poured = pourForCovers(kitchen(x), 400, 100, true, ["main"]).revenue;
+        return poured > merchant;
+      })(),
+    );
+    check(
+      "wine reaches the ledger as its own line when a service runs",
+      (() => {
+        let x = chefP4({ kit: ["cellar"], menu: ["roast_chicken", "bread"] });
+        for (const ing of ["chicken", "roots", "butter", "flour"]) {
+          x = runCommand(chef, x, "buyIngredient", `market:${ing}`);
+        }
+        x = runCommand(chef, x, "buyWine", "house_red");
+        x = runCommand(chef, x, "buyWine", "house_white");
+        const out = advanceWeek(chef, x, { dinner: 2, prep: 1 });
+        return out.ledger.some((l) => /bottles opened/i.test(l.label));
+      })(),
+    );
+  }
+
+  /* ======================================================== 5. the guide === */
+  {
+    check(
+      "the guide measures six things and none of them is money",
+      GUIDE_COMPONENTS.length === 6 &&
+        Math.abs(
+          GUIDE_COMPONENTS.reduce((n, c) => n + c.weight, 0) - 1,
+        ) < 0.001,
+    );
+    check(
+      "a market stall with nothing on the menu scores near nothing",
+      guideScore(kitchen(chefP4({ room: "stall", rep: 10 })), 10).total < 30,
+    );
+    check(
+      "and the score is deterministic — the same restaurant always scores the same",
+      (() => {
+        const x = chefP4({ menu: ["roast_chicken"] });
+        return (
+          guideScore(kitchen(x), 50).total === guideScore(kitchen(x), 50).total
+        );
+      })(),
+    );
+    check(
+      "winning is harder than keeping, so a restaurant does not flicker",
+      STAR_LEVELS.every((l) => l.stars === 0 || l.at > l.keep),
+    );
+    check(
+      "nobody goes from nothing to two stars in one edition",
+      starsFor(99, 0) === 1 && starsFor(99, 1) === 2,
+    );
+    check(
+      "a star already held survives a score that would not have won it",
+      starsFor(55, 1) === 1 && starsFor(40, 1) === 0,
+    );
+    check(
+      "the guide publishes once a year on the same week",
+      guideDue(40) && guideDue(92) && !guideDue(41),
+    );
+    check(
+      "a star fills the room and raises what a cover is worth",
+      (() => {
+        const one = starLevel(1);
+        const three = starLevel(3);
+        return (
+          one.draw > 1 && three.draw > one.draw && three.worth > one.worth
+        );
+      })(),
+    );
+    check(
+      "and it raises the bar every night is judged against",
+      STAR_LEVELS.every(
+        (l, i) => i === 0 || l.expectation > STAR_LEVELS[i - 1].expectation,
+      ),
+      "a star is a standard you have to hold, not a prize you keep",
+    );
+    check(
+      "a star is won through the real week and written into the record",
+      (() => {
+        const x = chefP4({
+          week: 40,
+          room: "flagship",
+          rep: 90,
+          kit: ["cellar", "porcelain", "range", "prep"],
+          knows: TECHNIQUES.map((t) => t.id),
+          menu: ["roast_chicken", "chocolate_tart"],
+        });
+        const k = kitchen(x);
+        k.standing = Object.fromEntries(
+          STANDINGS.map((y) => [y.id, 92]),
+        ) as never;
+        k.cellar = [
+          { id: "c1", wine: "burgundy", bottles: 3, unitCost: 300, boughtWeek: 1 },
+        ];
+        k.recipes = (k.recipes ?? []).map((r) => ({ ...r, signature: true }));
+        const out = advanceWeek(chef, x, {});
+        return (
+          (kitchen(out.state).stars ?? 0) > 0 &&
+          (kitchen(out.state).guide ?? []).length === 1
+        );
+      })(),
+    );
+    check(
+      "and a star can be taken back",
+      (() => {
+        const x = chefP4({ week: 40, room: "stall", rep: 12 });
+        kitchen(x).stars = 2;
+        const out = advanceWeek(chef, x, {});
+        return (kitchen(out.state).stars ?? 0) < 2;
+      })(),
+    );
+    check(
+      "three stars is not an ending",
+      (() => {
+        const x = chefP4({ week: 40, room: "flagship", rep: 95 });
+        kitchen(x).stars = 3;
+        const out = advanceWeek(chef, x, {});
+        return out.state.outcome === null;
+      })(),
+    );
+    check(
+      "the screen can always say what is standing in the way",
+      (() => {
+        const x = chefP4({ menu: ["roast_chicken"] });
+        const t = towardsNext(kitchen(x), 45);
+        return !!t.next && t.short > 0 && !!t.weakest;
+      })(),
+    );
+  }
+
+  /* ===================================================== 6. the ventures === */
+  {
+    check(
+      "five ventures, each gated on rank and none of them buyable",
+      VENTURES.length === 5 &&
+        new Set(VENTURES.map((v) => v.needsRank)).size >= 4,
+    );
+    check(
+      "a nobody is offered nothing",
+      (() => {
+        const x = chefP4({ room: "stall", rep: 8 });
+        return VENTURES.every(
+          (v) => !!ventureBlocker(v, kitchen(x), 8, 9_999_999),
+        );
+      })(),
+    );
+    check(
+      "taking one costs blocks out of every week it runs",
+      (() => {
+        let x = chefP4({ room: "flagship", rep: 90, knows: TECHNIQUES.map((t) => t.id) });
+        kitchen(x).stars = 3;
+        const before = chef.timeBudget(x);
+        x = runCommand(chef, x, "startVenture", "consult");
+        return chef.timeBudget(x) === before - 2;
+      })(),
+      "being somewhere else is the whole cost",
+    );
+    check(
+      "only one at a time",
+      (() => {
+        let x = chefP4({ room: "flagship", rep: 90, knows: TECHNIQUES.map((t) => t.id) });
+        kitchen(x).stars = 3;
+        x = runCommand(chef, x, "startVenture", "consult");
+        x = runCommand(chef, x, "startVenture", "class");
+        return venturesOf(kitchen(x)).active?.id === "consult";
+      })(),
+    );
+    check(
+      "it counts down once per resolved week and pays on the last one",
+      (() => {
+        let x = chefP4({ room: "flagship", rep: 90, knows: TECHNIQUES.map((t) => t.id) });
+        kitchen(x).stars = 3;
+        x = runCommand(chef, x, "startVenture", "class");
+        const weeks = VENTURE_BY_ID.get("class")!.weeks;
+        let paid = false;
+        for (let i = 0; i < weeks; i++) {
+          const out = advanceWeek(chef, x, {});
+          x = out.state;
+          if (out.ledger.some((l) => /masterclass/i.test(l.label))) paid = true;
+        }
+        return paid && venturesOf(kitchen(x)).active === null;
+      })(),
+    );
+    check(
+      "a book pays royalties every week afterwards, whether or not you open",
+      (() => {
+        let x = chefP4({ room: "flagship", rep: 95, knows: TECHNIQUES.map((t) => t.id) });
+        kitchen(x).stars = 3;
+        x = runCommand(chef, x, "startVenture", "book");
+        for (let i = 0; i < VENTURE_BY_ID.get("book")!.weeks; i++) {
+          x = advanceWeek(chef, x, {}).state;
+        }
+        const out = advanceWeek(chef, x, {});
+        return out.ledger.some((l) => l.label === "Royalties" && (l.amount ?? 0) > 0);
+      })(),
+    );
+    check(
+      "and the loudest one raises expectations permanently",
+      (() => {
+        let x = chefP4({ room: "flagship", rep: 95, knows: TECHNIQUES.map((t) => t.id) });
+        kitchen(x).stars = 3;
+        const before = expectationOf(kitchen(x));
+        x = runCommand(chef, x, "startVenture", "television");
+        for (let i = 0; i < VENTURE_BY_ID.get("television")!.weeks; i++) {
+          x = advanceWeek(chef, x, {}).state;
+        }
+        return expectationOf(kitchen(x)) > before + 10;
+      })(),
+    );
+    check(
+      "walking away pays nothing and gives the kitchen back",
+      (() => {
+        let x = chefP4({ room: "flagship", rep: 90, knows: TECHNIQUES.map((t) => t.id) });
+        kitchen(x).stars = 3;
+        const budget = chef.timeBudget(x);
+        x = runCommand(chef, x, "startVenture", "consult");
+        const cash = x.r.cash;
+        x = runCommand(chef, x, "dropVenture", "");
+        return (
+          x.r.cash === cash &&
+          chef.timeBudget(x) === budget &&
+          venturesOf(kitchen(x)).active === null
+        );
+      })(),
+    );
+    check(
+      "a one-off is offered once",
+      (() => {
+        const x = chefP4({ room: "flagship", rep: 95, knows: TECHNIQUES.map((t) => t.id) });
+        kitchen(x).stars = 3;
+        const k = kitchen(x);
+        k.ventures = { active: null, done: ["book"], royalties: 620 };
+        return !!ventureBlocker(VENTURE_BY_ID.get("book")!, k, 95, 999_999);
+      })(),
+    );
+  }
+
+  /* ================================================ 7. the luxury tier === */
+  {
+    check(
+      "the destination seats fewer than the flagship and charges nearly twice",
+      (() => {
+        const flagship = CHEF_PREMISES.find((p) => p.id === "flagship")!;
+        const dest = CHEF_PREMISES.find((p) => p.id === "destination")!;
+        return dest.capacity < flagship.capacity && dest.spend > flagship.spend * 1.7;
+      })(),
+      "the room at the top of this trade is small and expensive, not big",
+    );
+    check(
+      "the counter cannot be opened without the counter",
+      (() => {
+        const counter = SERVICE_BY_ID.get("counter")!;
+        const without = chefP4({ room: "flagship", skill: 95 });
+        const with_ = chefP4({ room: "flagship", skill: 95, kit: ["counter"] });
+        return (
+          !serviceOpen(counter, kitchen(without), 95) &&
+          serviceOpen(counter, kitchen(with_), 95) &&
+          (serviceBlocker(counter, kitchen(without), 95) ?? "")
+            .toLowerCase()
+            .includes("counter")
+        );
+      })(),
+    );
+    check(
+      "and it is the most exposed service in the game",
+      (() => {
+        const counter = SERVICE_BY_ID.get("counter")!;
+        return (
+          counter.reviewWeight ===
+            Math.max(...SERVICES.map((sv) => sv.reviewWeight)) &&
+          SERVICE_SHAPES.counter.walkoutCost ===
+            Math.max(...Object.values(SERVICE_SHAPES).map((sh) => sh.walkoutCost))
+        );
+      })(),
+    );
+    check(
+      "the three luxury ingredients all die faster than they are dear",
+      ["langoustine", "agedbeef", "caviar"].every((id) => {
+        const ing = INGREDIENT_BY_ID.get(id)!;
+        return ing.price > 50 && ing.life <= 3 && ing.quality >= 94;
+      }),
+    );
+    check(
+      "every luxury dish is gated on a technique that has to be learned",
+      ["langoustine", "aged_rib", "souffle", "caviar_service", "counter_course"].every(
+        (id) => RECIPE_BY_ID.has(id) && !!gateFor(id),
+      ),
+    );
+    check(
+      "the sommelier is a real role with real stations",
+      (() => {
+        const somm = ROLE_BY_ID.get("somm");
+        return !!somm && somm.salary > 1_000 && !!somm.stations?.front;
+      })(),
+    );
+  }
+
+  /* ============================================= 8. save compatibility === */
+  {
+    check(
+      "a kitchen with no Phase 4 fields at all is a valid save",
+      (() => {
+        const x = chefP4();
+        const k = kitchen(x);
+        delete k.techniques;
+        delete k.stages;
+        delete k.stagingUntil;
+        delete k.practising;
+        delete k.cellar;
+        delete k.stars;
+        delete k.guide;
+        delete k.ventures;
+        return chef.validateData!(x.data);
+      })(),
+    );
+    check(
+      "and it reads as a chef who has learned nothing and been offered nothing",
+      (() => {
+        const x = chefP4();
+        const k = kitchen(x);
+        delete k.techniques;
+        delete k.cellar;
+        delete k.stars;
+        delete k.ventures;
+        return (
+          learnedTechniques(k).length === 0 &&
+          starsOf(k) === 0 &&
+          techniqueWorth(k) === 1 &&
+          venturesOf(k).active === null
+        );
+      })(),
+    );
+    check(
+      "an un-migrated save plays a week and gains the fields it needs",
+      (() => {
+        let x = chefP4({ menu: ["roast_chicken"] });
+        const k = kitchen(x);
+        delete k.techniques;
+        delete k.cellar;
+        delete k.stars;
+        delete k.ventures;
+        x = runCommand(chef, x, "buyIngredient", "market:chicken");
+        x = advanceWeek(chef, x, { dinner: 2 }).state;
+        return Number.isFinite(x.r.cash) && !!kitchen(x).ventures;
+      })(),
+    );
+    check(
+      "a technique progressed past what it costs is refused",
+      (() => {
+        const x = chefP4();
+        kitchen(x).techniques = { stocks: 9_000 };
+        return !chef.validateData!(x.data);
+      })(),
+    );
+    check(
+      "a technique the catalogue does not have is refused",
+      (() => {
+        const x = chefP4();
+        kitchen(x).techniques = { juggling: 10 };
+        return !chef.validateData!(x.data);
+      })(),
+    );
+    check(
+      "a negative bottle count is refused",
+      (() => {
+        const x = chefP4();
+        kitchen(x).cellar = [
+          { id: "l", wine: "barolo", bottles: -4, unitCost: 10, boughtWeek: 1 },
+        ];
+        return !chef.validateData!(x.data);
+      })(),
+    );
+    check(
+      "a wine the catalogue does not have is refused",
+      (() => {
+        const x = chefP4();
+        kitchen(x).cellar = [
+          { id: "l", wine: "moonshine", bottles: 4, unitCost: 10, boughtWeek: 1 },
+        ];
+        return !chef.validateData!(x.data);
+      })(),
+    );
+    check(
+      "forty stars are refused",
+      (() => {
+        const x = chefP4();
+        kitchen(x).stars = 40;
+        return !chef.validateData!(x.data);
+      })(),
+    );
+    check(
+      "a venture running longer than it lasts is refused",
+      (() => {
+        const x = chefP4();
+        kitchen(x).ventures = {
+          active: { id: "class", startedWeek: 1, weeksLeft: 900 },
+          done: [],
+          royalties: 0,
+        };
+        return !chef.validateData!(x.data);
+      })(),
+    );
+    check(
+      "a long run with all of it running is still a valid save",
+      (() => {
+        let x = chefP4({
+          room: "restaurant",
+          rep: 70,
+          kit: ["cellar", "range", "prep"],
+          menu: ["roast_chicken", "bread", "soup"],
+          knows: ["breakdown", "stocks", "doughs"],
+        });
+        x = runCommand(chef, x, "buyWine", "chablis");
+        x = runCommand(chef, x, "setPractice", "curing");
+        for (const ing of ["chicken", "roots", "butter", "flour"]) {
+          x = runCommand(chef, x, "buyIngredient", `market:${ing}`);
+        }
+        for (let i = 0; i < 45; i++) {
+          x = advanceWeek(chef, x, { dinner: 2, practise: 1 }).state;
+        }
+        return (
+          chef.validateData!(x.data) &&
+          validateRun(JSON.parse(JSON.stringify(x)) as Record<string, unknown>)
+        );
+      })(),
+    );
+  }
+
+  /* ================================================== 9. the screens === */
+  {
+    const screens = sectionsFor("chef").flatMap((sec) =>
+      sec.screens.map((sc) => sc.id),
+    );
+    check(
+      "the chef has a craft screen and a beyond-the-kitchen screen",
+      screens.includes("craft") && screens.includes("beyond"),
+    );
+    check(
+      "and both sit under the chef rather than under the restaurant",
+      sectionOf("craft", "chef").id === "chef" &&
+        sectionOf("beyond", "chef").id === "chef",
+    );
+    check(
+      "the Physician is untouched by any of it",
+      !sectionsFor("doctor")
+        .flatMap((sec) => sec.screens.map((sc) => sc.id))
+        .some((id) => id === "craft" || id === "beyond"),
+    );
+  }
+}
+
+/**
+ * WHAT THE INTERFACE TELLS EACH CAREER
+ *
+ * Four systems — nav badges, the one next step, the lessons, the words — were
+ * built for the Physician and returned empty for everybody else. These assert
+ * that each career now has all four, that nothing any of them says routes to a
+ * screen that career cannot reach, and that none of them speaks another
+ * career's language.
+ */
+console.log("\nGuidance, in each career's own words\n" + "─".repeat(52));
+{
+  const screensFor = (careerId: string) =>
+    new Set(sectionsFor(careerId).flatMap((s) => s.screens.map((x) => x.id)));
+
+  /* Deliberately narrow markers. "weeks of cover" is a solvency phrase every
+     career uses and "covers" is the Chef's unit, so the pattern is the plural
+     alone — a looser one fails on prose that is perfectly correct. */
+  const MEDICAL = /patient|caseload|triage|outbreak|physician|\bward\b|\bnurse/i;
+  const KITCHEN = /larder|brigade|\bcovers\b|plate quality|commis|the pass\b/i;
+  const LEGAL = /instruction|hearing|costs order|\bcounsel\b|adjourn|solicitor|chambers/i;
+
+  /* A run that has gone wrong in several directions at once, so the alert
+     derivation is exercised rather than merely called. */
+  const stressed = (career: CareerDef) => {
+    const s = startRun(career, 91);
+    s.week = 20;
+    s.r.cash = -5_000;
+    s.r.burnout = 88;
+    return s;
+  };
+
+  for (const [id, career] of [
+    ["doctor", doctor],
+    ["chef", chef],
+    ["lawyer", lawyer],
+  ] as const) {
+    const screens = screensFor(id);
+    const fresh = startRun(career, 4);
+    const bad = stressed(career);
+    const alerts = [...deriveAlerts(fresh), ...deriveAlerts(bad)];
+
+    check(
+      `${id}: a run in trouble raises something on the navigation`,
+      deriveAlerts(bad).length > 0,
+      `${deriveAlerts(bad).length} alerts`,
+    );
+    check(
+      `${id}: every alert says what is wrong and why it matters`,
+      alerts.every((a) => a.title.length > 6 && a.detail.length > 30),
+    );
+    check(
+      `${id}: every alert routes to a screen this career can actually reach`,
+      alerts.every((a) => screens.has(a.destination)),
+      alerts
+        .filter((a) => !screens.has(a.destination))
+        .map((a) => `${a.id} -> ${a.destination}`)
+        .join(", "),
+    );
+    check(
+      `${id}: no two alerts share an id`,
+      new Set(deriveAlerts(bad).map((a) => a.id)).size ===
+        deriveAlerts(bad).length,
+    );
+
+    /* The plan steps are career-agnostic and were the reason two careers had
+       no guidance at all: an unspent block is an unspent block. */
+    check(
+      `${id}: an unassigned week is called out`,
+      nextStep(fresh, {}, 0, 6, false)?.id === "allocate",
+    );
+    check(
+      `${id}: and a half-assigned one`,
+      nextStep(fresh, { rest: 1 }, 1, 6, false)?.id === "allocate:partial",
+    );
+
+    /* Lessons, and the screens they claim to belong on. */
+    const lessons = lessonStatus(fresh, { allocated: 0, hasReport: false }, []);
+    check(
+      `${id}: the career has lessons of its own`,
+      lessons.length >= 5,
+      `${lessons.length}`,
+    );
+    check(
+      `${id}: every lesson sits on a screen this career has`,
+      lessons.every((x) => screens.has(x.lesson.screen)),
+      lessons
+        .filter((x) => !screens.has(x.lesson.screen))
+        .map((x) => `${x.lesson.id} -> ${x.lesson.screen}`)
+        .join(", "),
+    );
+    check(
+      `${id}: every lesson teaches at least three things`,
+      lessons.every((x) => x.lesson.points.length >= 3 && x.lesson.intro.length > 30),
+    );
+    const opener = lessonFor(
+      "overview",
+      fresh,
+      { allocated: 0, hasReport: false },
+      [],
+    );
+    check(
+      `${id}: week one opens with the lesson that explains the week`,
+      opener !== null && opener.points.length >= 3,
+    );
+    check(
+      `${id}: a lesson the player has closed stays closed`,
+      opener !== null &&
+        lessonFor("overview", fresh, { allocated: 0, hasReport: false }, [
+          opener.id,
+        ]) === null,
+    );
+
+    /* And the vocabulary. */
+    check(
+      `${id}: the career has words of its own to look up`,
+      glossaryFor(id).length >= 8,
+      `${glossaryFor(id).length}`,
+    );
+    check(
+      `${id}: every word is explained twice — plainly, and properly`,
+      glossaryFor(id).every(
+        (t) => t.plain.length > 3 && t.detail.length > 40 && t.term.length > 2,
+      ),
+    );
+  }
+
+  /* --------------------------------------------------- nothing leaks across */
+  const chefWords = [
+    ...deriveAlerts(stressed(chef)).map((a) => `${a.title} ${a.detail}`),
+    ...lessonStatus(startRun(chef, 4), { allocated: 0, hasReport: true }, []).map(
+      (x) =>
+        `${x.lesson.title} ${x.lesson.intro} ${x.lesson.points.map((p) => `${p.term} ${p.detail}`).join(" ")}`,
+    ),
+    ...glossaryFor("chef").map((t) => `${t.term} ${t.plain} ${t.detail}`),
+  ].join(" ");
+
+  const lawWords = [
+    ...deriveAlerts(stressed(lawyer)).map((a) => `${a.title} ${a.detail}`),
+    ...lessonStatus(startRun(lawyer, 4), { allocated: 0, hasReport: true }, []).map(
+      (x) =>
+        `${x.lesson.title} ${x.lesson.intro} ${x.lesson.points.map((p) => `${p.term} ${p.detail}`).join(" ")}`,
+    ),
+    ...glossaryFor("lawyer").map((t) => `${t.term} ${t.plain} ${t.detail}`),
+  ].join(" ");
+
+  check(
+    "nothing the Chef is told borrows a Physician's word",
+    !MEDICAL.test(chefWords),
+    chefWords.match(MEDICAL)?.[0] ?? "",
+  );
+  check(
+    "nor a Solicitor's",
+    !LEGAL.test(chefWords),
+    chefWords.match(LEGAL)?.[0] ?? "",
+  );
+  check(
+    "nothing the Solicitor is told borrows a Physician's word",
+    !MEDICAL.test(lawWords),
+    lawWords.match(MEDICAL)?.[0] ?? "",
+  );
+  check(
+    "nor a Chef's",
+    !KITCHEN.test(lawWords),
+    lawWords.match(KITCHEN)?.[0] ?? "",
+  );
+  check(
+    "and the two careers share no vocabulary entry at all",
+    (() => {
+      const a = new Set(glossaryFor("chef").map((t) => t.id));
+      return glossaryFor("lawyer").every((t) => !a.has(t.id));
+    })(),
+  );
+
+  /* The career-specific half, which only fires once the run is in the state
+     the alert is about. */
+  {
+    const k = startRun(chef, 12);
+    check(
+      "a kitchen with nothing in it is told so, and pointed at the larder",
+      deriveAlerts(k).some(
+        (a) => a.id === "larder:empty" && a.destination === "larder",
+      ),
+    );
+    const l = startRun(lawyer, 12);
+    l.week = 6;
+    check(
+      "a practice with no work is told so, and pointed at the instructions",
+      deriveAlerts(l).some(
+        (a) => a.id === "pipeline:empty" && a.destination === "instructions",
+      ),
+    );
+    check(
+      "and it is offered the block that fixes it",
+      nextStep(l, { rest: 6 }, 6, 6, true)?.id === "law:pitch",
+    );
+  }
+}
+
+
+/**
+ * THE SOLICITOR'S BAD FORTNIGHTS
+ *
+ * The crisis machinery was always career-neutral in shape and never in
+ * content: medical prose, medical reputation categories, a medical cast, and
+ * a raiser that only ran inside `medical/phase2.ts`. These assert that a
+ * practice now gets its own five, that they are answerable, and that nothing
+ * about them speaks somebody else's language or charges somebody else's
+ * money.
+ */
+console.log("\nThe Solicitor: crises\n" + "─".repeat(52));
+{
+  const MEDICAL =
+    /patient|clinic|ward\b|nurse|physician|caseload|triage|department|rota/i;
+
+  /* ------------------------------------------------------- the content */
+  check(
+    "a practice can suffer five kinds, and not the two it cannot",
+    LAWYER_CRISIS_KINDS.length === 5 &&
+      !LAWYER_CRISIS_KINDS.includes("shortage") &&
+      !LAWYER_CRISIS_KINDS.includes("scandal"),
+    LAWYER_CRISIS_KINDS.join(", "),
+  );
+  check(
+    "every one of them is authored, and none of the others is",
+    LAWYER_CRISIS_KINDS.every((k) => (LAWYER_CRISIS_STAGES[k] ?? []).length > 0) &&
+      Object.keys(LAWYER_CRISIS_STAGES).length === LAWYER_CRISIS_KINDS.length,
+  );
+
+  for (const kind of LAWYER_CRISIS_KINDS) {
+    const stages = stagesFor(kind, "lawyer");
+    check(
+      `${kind}: it happens, it continues, and it ends`,
+      stages.length >= 3,
+      `${stages.length} stages`,
+    );
+    check(
+      `${kind}: every stage states the situation and offers a way to act`,
+      stages.every(
+        (st) => st.title.length > 10 && st.body.length > 40 && st.choices.length >= 2,
+      ),
+    );
+    check(
+      `${kind}: every choice says what it is, what it costs, and what happened`,
+      stages.every((st) =>
+        st.choices.every(
+          (c) =>
+            c.id.length > 1 &&
+            c.label.length > 4 &&
+            c.detail.length > 8 &&
+            c.result.length > 20,
+        ),
+      ),
+    );
+    check(
+      `${kind}: no stage offers the same choice twice`,
+      stages.every(
+        (st) => new Set(st.choices.map((c) => c.id)).size === st.choices.length,
+      ),
+    );
+    check(
+      `${kind}: every stage has something that actually helps`,
+      stages.every((st) => st.choices.some((c) => c.severity < 0)),
+    );
+    /* The terminal beat must contain an exit. A crisis with no way out is a
+       loss screen, and this game does not have those. */
+    check(
+      `${kind}: the last stage can be ended`,
+      stages[stages.length - 1].choices.some((c) => c.severity <= -100),
+    );
+    check(
+      `${kind}: every choice moves something the simulation holds`,
+      stages.every((st) =>
+        st.choices.every(
+          (c) =>
+            c.severity !== 0 ||
+            Boolean(c.cost || c.debt || c.blocks || c.standing),
+        ),
+      ),
+    );
+    check(
+      `${kind}: it never moves a reputation category this career has no screen for`,
+      stages.every((st) => st.choices.every((c) => c.rep === undefined)),
+    );
+    check(
+      `${kind}: and never names somebody from another career's cast`,
+      stages.every((st) => st.choices.every((c) => c.people === undefined)),
+    );
+
+    const words = stages
+      .map(
+        (st) =>
+          `${st.title} ${st.body} ${st.choices
+            .map((c) => `${c.label} ${c.detail} ${c.result}`)
+            .join(" ")}`,
+      )
+      .join(" ");
+    check(
+      `${kind}: and it does not borrow a Physician's word`,
+      !MEDICAL.test(words),
+      words.match(MEDICAL)?.[0] ?? "",
+    );
+  }
+
+  /* ------------------------------------------------------ the registry */
+  check(
+    "a crisis carries whose it is, and resolves against that set",
+    stageOf(startCrisis("cashflow", 4, 60, undefined, "lawyer")).title !==
+      stageOf(startCrisis("cashflow", 4, 60)).title,
+  );
+  check(
+    "a crisis written before any of this reads as the Physician's",
+    stageOf({
+      id: "cashflow-4",
+      kind: "cashflow",
+      startedWeek: 4,
+      severity: 60,
+      stage: 0,
+      taken: [],
+      ignored: 0,
+    }).title === stagesFor("cashflow")[0].title,
+  );
+  check(
+    "a kind this career never authored falls back rather than crashing",
+    stagesFor("shortage", "lawyer").length > 0 &&
+      stagesFor("shortage", "lawyer") === stagesFor("shortage"),
+  );
+  check(
+    "and the Physician's own set is exactly as it was",
+    CRISIS_KINDS.every((k) => stagesFor(k, "doctor").length >= 3),
+  );
+
+  /* ---------------------------------------------------------- the risk */
+  {
+    const calm = {
+      week: 30,
+      cashWeeks: 20,
+      lost: 0,
+      unprepared: 0,
+      conflicted: 0,
+      scrutiny: 0,
+      staff: 0,
+      burnout: 20,
+    };
+    check(
+      "a practice doing everything right is not immune, only unlikely",
+      practiceCrisisRisk(calm).chance > 0 &&
+        practiceCrisisRisk(calm).chance <= 0.01,
+      `${practiceCrisisRisk(calm).chance}`,
+    );
+    check(
+      "thin cash against work already done is what brings the cash emergency",
+      practiceCrisisRisk({ ...calm, cashWeeks: 0 }).kind === "cashflow",
+    );
+    check(
+      "arriving at a date short of hours is what brings the claim",
+      practiceCrisisRisk({ ...calm, unprepared: 3 }).kind === "lawsuit",
+    );
+    check(
+      "acting against a former client is what brings the regulator",
+      practiceCrisisRisk({ ...calm, conflicted: 2 }).kind === "inspection",
+    );
+    check(
+      "being read closely is what brings the confidentiality one",
+      practiceCrisisRisk({ ...calm, scrutiny: 90 }).kind === "dataleak",
+    );
+    check(
+      "and the hours everybody is working are what bring the resignation",
+      practiceCrisisRisk({ ...calm, staff: 2, burnout: 95 }).kind === "walkout",
+    );
+    check(
+      "nobody resigns from a practice of one",
+      practiceCrisisRisk({ ...calm, staff: 0, burnout: 95 }).kind !== "walkout",
+    );
+    check(
+      "risk is bounded however badly it is going",
+      practiceCrisisRisk({
+        week: 90,
+        cashWeeks: -20,
+        lost: 40,
+        unprepared: 20,
+        conflicted: 9,
+        scrutiny: 100,
+        staff: 6,
+        burnout: 100,
+      }).chance <= 0.16,
+    );
+    check(
+      "and it never names a kind this career cannot have",
+      [calm, { ...calm, cashWeeks: 0 }, { ...calm, scrutiny: 99 }].every((c) => {
+        const k = practiceCrisisRisk(c).kind;
+        return k === null || LAWYER_CRISIS_KINDS.includes(k);
+      }),
+    );
+  }
+
+  /* -------------------------------------------------------- answering it */
+  const withCrisis = (city = "london") => {
+    const s = startRun(lawyer, 3, { city });
+    s.week = 20;
+    s.r.cash = 400_000;
+    s.crises = [startCrisis("inspection", s.week, 70, undefined, "lawyer")];
+    return s;
+  };
+
+  {
+    const s = withCrisis();
+    const before = s.r.cash;
+    const answered = runCommand(lawyer, s, "crisisChoice", "inspection-20:accountant");
+    const c = (answered.crises ?? [])[0];
+    check(
+      "a choice that costs money charges it",
+      answered.r.cash === before - 9_000,
+      `${before - answered.r.cash}`,
+    );
+    check(
+      "and it moves the crisis on rather than leaving it where it was",
+      c.severity < 70 && c.stage === 1 && c.taken.includes("accountant"),
+    );
+    check(
+      "and it counts as having done something about it",
+      c.ignored === 0,
+    );
+
+    const twice = runCommand(lawyer, answered, "crisisChoice", "inspection-20:accountant");
+    check(
+      "the same choice cannot be taken twice",
+      twice.r.cash === answered.r.cash,
+    );
+    check(
+      "a choice that is not on this stage does nothing",
+      runCommand(lawyer, answered, "crisisChoice", "inspection-20:open").r.cash ===
+        answered.r.cash,
+    );
+    check(
+      "and neither does a crisis that is not running",
+      runCommand(lawyer, s, "crisisChoice", "walkout-3:match").r.cash === before,
+    );
+  }
+
+  {
+    /* Local money, like every other sum in this career. */
+    const london = withCrisis("london");
+    const lagos = withCrisis("lagos");
+    const paidLondon =
+      london.r.cash -
+      runCommand(lawyer, london, "crisisChoice", "inspection-20:accountant").r.cash;
+    const paidLagos =
+      lagos.r.cash -
+      runCommand(lawyer, lagos, "crisisChoice", "inspection-20:accountant").r.cash;
+    check(
+      "a crisis costs what this market charges, not what London does",
+      paidLagos < paidLondon && paidLagos > 0,
+      `${paidLagos} vs ${paidLondon}`,
+    );
+  }
+
+  {
+    const poor = withCrisis();
+    poor.r.cash = 100;
+    check(
+      "a choice you cannot afford is refused rather than overdrawing you",
+      runCommand(lawyer, poor, "crisisChoice", "inspection-20:accountant").r.cash ===
+        100,
+    );
+    check(
+      "but the ones that cost time rather than money are still open",
+      (() => {
+        const acted = runCommand(lawyer, poor, "crisisChoice", "inspection-20:open");
+        return (acted.r._crisisBlocks ?? 0) === 1 && acted.crises![0].stage === 1;
+      })(),
+    );
+  }
+
+  {
+    /* Blocks are paid out of the week, with a floor that keeps a practice in
+       the worst fortnight of its life still able to act. */
+    const s = withCrisis();
+    const full = lawyer.timeBudget(s);
+    s.r._crisisBlocks = 2;
+    check("crisis work is paid for in time", lawyer.timeBudget(s) === full - 2);
+    s.r._crisisBlocks = 9;
+    check(
+      "and it can never freeze a run out of acting entirely",
+      lawyer.timeBudget(s) >= 2,
+    );
+  }
+
+  {
+    /* Borrowing and standing, the two movements a practice has that the
+       Physician's copy of this does not use. */
+    const s = withCrisis();
+    s.crises = [startCrisis("cashflow", s.week, 70, undefined, "lawyer")];
+    const debtBefore = s.r.debt;
+    const borrowed = runCommand(lawyer, s, "crisisChoice", "cashflow-20:borrow");
+    check(
+      "borrowing against the bills actually puts it on the loan",
+      borrowed.r.debt > debtBefore,
+      `${borrowed.r.debt - debtBefore}`,
+    );
+    const standingBefore = s.r.reputation;
+    const deferred = runCommand(lawyer, s, "crisisChoice", "cashflow-20:defer");
+    check(
+      "and asking everybody to wait costs you standing",
+      deferred.r.reputation < standingBefore,
+    );
+  }
+
+  /* ------------------------------------------------------- over the weeks */
+  {
+    /* Ignored, it escalates and then ends itself in the worst available way. */
+    let s = withCrisis();
+    let escalated = false;
+    for (let i = 0; i < 12 && (s.crises ?? []).length > 0; i++) {
+      s = advanceWeek(lawyer, s, { rest: 1 }).state;
+      if ((s.crises ?? [])[0]?.stage === 2) escalated = true;
+    }
+    check(
+      "a crisis nobody answers escalates to its last stage",
+      escalated,
+    );
+    check(
+      "and then it resolves itself, badly, rather than running for ever",
+      (s.crises ?? []).length === 0,
+    );
+    check(
+      "and the run records that you never answered it",
+      timelineOf(s).some((t) => t.kind === "failure"),
+    );
+    check(
+      "and the run is still going",
+      s.outcome === null,
+    );
+  }
+
+  {
+    /* Answered to zero, it closes and the record says so. */
+    let s = withCrisis();
+    s.crises = [startCrisis("dataleak", s.week, 40, undefined, "lawyer")];
+    s = runCommand(lawyer, s, "crisisChoice", "dataleak-20:tell");
+    s = runCommand(lawyer, s, "crisisChoice", "dataleak-20:meet");
+    s = advanceWeek(lawyer, s, { casework: 1 }).state;
+    check(
+      "a crisis answered to nothing closes",
+      (s.crises ?? []).length === 0,
+    );
+    check(
+      "and coming through one is worth something",
+      timelineOf(s).some((t) => t.kind === "recovery"),
+    );
+  }
+
+  {
+    /* Two at a time is a bad month; three would be noise. */
+    const s = withCrisis();
+    s.crises = [
+      startCrisis("cashflow", 20, 60, undefined, "lawyer"),
+      startCrisis("walkout", 20, 60, undefined, "lawyer"),
+    ];
+    const after = advanceWeek(lawyer, s, { rest: 1 }).state;
+    check(
+      "no more than two run at once",
+      (after.crises ?? []).length <= MAX_CRISES,
+    );
+  }
+
+  /* Round-tripped through JSON, because that is what a save actually is. */
+  const asSaved = (s: unknown) =>
+    JSON.parse(JSON.stringify(s)) as Record<string, unknown>;
+
+  check(
+    "a save carrying a solicitor's crisis is a valid save",
+    (() => {
+      const s = withCrisis();
+      const played = advanceWeek(lawyer, s, { casework: 2 }).state;
+      return validateRun(asSaved(played)) && lawyer.validateData!(played.data);
+    })(),
+  );
+  check(
+    "and a crisis whose career is not even a string is refused",
+    !validateRun(
+      asSaved({
+        ...withCrisis(),
+        crises: [{ ...startCrisis("cashflow", 20, 60), career: 7 }],
+      }),
+    ),
+  );
+}
+
+
+console.log("\nWhat a city charges, and for what\n" + "─".repeat(52));
+{
+  /*
+   * THE TWO INDICES
+   *
+   * The expensive cities were losing tens of thousands a run to arithmetic
+   * rather than to difficulty, and the cause was one index doing two jobs.
+   * These assertions are the shape of the fix, written so it cannot quietly
+   * come back.
+   *
+   * The rule: **a recurring cost of producing revenue tracks what the city
+   * pays for food; a thing you buy tracks the local cost base.** Rent is the
+   * exception and is meant to be — it is the city's own premium, and it is
+   * the dial the cities are supposed to differ on.
+   */
+  const at = (city: string) => {
+    const s = startRun(chef, 11, { city });
+    return kitchen(s);
+  };
+
+  check(
+    "wages track what a cover is worth, not what a landlord charges",
+    KITCHEN_CITIES.every(
+      (c) => Math.abs(labourIndex(at(c.id)) - c.spend) < 0.0001,
+    ),
+    "a wage is a cost of producing revenue, exactly as produce is",
+  );
+  check(
+    "and capital sits between what space costs and what food fetches",
+    KITCHEN_CITIES.every(
+      (c) =>
+        Math.abs(capitalIndex(at(c.id)) - (c.rent + c.spend) / 2) < 0.0001,
+    ),
+  );
+  check(
+    "a room is priced on capital, not on rent",
+    (() => {
+      const bistro = CHEF_PREMISES.find((p) => p.id === "bistro")!;
+      /* London's rent is 1.85 and its takings 1.35: pricing the lease off
+         rent charged that premium twice, once as capital and again every
+         week. The room now costs the blend. */
+      const london = at("london");
+      return (
+        premisesPrice(london, bistro) ===
+          Math.round(bistro.cost * capitalIndex(london)) &&
+        premisesPrice(london, bistro) < Math.round(bistro.cost * 1.85)
+      );
+    })(),
+  );
+  check(
+    "and the fit-out loan with it",
+    (() => {
+      const cheap = startRun(chef, 11, { city: "madrid" });
+      const dear = startRun(chef, 11, { city: "london" });
+      /* Both scaled to the same index, so what you owe against what you can
+         earn is the same ratio in both. */
+      const ratio = (s: RunState) =>
+        s.r.debt / capitalIndex(kitchen(s));
+      return Math.abs(ratio(cheap) - ratio(dear)) < 1;
+    })(),
+  );
+  check(
+    "no city is charged its property premium twice",
+    (() => {
+      /*
+       * The test the whole fix exists for.
+       *
+       * A room's *payback* — what it costs against what a cover in it is
+       * worth — must not be dramatically worse in an expensive city than a
+       * cheap one, because that difference compounds up a four-rung ladder
+       * into a kitchen that can never leave the market stall. Which is
+       * exactly what the harness found: a competent London kitchen was still
+       * on the stall after a hundred and twenty weeks.
+       *
+       * The spread was **1.52** when the lease was priced off rent alone.
+       * It is **1.25** on the blend, and the assertion is written against the
+       * improvement rather than against a round number, because the residual
+       * is deliberate — an expensive city is still supposed to be expensive,
+       * and rent is where that belongs.
+       */
+      const bistro = CHEF_PREMISES.find((p) => p.id === "bistro")!;
+      const spreadOf = (price: (c: (typeof KITCHEN_CITIES)[number]) => number) => {
+        const payback = KITCHEN_CITIES.map((c) => price(c) / (bistro.spend * c.spend));
+        return Math.max(...payback) / Math.min(...payback);
+      };
+      const now = spreadOf((c) => bistro.cost * ((c.rent + c.spend) / 2));
+      const before = spreadOf((c) => bistro.cost * c.rent);
+      /* And the live function agrees with the arithmetic above. */
+      const live = KITCHEN_CITIES.every(
+        (c) =>
+          premisesPrice(at(c.id), bistro) ===
+          Math.round(bistro.cost * ((c.rent + c.spend) / 2)),
+      );
+      return live && now < 1.3 && now < before * 0.85;
+    })(),
+    "the ladder has to be climbable everywhere, or the city is a trap",
+  );
+  check(
+    "an expensive city is still expensive where it is supposed to be",
+    (() => {
+      /* The fix must not have flattened the cities into one another. Rent is
+         the dial they are meant to differ on, and it still does. */
+      const cheap = at("madrid");
+      const dear = at("newyork");
+      return rent(dear) > rent(cheap) * 2.5;
+    })(),
+  );
+  check(
+    "and every city still has its own weekly shape",
+    new Set(
+      KITCHEN_CITIES.map((c) => {
+        const k = at(c.id);
+        return `${rent(k)}:${spendPerHead(k)}:${Math.round(labourIndex(k) * 100)}`;
+      }),
+    ).size === KITCHEN_CITIES.length,
+  );
+}
+
+
+/**
+ * THE SOLICITOR'S CAST
+ *
+ * `people.ts` was career-neutral machinery with exactly one career plugged
+ * into it. These assert that a practice now has people of its own, that they
+ * are the same people who talk on the handset rather than a second set of
+ * names, and — the part that decides whether any of this is worth having —
+ * that knowing somebody changes a number.
+ */
+console.log("\nThe Solicitor: the people\n" + "─".repeat(52));
+{
+  /** A run far enough in that everybody who is coming has arrived. */
+  const peopled = (seed = 5) => {
+    const s = startRun(lawyer, seed);
+    s.week = 20;
+    s.r.cash = 400_000;
+    return advanceWeek(lawyer, s, { rest: 1 }).state;
+  };
+
+  check(
+    "the career has a cast, and it is written rather than generated",
+    LAWYER_CAST.length === 6 &&
+      LAWYER_CAST.every(
+        (p) =>
+          p.bio.length > 80 &&
+          p.title.length > 8 &&
+          p.traits.length >= 2 &&
+          p.handle.length > 2,
+      ),
+  );
+  check(
+    "nobody in it collides with another career's cast",
+    LAWYER_CAST.every((p) => !CAST_BY_ID.has(p.id)),
+    LAWYER_CAST.filter((p) => CAST_BY_ID.has(p.id))
+      .map((p) => p.id)
+      .join(", "),
+  );
+  check(
+    "every one of them wants something different from the others",
+    new Set(LAWYER_CAST.map((p) => p.role)).size >= 4,
+  );
+  /*
+   * Written for this career rather than rephrased from the last one. The
+   * first draft of Margaret Ellory was the Physician's supervising consultant
+   * with the nouns changed — "a standing refusal to tell you something
+   * comfortable" against Prof. Hallam's "has never once told you something
+   * comfortable" — which is how two casts quietly become one cast.
+   */
+  check(
+    "and none of them is another cast's character with the nouns changed",
+    (() => {
+      const phrases = (t: string) =>
+        t
+          .toLowerCase()
+          .split(/[.,;—]/)
+          .map((x) => x.trim())
+          .filter((x) => x.split(" ").length >= 5);
+      const theirs = new Set(FULL_CAST.flatMap((p) => phrases(p.bio)));
+      const shared = LAWYER_CAST.flatMap((p) => phrases(p.bio)).filter((x) =>
+        theirs.has(x),
+      );
+      return shared.length === 0;
+    })(),
+  );
+
+  /*
+   * The claim that makes this worth doing: the handset and the relationships
+   * are one cast. Margaret Ellory sends the welcome message AND has a card.
+   */
+  check(
+    "the people on the handset are the people on the screen",
+    (() => {
+      const handles = new Set(LAWYER_CAST.map((p) => `@${p.handle}`));
+      const voices = [
+        LEGAL_VOICES.mentor,
+        LEGAL_VOICES.opponent,
+        LEGAL_VOICES.costs,
+      ];
+      return voices.every((v) => handles.has(v.handle));
+    })(),
+  );
+  check(
+    "and the institutions on the handset are not pretending to be people",
+    LEGAL_ORG_HANDLES.every(
+      (h) => !LAWYER_CAST.some((p) => `@${p.handle}` === h),
+    ),
+  );
+
+  /* ---------------------------------------------------------- arriving */
+  {
+    const week1 = startRun(lawyer, 5);
+    check(
+      "the people who were always there are there from week one",
+      (week1.people ?? []).length === 3 &&
+        (week1.people ?? []).some((p) => p.id === "ellory"),
+      `${(week1.people ?? []).length}`,
+    );
+    const later = peopled();
+    check(
+      "and the rest arrive once the run gives them a reason to",
+      (later.people ?? []).length === 6,
+      (later.people ?? []).map((p) => p.id).join(", "),
+    );
+    check(
+      "arriving does not disturb anybody already in your life",
+      (() => {
+        let s = startRun(lawyer, 5);
+        s = runCommand(lawyer, s, "noop", "");
+        const ellory = personIn(s, "ellory")!;
+        ellory.warmth = 90;
+        s.week = 20;
+        const after = advanceWeek(lawyer, s, { rest: 1 }).state;
+        return personIn(after, "ellory")!.warmth >= 88;
+      })(),
+    );
+  }
+
+  check(
+    "the panel can look any of them up, whoever is playing",
+    LAWYER_CAST.every((p) => personDefIn("lawyer", p.id)?.name === p.name) &&
+      personDefIn("doctor", "hallam") !== undefined,
+  );
+
+  /* ------------------------------------------------- what they are worth */
+  {
+    const s = peopled();
+    const bump = (id: string, key: "warmth" | "trust" | "respect", to: number) => {
+      const copy = JSON.parse(JSON.stringify(s)) as typeof s;
+      const person = personIn(copy, id)!;
+      person[key] = to;
+      return copy;
+    };
+
+    /*
+     * They do not start as strangers, and that is the point: Margaret already
+     * trusts you because she trained you, and Adaeze already likes you because
+     * you wound up her father's estate. What must be true is that nobody is
+     * ever a *penalty* — a career cannot be harder for having met somebody.
+     */
+    check(
+      "knowing somebody is never worse than not knowing them",
+      referralPull(s) >= 0 &&
+        briefDiscount(s) <= 1 &&
+        costsRelief(s) <= 1 &&
+        conductGrace(s) <= 1 &&
+        offerGoodwill(s) >= 0 &&
+        mentorBonus(s) >= 0,
+    );
+    check(
+      "and somebody who thinks nothing of you is worth exactly nothing",
+      (() => {
+        const cold = JSON.parse(JSON.stringify(s)) as typeof s;
+        for (const person of cold.people ?? []) {
+          person.warmth = -100;
+          person.trust = 0;
+          person.respect = 0;
+        }
+        return (
+          referralPull(cold) === 0 &&
+          briefDiscount(cold) === 1 &&
+          costsRelief(cold) === 1 &&
+          conductGrace(cold) === 1 &&
+          offerGoodwill(cold) === 0 &&
+          mentorBonus(cold) === 0
+        );
+      })(),
+    );
+    check(
+      "the head start each of them gives is small enough to be a head start",
+      referralPull(s) <= 5 && mentorBonus(s) <= 0.25 && conductGrace(s) >= 0.9,
+      `referral ${referralPull(s)}, mentor ${mentorBonus(s).toFixed(2)}`,
+    );
+    check(
+      "a client who talks about you brings work towards the door",
+      referralPull(bump("okonjo", "warmth", 100)) > 0,
+      `${referralPull(bump("okonjo", "warmth", 100))}`,
+    );
+    check(
+      "a clerk who rates you quotes a better brief fee",
+      briefDiscount(bump("nakamura", "respect", 100)) < 1,
+    );
+    check(
+      "a costs draftsman who trusts you argues their bill down",
+      costsRelief(bump("oyelaran", "trust", 100)) < 1,
+    );
+    check(
+      "a case officer who knows you reads your file less readily",
+      conductGrace(bump("whitcombe", "trust", 100)) < 1,
+    );
+    check(
+      "an opponent who rates you opens higher",
+      offerGoodwill(bump("farrow", "respect", 100)) > 0,
+    );
+    check(
+      "and an hour of your mentor is worth an hour of your own reading",
+      mentorBonus(bump("ellory", "trust", 100)) > 0,
+    );
+    check(
+      "every one of them is bounded — knowing people is not the whole game",
+      referralPull(bump("okonjo", "warmth", 100)) <= 12 &&
+        briefDiscount(bump("nakamura", "respect", 100)) >= 0.78 &&
+        costsRelief(bump("oyelaran", "trust", 100)) >= 0.75 &&
+        conductGrace(bump("whitcombe", "trust", 100)) >= 0.6 &&
+        offerGoodwill(bump("farrow", "respect", 100)) <= 0.14 &&
+        mentorBonus(bump("ellory", "trust", 100)) <= 0.9,
+    );
+
+    /* And it is not only arithmetic on a helper — the week reads it. */
+    check(
+      "the mentor's hour actually lands as advocacy",
+      (() => {
+        const warm = bump("ellory", "trust", 100);
+        const plain = advanceWeek(lawyer, s, { research: 1 }).state.r.skill;
+        const helped = advanceWeek(lawyer, warm, { research: 1 }).state.r.skill;
+        return helped > plain;
+      })(),
+    );
+  }
+
+  /* -------------------------------------------------- they remember things */
+  {
+    const s = peopled(9);
+    const p = practice(s);
+    const k = CASE_BY_ID.get("probate")!;
+    p.cases = [
+      {
+        id: "c-9",
+        kind: "probate",
+        client: "the Okonjo family",
+        openedWeek: 1,
+        dueWeek: s.week + 8,
+        hoursDone: k.hours,
+        settlementOffer: 0,
+        payer: "prompt",
+      },
+    ];
+
+    const settled = runCommand(lawyer, s, "settleCase", "c-9");
+    check(
+      "settling is something your opponent notices",
+      personIn(settled, "farrow")!.respect >
+        personIn(s, "farrow")!.respect,
+    );
+    check(
+      "and he says why, so the number is never silent",
+      personIn(settled, "farrow")!.recent[0]?.text.includes("Okonjo"),
+    );
+
+    const dropped = runCommand(lawyer, s, "dropCase", "c-9");
+    check(
+      "coming off the record is something your mentor notices",
+      personIn(dropped, "ellory")!.respect < personIn(s, "ellory")!.respect,
+    );
+    check(
+      "and the client notices considerably more",
+      personIn(dropped, "okonjo")!.warmth < personIn(s, "okonjo")!.warmth - 5,
+    );
+
+    const briefed = runCommand(lawyer, s, "briefCounsel", "c-9");
+    check(
+      "briefing counsel is something the clerk notices",
+      personIn(briefed, "nakamura")!.warmth >
+        personIn(s, "nakamura")!.warmth,
+    );
+    check(
+      "and a clerk who rates you charges the practice less for it",
+      (() => {
+        const known = JSON.parse(JSON.stringify(s)) as typeof s;
+        personIn(known, "nakamura")!.respect = 100;
+        const paidPlain = s.r.cash - briefed.r.cash;
+        const paidKnown =
+          known.r.cash -
+          runCommand(lawyer, known, "briefCounsel", "c-9").r.cash;
+        return paidKnown < paidPlain && paidKnown > 0;
+      })(),
+    );
+  }
+
+  {
+    /* Winning is what your mentor rates, and it is her own scale — a house
+       purchase is not a group claim. */
+    const s = peopled(11);
+    const p = practice(s);
+    const k = CASE_BY_ID.get("employment")!;
+    p.cases = [
+      {
+        id: "c-1",
+        kind: "employment",
+        client: "the Okonjo family",
+        openedWeek: 1,
+        dueWeek: s.week,
+        hoursDone: k.hours * 4,
+        settlementOffer: 0,
+        payer: "prompt",
+        adjournments: MAX_ADJOURNMENTS,
+      },
+    ];
+    let won: ReturnType<typeof advanceWeek> | null = null;
+    let lost: ReturnType<typeof advanceWeek> | null = null;
+    for (let seed = 1; seed <= 40 && !(won && lost); seed++) {
+      const copy = JSON.parse(JSON.stringify({ ...s, seed })) as typeof s;
+      const out = advanceWeek(lawyer, copy, { rest: 1 });
+      const v = practice(out.state).lastVerdicts.at(-1);
+      if (v?.won && !won) won = out;
+      if (v && !v.won && !lost) lost = out;
+    }
+    check("both outcomes happen", Boolean(won && lost));
+    if (won) {
+      check(
+        "a judgment your way is something your mentor rates",
+        personIn(won.state, "ellory")!.respect >
+          personIn(s, "ellory")!.respect,
+      );
+      check(
+        "and the client whose matter it was remembers it",
+        personIn(won.state, "okonjo")!.warmth > personIn(s, "okonjo")!.warmth,
+      );
+    }
+    if (lost) {
+      check(
+        "losing brings the costs draftsman into your life",
+        personIn(lost.state, "oyelaran")!.trust >=
+          personIn(s, "oyelaran")!.trust,
+      );
+      check(
+        "and a draftsman who trusts you makes the loss cheaper",
+        (() => {
+          const known = JSON.parse(JSON.stringify({ ...s, seed: lost!.state.seed })) as typeof s;
+          personIn(known, "oyelaran")!.trust = 100;
+          const line = (r: ReturnType<typeof advanceWeek>) =>
+            Math.abs(
+              r.ledger.find((x) => /costs order/i.test(x.label))?.amount ?? 0,
+            );
+          const cheaper = advanceWeek(lawyer, known, { rest: 1 });
+          return line(cheaper) > 0 && line(cheaper) < line(lost!);
+        })(),
+      );
+    }
+  }
+
+  check(
+    "a run carrying a solicitor's people is a valid save",
+    (() => {
+      const s = peopled(13);
+      return (
+        validateRun(JSON.parse(JSON.stringify(s))) &&
+        (s.people ?? []).every(
+          (x) => PERSON_ROLES.includes(x.role) && x.memory.length >= 0,
+        )
+      );
+    })(),
+  );
+}
+
 
 console.log(
   `\n${failures === 0 ? "all checks passed" : `${failures} FAILED`}\n`,

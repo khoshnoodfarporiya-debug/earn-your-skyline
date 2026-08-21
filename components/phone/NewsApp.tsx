@@ -1,7 +1,7 @@
 "use client";
 
 import type { RunState } from "@/lib/game/types";
-import { med } from "@/lib/game/careers/doctor";
+import { phoneOf } from "@/lib/ui/phoneAccess";
 import { EndOfList } from "./EndOfList";
 
 const TONE = {
@@ -15,7 +15,7 @@ const TONE = {
  * state. Each item is tagged with a word as well as a colour.
  */
 export function NewsApp({ state }: { state: RunState }) {
-  const m = med(state);
+  const phone = phoneOf(state);
   /*
    * Two sources, one feed.
    *
@@ -37,7 +37,7 @@ export function NewsApp({ state }: { state: RunState }) {
     impact: n.impact,
   }));
   const news = [
-    ...m.phone.news.map((n) => ({ ...n, impact: "" })),
+    ...(phone?.news ?? []).map((n) => ({ ...n, impact: "" })),
     ...world,
   ].sort((a, b) => b.week - a.week);
 

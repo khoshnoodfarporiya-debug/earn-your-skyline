@@ -1,7 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import type { PostContext, PostDef } from "@/lib/game/medical/types";
+/**
+ * What the composer actually needs from a post, generic over the career's
+ * own context type — the doctor's `PostDef` and the chef's `ChefPostDef`
+ * both satisfy it structurally, and neither leaks into the other.
+ */
+interface ComposerPost<C> {
+  id: string;
+  label: string;
+  blurb: string;
+  body: (c: C) => string;
+  hazard?: number;
+  preview: string[];
+  /** Grouping word shown beside the chosen post. Career-specific. */
+  category: string;
+}
 
 /**
  * The composer.
@@ -11,17 +25,20 @@ import type { PostContext, PostDef } from "@/lib/game/medical/types";
  * not a surprise. Anything carrying a confidentiality or accuracy hazard says
  * so in plain words and in a marked block, never by colour alone.
  */
-export function PostComposer({
+export function PostComposer<C>({
   posts,
   context,
   canPost,
   week,
+  emptyLine,
   onPublish,
 }: {
-  posts: PostDef[];
-  context: PostContext;
+  posts: ComposerPost<C>[];
+  context: C;
   canPost: boolean;
   week: number;
+  /** The career's own advice for an empty catalogue. */
+  emptyLine: string;
   onPublish: (id: string) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -54,8 +71,7 @@ export function PostComposer({
       <div className="border-b border-rule/60 bg-[#101C31] px-4 py-3.5">
         <p className="sign text-[11.5px] text-ink-faint">Composer</p>
         <p className="mt-1 text-[14px] leading-relaxed text-ink-soft">
-          Nothing worth saying yet. Open a department, hire someone, or earn a
-          credential and there will be.
+          {emptyLine}
         </p>
       </div>
     );

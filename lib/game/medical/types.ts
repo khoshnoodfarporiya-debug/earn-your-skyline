@@ -38,7 +38,8 @@ export type StaffRoleId =
   | "nurse"
   | "technician"
   | "admin"
-  | "comms";
+  | "comms"
+  | "paramedic";
 
 export interface Specialty {
   id: SpecialtyId;
@@ -80,6 +81,41 @@ export interface Condition {
   minSkill: number;
   /** All of these must be owned (and staffed) to treat the case at all. */
   equipment?: EquipmentId[];
+}
+
+/**
+ * AN AMBULANCE
+ *
+ * Not equipment, and the difference is the whole point of the type. A machine
+ * makes you better at treating the people who reach you; a vehicle changes
+ * *who reaches you at all*.
+ *
+ * Two levers, and they pull in tension:
+ *
+ *   `reach`   more of the surrounding population becomes yours to see
+ *   `acuity`  and a harder share of it arrives — critical work pays more and
+ *             punishes you when you cannot take it
+ *
+ * Both are worth nothing without `crew`. An ambulance with nobody qualified to
+ * ride in it is exactly the ornament an unstaffed scanner is, and it is
+ * modelled the same way rather than as a purchase block, because owning the
+ * thing and being able to use it are different states a player should be able
+ * to get themselves into.
+ */
+export interface FleetVehicle {
+  id: string;
+  label: string;
+  blurb: string;
+  cost: number;
+  upkeep: number;
+  /** Added to the catchment multiplier. 0.14 means "+14% of the population". */
+  reach: number;
+  /** How far the arriving case mix tilts toward severity. 0 leaves it alone. */
+  acuity: number;
+  /** Paramedics this vehicle needs before it does anything at all. */
+  crew: number;
+  /** Share of cost that still counts toward net worth. */
+  retention: number;
 }
 
 export interface FacilityType {
@@ -582,6 +618,15 @@ export interface MedicalState {
   phone: PhoneState;
   /** Consumables the clinic burns through treating people. */
   supplies: SupplyState;
+  /**
+   * Ambulances on the road.
+   *
+   * Optional so a v11 save written before the fleet existed still loads — the
+   * same treatment `markets` gets. Every reader goes through the helpers in
+   * `fleet.ts`, which read an absent fleet as an empty one, so an un-migrated
+   * run behaves exactly like a practice that never bought a vehicle.
+   */
+  fleet?: string[];
   /**
    * Live market conditions per city.
    *

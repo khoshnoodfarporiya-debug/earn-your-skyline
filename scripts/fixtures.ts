@@ -12,7 +12,14 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { doctor, med } from "../lib/game/careers/doctor";
-import { advanceWeek, runCommand, startRun } from "../lib/game/engine";
+import {
+  advanceWeek,
+  resolveEventChoice,
+  runCommand,
+  startRun,
+} from "../lib/game/engine";
+import { lawyer, practice } from "../lib/game/careers/lawyer";
+import { stageOf, startCrisis } from "../lib/game/crisis";
 import { EVENT_VISUALS } from "../lib/ui/visuals";
 import { postContext } from "../lib/game/medical/phone";
 import { POSTS } from "../lib/game/medical/posts";
@@ -132,4 +139,112 @@ const cmd = (s: RunState, c: string, a: string) => runCommand(doctor, s, c, a);
   }
   console.log(`  (${available.length} posts available: ${available.map((p) => p.label).join(", ")})`);
   write("phone-ready", s);
+}
+
+/* ------------------------------------------------------------ the Solicitor
+ *
+ * A practice one week away from a hearing, with money already owed to it.
+ *
+ * The browser suite needs to press Commit once and watch a court decide
+ * something — playing eight weeks of casework through the interface to reach
+ * the same place would be a slow test of the commit button rather than a test
+ * of the career. It also needs a judgment sitting on the books so the factoring
+ * control on the Books screen is reachable.
+ *
+ * Nothing is hand-edited: this is a real run, played forward by a plain bot
+ * until it happens to be in that state, and the candidate is *probed* — a
+ * throwaway copy is advanced a week and rejected unless a verdict genuinely
+ * lands. A hearing can be relisted, so "the date is next week" is not by
+ * itself a promise that anything will be decided, and a fixture that only
+ * usually resolves would make the browser test flaky rather than wrong.
+ */
+{
+  let found: RunState | null = null;
+
+  outer: for (let seed = 1; seed <= 240 && !found; seed++) {
+    let s = startRun(lawyer, seed);
+    for (let w = 0; w < 70; w++) {
+      /* Take whatever is on the table that the firm can still carry. */
+      for (const offer of [...practice(s).offers]) {
+        if (practice(s).cases.length >= 3) break;
+        s = runCommand(lawyer, s, "takeCase", offer.id);
+      }
+
+      const p = practice(s);
+      const due = p.cases.find((c) => c.dueWeek === s.week + 1);
+      if (due && (p.bills ?? []).length > 0 && p.offers.length > 0) {
+        const probe = advanceWeek(
+          lawyer,
+          JSON.parse(JSON.stringify(s)) as RunState,
+          { casework: 4 },
+        );
+        const decided = practice(probe.state).lastVerdicts.length >
+          p.lastVerdicts.length;
+        if (decided && !probe.state.outcome) {
+          console.log(
+            `  (seed ${seed}, week ${s.week}: ${p.cases.length} live, ${(p.bills ?? []).length} billed, ${p.offers.length} on the table)`,
+          );
+          found = s;
+          break outer;
+        }
+      }
+
+      const out = advanceWeek(lawyer, s, { casework: 4, pitch: 1, network: 1 });
+      s = out.state;
+      if (out.event) s = resolveEventChoice(lawyer, s, out.event.def, 0);
+      if (s.outcome) break;
+    }
+  }
+
+  if (!found) {
+    throw new Error("no solicitor state found with a hearing next week and a bill on the books");
+  }
+  write("solicitor-listed", found);
+}
+
+/* ------------------------------------------------- a practice mid-crisis
+ *
+ * A real run, played forward, with a client-account review attached at the
+ * point the browser suite needs to see one. Constructed through `startCrisis`
+ * rather than written as a literal — the same treatment `nearly-lost` gets,
+ * for the same reason: a hand-built object would drift from the save contract
+ * and let a browser test pass against a broken app.
+ *
+ * Waiting for `practiceCrisisRisk` to raise one naturally would work and would
+ * make the fixture depend on a die roll, which is the one thing a fixture must
+ * not do.
+ */
+{
+  let s = startRun(lawyer, 31);
+  for (let w = 0; w < 12; w++) {
+    const offer = practice(s).offers[0];
+    if (offer) s = runCommand(lawyer, s, "takeCase", offer.id);
+    /* Rest in the plan on purpose. Three casework blocks and no rest burns a
+       solicitor to 98 in twelve weeks, and the fixture then arrives carrying a
+       burnout setback whose panel sits above the crisis — which is a fine
+       thing for the game to do and a terrible thing for a fixture about
+       crises to be testing. */
+    const out = advanceWeek(lawyer, s, { casework: 2, pitch: 1, rest: 2 });
+    s = out.state;
+    if (out.event) s = resolveEventChoice(lawyer, s, out.event.def, 0);
+  }
+
+  /* Enough in hand that every choice on the stage is affordable — the point
+     of the fixture is the decision, not the affordability gate, which has its
+     own assertions in `npm run check`. */
+  s.r.cash = 180_000;
+  s.crises = [startCrisis("inspection", s.week, 65, undefined, "lawyer")];
+
+  const stage = stageOf(s.crises[0]);
+  if (stage.choices.length < 2) {
+    throw new Error("crisis fixture has nothing to decide");
+  }
+  if ((s.setbacks ?? []).length > 0) {
+    throw new Error(
+      `crisis fixture is also in a setback (${(s.setbacks ?? []).map((x) => x.kind).join(", ")})`,
+    );
+  }
+  if (s.outcome) throw new Error("crisis fixture must not carry an outcome");
+  console.log(`  (${stage.choices.length} choices on "${stage.title}")`);
+  write("solicitor-crisis", s);
 }

@@ -7,6 +7,7 @@ import {
   SPECIALTY_BY_ID,
 } from "./data";
 import { catchmentMultiplier } from "./marketing";
+import { fleetAcuity, fleetReach, fleetUpkeep, fleetValue } from "./fleet";
 import { playerCoverage } from "./progression";
 import {
   biasFor,
@@ -260,7 +261,11 @@ export function catchmentIn(
   const here = slotsIn(m, city);
   if (here <= 0) return 0;
   const base = here * 3.2 * (0.55 + reputation / 100);
-  const marketed = base * catchmentMultiplier(m, reputation);
+  /* Marketing makes more of the population want you; the fleet makes more of
+     it able to reach you. Both widen the same funnel, so both multiply here —
+     and an uncrewed fleet contributes nothing, which `fleetReach` enforces. */
+  const marketed =
+    base * (catchmentMultiplier(m, reputation) + fleetReach(m));
   const contested = marketed * contestedShare(city, reputation);
   return Math.max(0, Math.min(contested, populationCeiling(city)));
 }
@@ -297,8 +302,19 @@ export function generateCases(
     // — the affected specialties surge whether or not you can treat them.
     const local = city ? biasFor(city, cond.specialty) : 1;
     const surge = city ? outbreakSurge(med, city, cond.specialty) : 1;
+    /*
+     * Ambulances bring in the serious end. Scaled by severity so a critical
+     * case is lifted the full amount and a trivial one not at all — a fleet
+     * changes the *composition* of the week, it does not simply add patients
+     * (that is `reach`, and it happens upstream in the catchment).
+     */
+    const acuity = 1 + fleetAcuity(med) * ((cond.severity - 1) / 4);
     return (
-      cond.prevalence * local * surge * (open ? 1 : UNOPENED_DEPARTMENT_WEIGHT)
+      cond.prevalence *
+      local *
+      surge *
+      acuity *
+      (open ? 1 : UNOPENED_DEPARTMENT_WEIGHT)
     );
   });
   const sum = weights.reduce((a, b) => a + b, 0);
@@ -487,6 +503,9 @@ export function weeklyUpkeep(med: MedicalState): number {
   for (const d of med.departments) {
     total += SPECIALTY_BY_ID.get(d)?.upkeep ?? 0;
   }
+  /* Charged whether or not the fleet is crewed. A vehicle you cannot staff
+     still costs you what a vehicle costs. */
+  total += fleetUpkeep(med);
   return total;
 }
 
@@ -505,6 +524,7 @@ export function assetValue(med: MedicalState): number {
   for (const e of med.equipment) {
     total += (EQUIPMENT_BY_ID.get(e)?.cost ?? 0) * 0.6;
   }
+  total += fleetValue(med);
   return total;
 }
 

@@ -2,6 +2,8 @@
 
 import type { RunState } from "@/lib/game/types";
 import { med } from "@/lib/game/careers/doctor";
+import { kitchen } from "@/lib/game/careers/chef";
+import { practice } from "@/lib/game/careers/lawyer";
 import {
   MAX_FEED,
   canPostThisWeek,
@@ -13,6 +15,28 @@ import {
   identityOf,
   standingWord,
 } from "@/lib/game/medical/social";
+import {
+  CHEF_POSTS,
+  canPostChefWeek,
+  chefExpectationLine,
+  chefIdentityOf,
+  chefPostContext,
+  chefReachLine,
+} from "@/lib/game/careers/chefPhone";
+import {
+  LEGAL_POSTS,
+  canPostLawyerWeek,
+  lawyerEchoLine,
+  lawyerIdentityOf,
+  lawyerPostContext,
+  lawyerPressureLine,
+} from "@/lib/game/careers/lawyerPhone";
+import { engagementOf, interestOf } from "@/lib/game/careers/buzz";
+import {
+  composerEmptyLine,
+  phoneOf,
+  scrutinyLine,
+} from "@/lib/ui/phoneAccess";
 import { Avatar } from "../ui/Avatar";
 import { EndOfList } from "./EndOfList";
 import { PostComposer } from "./PostComposer";
@@ -31,33 +55,138 @@ export function PulseApp({
   state: RunState;
   dispatch: (cmd: string, arg: string) => void;
 }) {
-  const m = med(state);
-  const { social, feed } = m.phone;
-  const identity = identityOf(social);
-  const ctx = postContext(m, { week: state.week, panel: state.r.panel });
-  const canPost = canPostThisWeek(m, state.week);
+  /*
+   * One screen, three vocabularies. The metrics, the feed and the composer's
+   * mechanics are identical between careers; the catalogue of things worth
+   * saying, and the words your standing reads as, are each career's own.
+   */
+  const isChef = state.careerId === "chef";
+  const isLawyer = state.careerId === "lawyer";
+  const phone = phoneOf(state);
+  const social = phone?.social ?? {
+    followers: 0,
+    trust: 50,
+    sentiment: 50,
+    scrutiny: 0,
+  };
+  const feed = phone?.feed ?? [];
+  const identity = isChef
+    ? chefIdentityOf(social)
+    : isLawyer
+      ? lawyerIdentityOf(social)
+      : identityOf(social);
 
-  const available = POSTS.filter(
-    (p) => p.available(ctx) && !(p.once && m.phone.postsMade.includes(p.id)),
-  );
+  /* The doctor's composer inputs. Only computed for a doctor — `med(state)`
+     would throw on anyone else's save. */
+  const m = isChef || isLawyer ? null : med(state);
+  const ctx = m
+    ? postContext(m, { week: state.week, panel: state.r.panel })
+    : null;
+  const doctorPosts =
+    m && ctx
+      ? POSTS.filter(
+          (p) =>
+            p.available(ctx) && !(p.once && m.phone.postsMade.includes(p.id)),
+        )
+      : [];
 
-  const metrics = [
-    {
-      label: "Followers",
-      value: followerCount(social.followers),
-      word: "reach",
-    },
-    {
-      label: "Trust",
-      value: `${Math.round(social.trust)}`,
-      word: standingWord(social.trust),
-    },
-    {
-      label: "Sentiment",
-      value: `${Math.round(social.sentiment)}`,
-      word: standingWord(social.sentiment),
-    },
-  ];
+  /* The chef's. */
+  const k = isChef ? kitchen(state) : null;
+  const chefCtx = k ? chefPostContext(k, state.week) : null;
+  const chefPosts =
+    k && chefCtx
+      ? CHEF_POSTS.filter(
+          (p) =>
+            p.available(chefCtx) &&
+            !(p.once && (k.phone?.postsMade ?? []).includes(p.id)),
+        )
+      : [];
+
+  /* And the solicitor's. */
+  const p = isLawyer ? practice(state) : null;
+  const lawCtx = p ? lawyerPostContext(p, state.week) : null;
+  const lawPosts =
+    p && lawCtx
+      ? LEGAL_POSTS.filter(
+          (x) =>
+            x.available(lawCtx) &&
+            !(x.once && (p.phone?.postsMade ?? []).includes(x.id)),
+        )
+      : [];
+
+  const canPost = isChef
+    ? k !== null && canPostChefWeek(k, state.week)
+    : isLawyer
+      ? p !== null && canPostLawyerWeek(p, state.week)
+      : m !== null && canPostThisWeek(m, state.week);
+
+  /*
+   * The third figure is each career's own, and it is always the thing the
+   * phone is *for* in that career rather than a second vanity number.
+   *
+   * A chef's is engagement — how many of the followers are still listening,
+   * which falls when you post every week and rises when the room is happy. A
+   * solicitor's is leverage: what publicity is currently adding to every
+   * settlement offer on the books. Both are read from the simulation, not
+   * from the phone.
+   */
+  const metrics = isChef
+    ? [
+        {
+          label: "Followers",
+          value: followerCount(social.followers),
+          word: "reach",
+        },
+        {
+          label: "Listening",
+          value: followerCount(
+            engagementOf(social.followers, social.sentiment, chefCtx?.reach ?? 1),
+          ),
+          word: "engaged",
+        },
+        {
+          label: "Booking",
+          value: k
+            ? `+${Math.round((interestOf(k) - 1) * 100)}%`
+            : "+0%",
+          word: "from what you said",
+        },
+      ]
+    : isLawyer
+      ? [
+          {
+            label: "Followers",
+            value: followerCount(social.followers),
+            word: "reach",
+          },
+          {
+            label: "Trust",
+            value: `${Math.round(social.trust)}`,
+            word: standingWord(social.trust),
+          },
+          {
+            label: "Leverage",
+            value: `+${Math.round((lawCtx?.pressure ?? 0) * 100)}%`,
+            word: "on what they offer",
+          },
+        ]
+      : [
+          {
+            label: "Followers",
+            value: followerCount(social.followers),
+            word: "reach",
+          },
+          {
+            label: "Trust",
+            value: `${Math.round(social.trust)}`,
+            word: standingWord(social.trust),
+          },
+          {
+            label: "Sentiment",
+            value: `${Math.round(social.sentiment)}`,
+            word: standingWord(social.sentiment),
+          },
+        ];
 
   return (
     <div>
@@ -90,27 +219,90 @@ export function PulseApp({
           ))}
         </dl>
 
+        {/*
+          * The two things a chef's phone costs them, stated where the posting
+          * happens rather than on a screen they would have to go and find.
+          */}
+        {isChef && chefCtx && chefCtx.reach < 0.95 && (
+          <p className="mt-2 rounded-form border border-rule px-3 py-1.5 text-[13px] text-ink-soft">
+            <span className="sign mr-1.5 text-[11.5px] text-ink-faint">Reach</span>
+            {chefReachLine(chefCtx)}
+          </p>
+        )}
+        {isChef && chefCtx && chefExpectationLine(chefCtx) && (
+          <p className="mt-2 rounded-form border border-caution/50 bg-caution-tint px-3 py-1.5 text-[13px] text-caution">
+            <span className="sign mr-1.5 text-[11.5px]">Expectations</span>
+            {chefExpectationLine(chefCtx)}
+          </p>
+        )}
+
+        {/* And the two a solicitor's buys them, on the same terms: what is
+            still working, and for how much longer. */}
+        {isLawyer && lawCtx && lawyerPressureLine(lawCtx) && (
+          <p className="mt-2 rounded-form border border-rule px-3 py-1.5 text-[13px] text-ink-soft">
+            <span className="sign mr-1.5 text-[11.5px] text-ink-faint">
+              Leverage
+            </span>
+            {lawyerPressureLine(lawCtx)}
+          </p>
+        )}
+        {isLawyer && lawCtx && lawyerEchoLine(lawCtx) && (
+          <p className="mt-2 rounded-form border border-rule px-3 py-1.5 text-[13px] text-ink-soft">
+            <span className="sign mr-1.5 text-[11.5px] text-ink-faint">
+              In the door
+            </span>
+            {lawyerEchoLine(lawCtx)}
+          </p>
+        )}
+
         {social.scrutiny >= 25 && (
           <p className="mt-2 rounded-form border border-caution/50 bg-caution-tint px-3 py-1.5 text-[13px] text-caution">
             <span className="sign mr-1.5 text-[11.5px]">Scrutiny</span>
-            {Math.round(social.scrutiny)} — you are being watched, and it is
-            adding to your malpractice risk each week.
+            {scrutinyLine(state.careerId, social.scrutiny)}
           </p>
         )}
       </header>
 
-      <PostComposer
-        posts={available}
-        context={ctx}
-        canPost={canPost}
-        week={state.week}
-        onPublish={(id) => dispatch("post", id)}
-      />
+      {/* Same composer, per-career catalogue. The generic keeps each
+          catalogue honest against its own context type. */}
+      {isChef && chefCtx ? (
+        <PostComposer
+          posts={chefPosts}
+          context={chefCtx}
+          canPost={canPost}
+          week={state.week}
+          emptyLine={composerEmptyLine(state.careerId)}
+          onPublish={(id) => dispatch("post", id)}
+        />
+      ) : isLawyer && lawCtx ? (
+        <PostComposer
+          posts={lawPosts}
+          context={lawCtx}
+          canPost={canPost}
+          week={state.week}
+          emptyLine={composerEmptyLine(state.careerId)}
+          onPublish={(id) => dispatch("post", id)}
+        />
+      ) : ctx ? (
+        <PostComposer
+          posts={doctorPosts}
+          context={ctx}
+          canPost={canPost}
+          week={state.week}
+          emptyLine={composerEmptyLine(state.careerId)}
+          onPublish={(id) => dispatch("post", id)}
+        />
+      ) : null}
 
       {/* ------------------------------------------------------------ feed */}
       {feed.length === 0 ? (
         <p className="px-4 py-8 text-center text-[14px] leading-relaxed text-ink-soft">
-          Your feed is empty. Publish something, or wait — the profession talks
+          Your feed is empty. Publish something, or wait —{" "}
+          {isChef
+            ? "the city eats out and talks about it"
+            : isLawyer
+              ? "the profession talks about who won what"
+              : "the profession talks"}{" "}
           whether or not you join in.
         </p>
       ) : (

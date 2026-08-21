@@ -13,6 +13,7 @@ import type { SpecialtyId } from "@/lib/game/medical/types";
 import { money } from "@/lib/game/format";
 import { Panel } from "../ui/Panel";
 import { ActionButton, ItemCard } from "../ui/ItemCard";
+import { STAFF_ART } from "@/lib/ui/careerSceneArt";
 
 export function StaffPanel({
   state,
@@ -88,6 +89,7 @@ export function StaffPanel({
                     ? `${money(role.hireCost - cash)} short of the recruitment cost.`
                     : undefined
                 }
+                visual={STAFF_ART[role.id]}
               >
                 {role.specialised && (
                   <label className="flex items-center gap-2">

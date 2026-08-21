@@ -10,6 +10,8 @@ import { DEPARTMENTS } from "./departments";
 import { totalOutstanding, weeklyDebtService } from "../game/finance";
 import { money } from "../game/format";
 import type { ScreenId } from "./navigation";
+import { chefAlerts } from "./chefHelp";
+import { lawyerAlerts } from "./lawyerHelp";
 
 /**
  * Urgent state, derived rather than stored.
@@ -37,7 +39,22 @@ export interface Alert {
 
 const RANK: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
 
+/** Most severe first, whoever produced them. */
+const bySeverity = (alerts: Alert[]): Alert[] =>
+  [...alerts].sort((a, b) => RANK[a.severity] - RANK[b.severity]);
+
+/**
+ * What needs attention, in this career's own terms.
+ *
+ * The *shape* — a title, a reason, and the screen that fixes it — is
+ * career-agnostic and always was. What was medical was the content, and this
+ * function returned an empty list for anybody else, which is why a Chef or a
+ * Solicitor never saw a badge on a destination in their lives. Each career now
+ * derives its own; see `chefHelp.ts` and `lawyerHelp.ts`.
+ */
 export function deriveAlerts(state: RunState): Alert[] {
+  if (state.careerId === "chef") return bySeverity(chefAlerts(state));
+  if (state.careerId === "lawyer") return bySeverity(lawyerAlerts(state));
   if (state.careerId !== "doctor") return [];
   const m = med(state);
   const out: Alert[] = [];
@@ -283,7 +300,7 @@ export function deriveAlerts(state: RunState): Alert[] {
     });
   }
 
-  return out.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
+  return bySeverity(out);
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   saveTaught,
 } from "@/lib/game/save";
 import { lessonFor, lessonStatus } from "@/lib/ui/onboarding";
+import { glossaryFor } from "@/lib/ui/glossary";
 import { LessonCard } from "./onboarding/LessonCard";
 import { Glossary } from "./onboarding/Glossary";
 import { money } from "@/lib/game/format";
@@ -64,6 +65,10 @@ import { MoneyPanel } from "./medical/MoneyPanel";
 import { RivalsPanel } from "./medical/RivalsPanel";
 import { CrisisPanel } from "./medical/CrisisPanel";
 import { SetbackPanel } from "./medical/SetbackPanel";
+import { OperationPanel } from "./careers/OperationPanel";
+import { ChefScreens } from "./careers/ChefScreens";
+import { LawyerScreens } from "./careers/LawyerScreens";
+import { HomeMap } from "./careers/HomeMap";
 import { CharacterPanel } from "./medical/CharacterPanel";
 import { RetirementDialog } from "./RetirementDialog";
 import {
@@ -77,7 +82,7 @@ import { netWorth } from "@/lib/game/careers/doctor";
 import { cityOf } from "@/lib/game/medical/cities";
 import { GrowthPanel } from "./medical/GrowthPanel";
 import { LifePanel } from "./medical/LifePanel";
-import { unreadTotal } from "@/lib/game/medical/phone";
+import { phoneOf, unreadTotalIn } from "@/lib/ui/phoneAccess";
 import { Phone } from "./phone/Phone";
 
 /** Handset glyph for the shell button. */
@@ -152,6 +157,15 @@ export function Game({
   const [screen, setScreen] = useState<ScreenId>("overview");
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [phoneOpen, setPhoneOpen] = useState(false);
+  /* Which app the handset opens on. Screens set it when they "make a call"
+     — the larder ringing a supplier, the brigade ringing the agency. */
+  const [phoneApp, setPhoneApp] = useState<
+    import("./phone/PhoneShell").PhoneApp | undefined
+  >(undefined);
+  const openPhoneOn = (app?: import("./phone/PhoneShell").PhoneApp) => {
+    setPhoneApp(app);
+    setPhoneOpen(true);
+  };
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   /*
    * Which lessons the player has closed.
@@ -274,7 +288,12 @@ export function Game({
 
   const m = state.careerId === "doctor" ? med(state) : null;
   const activeSection = sectionOf(screen).id;
-  const unread = m ? unreadTotal(m) : 0;
+  /* The phone is career-aware now: any career that carries one gets the
+     button, the badge and the handset. One without one gets nothing, which
+     is absence rather than breakage. */
+  const phone = phoneOf(state);
+  const unread = phone ? unreadTotalIn(phone) : 0;
+  const hasGlossary = glossaryFor(state.careerId).length > 0;
 
   // Route alerts to the destination that fixes them, so a badge on a nav
   // item always corresponds to something actionable inside it.
@@ -344,12 +363,16 @@ export function Game({
         <div className="ml-auto hidden lg:block">
           <PrimaryNav
             active={activeSection}
+            careerId={state.careerId}
             onNavigate={setScreen}
             badges={badges}
           />
         </div>
 
-        {m && (
+        {/* Every career with a vocabulary of its own gets the control that
+            explains it. The gate used to be `m &&`, which is why two of the
+            three careers had no way to look a word up. */}
+        {hasGlossary && (
           <button
             ref={glossaryButtonRef}
             onClick={() => setGlossaryOpen(true)}
@@ -361,10 +384,10 @@ export function Game({
           </button>
         )}
 
-        {m && (
+        {phone && (
           <button
             ref={phoneButtonRef}
-            onClick={() => setPhoneOpen(true)}
+            onClick={() => openPhoneOn()}
             aria-haspopup="dialog"
             className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-form border border-rule bg-card text-ink-soft transition hover:border-clinical hover:text-clinical"
           >
@@ -382,7 +405,11 @@ export function Game({
       </header>
 
       {screen !== "overview" && (
-        <SectionNav active={screen} onNavigate={setScreen} />
+        <SectionNav
+          active={screen}
+          careerId={state.careerId}
+          onNavigate={setScreen}
+        />
       )}
 
       <main ref={mainRef} tabIndex={-1} className="outline-none">
@@ -441,6 +468,40 @@ export function Game({
             onPayLoan={() => dispatch("payLoan", "")}
           />
         )}
+
+        {/*
+         * The one screen a career that is not the Physician has.
+         *
+         * Placed here for two reasons found the hard way. It must sit outside
+         * the `{m && …}` gate below, because everything in there reads medical
+         * state that is null for a Chef — inside it, the panel rendered
+         * nothing at all. And it must sit outside the header, because the
+         * career name is itself a <button>: nested inside it, every "buy"
+         * control was a button within a button, which React flagged as a
+         * hydration error and which sent the first click to the back-to-menu
+         * handler instead of the kitchen.
+         */}
+        {screen === "operation" && (
+          <OperationPanel state={state} onCommand={dispatch} />
+        )}
+        {/* The Chef's five screens, for the same two reasons: they read
+            kitchen state, not medical state, and they must not be nested
+            inside the header's button. */}
+        <ChefScreens
+          screen={screen}
+          state={state}
+          onCommand={dispatch}
+          onCall={openPhoneOn}
+        />
+        {/* And the Solicitor's four, on the same terms — practice state, and
+            outside the header's button. */}
+        <LawyerScreens
+          screen={screen}
+          state={state}
+          onCommand={dispatch}
+          onCall={openPhoneOn}
+        />
+        {screen === "home" && <HomeMap state={state} />}
 
         {m && (
           <>
@@ -588,22 +649,29 @@ export function Game({
       <div className="lg:hidden">
         <PrimaryNav
           active={activeSection}
+          careerId={state.careerId}
           onNavigate={setScreen}
           badges={badges}
         />
       </div>
 
-      {phoneOpen && m && (
+      {phoneOpen && phone && (
         <Phone
+          key={phoneApp ?? "default"}
           state={state}
           dispatch={dispatch}
-          onClose={() => setPhoneOpen(false)}
+          initialApp={phoneApp}
+          onClose={() => {
+            setPhoneOpen(false);
+            setPhoneApp(undefined);
+          }}
           returnFocusTo={phoneButtonRef}
         />
       )}
 
       {glossaryOpen && (
         <Glossary
+          careerId={state.careerId}
           lessons={lessonStatus(state, teachCtx, taught)}
           onReopen={reopen}
           onClose={() => setGlossaryOpen(false)}

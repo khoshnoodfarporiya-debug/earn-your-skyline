@@ -34,7 +34,12 @@ export function OverviewHero({
 }) {
   const m = state.careerId === "doctor" ? med(state) : null;
   const stage = m ? practiceStageIndex(m) : -1;
-  const stageLabel = PRACTICE_STAGES[stage]?.label ?? "No premises yet";
+  /* The practice ladder is the Physician's. A career without one shows what
+     it is worth instead of being told it has no premises — a Chef starts on a
+     market stall, so "No premises yet" was simply untrue. */
+  const stageLabel = m
+    ? (PRACTICE_STAGES[stage]?.label ?? "No premises yet")
+    : career.scoreboard(state).label;
   const city = m ? cityOf(m.homeCity) : null;
   const urgent =
     alerts.find((a) => a.severity === "critical") ?? alerts[0] ?? null;
@@ -51,14 +56,28 @@ export function OverviewHero({
     }
     if (state.r.burnout >= 70) return "You are running on empty. Rest is not optional now.";
     if (state.r.debt <= 0) return "Debt-free. Everything from here is yours.";
+    /*
+     * The patient list is a Physician fact. A Chef has no `panel` at all, so
+     * this read `NaN patients on your list` on their first week — visible on
+     * screen, in the largest type the game uses. Every career has a
+     * scoreboard, so fall through to the one it defines for itself.
+     */
+    if (!m) return career.scoreboard(state).sub;
     return `${Math.round(state.r.panel).toLocaleString("en-US")} patients on your list.`;
   })();
 
-  const facts: [string, string][] = [
-    ["Week", `${state.week}`],
-    ["Based in", city?.name ?? "—"],
-    ["Practice", stageLabel],
-  ];
+  /* Where you are and what you have built are medical framings; a career
+     without them shows its own headline instead of two em dashes. */
+  const facts: [string, string][] = m
+    ? [
+        ["Week", `${state.week}`],
+        ["Based in", city?.name ?? "—"],
+        ["Practice", stageLabel],
+      ]
+    : [
+        ["Week", `${state.week}`],
+        [career.scoreboard(state).label, career.scoreboard(state).value],
+      ];
 
   return (
     <section aria-labelledby="overview-hero-title" className="form overflow-hidden">

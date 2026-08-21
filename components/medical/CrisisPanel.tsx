@@ -8,7 +8,11 @@ import {
   type ActiveCrisis,
 } from "@/lib/game/crisis";
 import { money } from "@/lib/game/format";
-import { CRISIS_GUIDE, crisisProgress } from "@/lib/ui/pressure";
+import {
+  crisisCostIn,
+  crisisGuideFor,
+  crisisProgress,
+} from "@/lib/ui/pressure";
 import { MedIcon } from "../visuals/MedIcon";
 import { Panel } from "../ui/Panel";
 import { ActionButton } from "../ui/ItemCard";
@@ -55,8 +59,16 @@ function CrisisCard({
   const stage = stageOf(crisis);
   const open = stage.choices.filter((c) => !crisis.taken.includes(c.id));
   const weeks = state.week - crisis.startedWeek;
-  const guide = CRISIS_GUIDE[crisis.kind];
-  const progress = crisisProgress(crisis.kind, crisis.stage, crisis.ignored);
+  /* Both the explanation and the stage count belong to whoever is having the
+     crisis: a solicitor's client-account audit is not a doctor's inspection,
+     and a career's set may not even be the same length. */
+  const guide = crisisGuideFor(state.careerId, crisis.kind);
+  const progress = crisisProgress(
+    crisis.kind,
+    crisis.stage,
+    crisis.ignored,
+    crisis.career ?? state.careerId,
+  );
 
   return (
     <section
@@ -169,7 +181,11 @@ function CrisisCard({
         ) : (
           <div className="mt-3 space-y-2">
             {open.map((choice) => {
-              const unaffordable = !!choice.cost && state.r.cash < choice.cost;
+              /* What it costs *here*. Authored in London money and localised
+                 by the same function the command charges through, so the
+                 figure on the button is the figure the engine takes. */
+              const cost = crisisCostIn(state, choice.cost ?? 0);
+              const unaffordable = cost > 0 && state.r.cash < cost;
               return (
                 <div
                   key={choice.id}
@@ -179,13 +195,13 @@ function CrisisCard({
                     <p className="text-[14px] font-semibold text-ink">
                       {choice.label}
                     </p>
-                    {choice.cost ? (
+                    {cost > 0 ? (
                       <p
                         className={`num text-[13px] ${
                           unaffordable ? "text-alarm" : "text-ink"
                         }`}
                       >
-                        {money(choice.cost)}
+                        {money(cost)}
                       </p>
                     ) : null}
                   </div>
@@ -193,6 +209,9 @@ function CrisisCard({
                     {choice.detail}
                     {choice.blocks
                       ? ` · costs ${choice.blocks} block${choice.blocks === 1 ? "" : "s"} next week`
+                      : ""}
+                    {choice.debt
+                      ? ` · adds ${money(crisisCostIn(state, choice.debt))} of borrowing`
                       : ""}
                   </p>
                   <div className="mt-2.5">
@@ -204,6 +223,11 @@ function CrisisCard({
                     >
                       Do this
                     </ActionButton>
+                    {unaffordable && (
+                      <span className="ml-2.5 text-[12px] text-ink-faint">
+                        Costs {money(cost)} and you have {money(state.r.cash)}.
+                      </span>
+                    )}
                   </div>
                 </div>
               );

@@ -2,19 +2,25 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { CAREER_PREVIEWS } from "@/lib/game/careers";
+import { CAREER_PREVIEWS, getCareer } from "@/lib/game/careers";
 import { careerVisual } from "@/lib/ui/visuals";
 import { CareerIcon } from "./Icons";
 import { ArtFrame } from "./visuals/ArtFrame";
+import { StartCityPicker } from "./StartCityPicker";
 
 /**
  * Career selection.
  *
  * Each career is a card with cover art, the fantasy, what it hands you and
  * what kills you — enough to choose on without opening the game. Selecting a
- * card arms it; a second press, or the Begin button, starts the run. That two
- * step exists so the detail is readable before committing on a phone, where
- * the card cannot show everything at once.
+ * card arms it; a second press, or the Begin button, moves on to *where* you
+ * start. That two step exists so the detail is readable before committing on a
+ * phone, where the card cannot show everything at once.
+ *
+ * Two questions, two screens: which life, then which city. They are separate
+ * because they are separate decisions — the city changes what the work is
+ * worth and what it costs to be there, and asking both at once on a phone
+ * would mean neither could be read properly.
  *
  * Closed careers are still legible: they are `disabled`, marked as such, and
  * carry the same information, because "why can't I play this" is a question
@@ -25,11 +31,25 @@ export function CareerSelect({
   hasSave,
   onContinue,
 }: {
-  onPick: (careerId: string) => void;
+  onPick: (careerId: string, cityId?: string) => void;
   hasSave: boolean;
   onContinue: () => void;
 }) {
   const [armed, setArmed] = useState<string | null>(null);
+  /* The career whose start city is being chosen, if we are on that step. */
+  const [placing, setPlacing] = useState<string | null>(null);
+
+  const placingCareer = placing ? getCareer(placing) : undefined;
+  if (placingCareer && (placingCareer.startCities?.length ?? 0) > 0) {
+    return (
+      <StartCityPicker
+        careerLabel={placingCareer.label}
+        cities={placingCareer.startCities!}
+        onBegin={(cityId) => onPick(placingCareer.id, cityId)}
+        onBack={() => setPlacing(null)}
+      />
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-5 py-14 sm:px-8">
@@ -92,8 +112,16 @@ export function CareerSelect({
               aria-pressed={c.available ? selected : undefined}
               onClick={() => {
                 if (!c.available) return;
-                if (selected) onPick(c.id);
-                else setArmed(c.id);
+                /* Armed already: on to where. A career with nowhere to choose
+                   between starts immediately, which is what a career with one
+                   place has always done. */
+                if (selected) {
+                  const def = getCareer(c.id);
+                  if ((def?.startCities?.length ?? 0) > 0) setPlacing(c.id);
+                  else onPick(c.id);
+                } else {
+                  setArmed(c.id);
+                }
               }}
               style={{ animationDelay: `${i * 70}ms` }}
               className={`rise group flex flex-col overflow-hidden rounded-form border text-left outline-none transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none ${
@@ -110,11 +138,21 @@ export function CareerSelect({
                 ratio="aspect-[16/10]"
                 scrim="bottom"
                 sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
-                /* All three sit above the fold in one row, so whichever the
-                   browser picks as the Largest Contentful Paint must not be
-                   lazy. Marking only the first left Next warning about the
-                   third once the first was cached. */
-                priority={i < 3}
+                /*
+                 * Every cover is eager, and that is the point rather than an
+                 * oversight.
+                 *
+                 * Whichever one the browser picks as the Largest Contentful
+                 * Paint must not be lazy, and which one it picks is not
+                 * predictable: it moves with the viewport, with the row the
+                 * grid happens to wrap at, and with what is already cached.
+                 * Marking only the first left Next warning about the third;
+                 * marking the first three left it warning about the seventh
+                 * once more cards were added. There is nothing else competing
+                 * for bandwidth on this screen, so the honest answer is that
+                 * all of them load.
+                 */
+                priority
                 /* The source art is night-lit; a small lift keeps the subject
                    readable under the caption scrim. */
                 imageClassName={`brightness-[1.18] contrast-[1.05] transition-transform duration-500 motion-reduce:transition-none ${
@@ -215,7 +253,7 @@ export function CareerSelect({
                   {!c.available
                     ? "Not built yet"
                     : selected
-                      ? "Begin this run →"
+                      ? "Choose where →"
                       : "Select"}
                 </span>
               </div>
@@ -225,8 +263,9 @@ export function CareerSelect({
       </div>
 
       <p className="mt-8 max-w-xl text-xs leading-relaxed text-ink-faint">
-        Chef and Solicitor are designed, not built. The engine already supports
-        them — each is one <span className="num">CareerDef</span> away.
+        Architect, Founder, Politician and Engineer are designed, not built.
+        The engine already supports them — each is one{" "}
+        <span className="num">CareerDef</span> away.
       </p>
     </main>
   );

@@ -5,6 +5,7 @@ import type {
   MedicalState,
 } from "../game/medical/types";
 import { CITIES } from "../game/medical/cities";
+import { CRITIC_ART } from "./chefArt";
 
 /**
  * Visual asset registry.
@@ -92,6 +93,22 @@ export const EVENT_VISUALS: Record<string, EventPresentation> = {
     alt: "A legal letter and case notes spread across a desk beside a doctor's coat.",
     focus: "center 48%",
   },
+  /*
+   * The Chef's critic.
+   *
+   * Keyed by the event id like every other entry, so the dialog that renders
+   * a Physician's inspection renders this with no knowledge of which career
+   * raised it. The file itself is declared once in `chefArt.ts` — this points
+   * at that entry rather than repeating the path.
+   */
+  critic: {
+    src: CRITIC_ART.src,
+    width: CRITIC_ART.width,
+    height: CRITIC_ART.height,
+    category: "Reviews",
+    alt: CRITIC_ART.alt,
+    focus: CRITIC_ART.focus,
+  },
 };
 
 export const eventVisual = (eventId: string): EventPresentation | null =>
@@ -139,6 +156,34 @@ export const CAREER_VISUALS: Record<string, Visual> = {
     height: 1086,
     alt: "",
     focus: "center 35%",
+  },
+  architect: {
+    src: "/visuals/careers/career-architect.webp",
+    width: 1448,
+    height: 1086,
+    alt: "",
+    focus: "center 38%",
+  },
+  founder: {
+    src: "/visuals/careers/career-founder.webp",
+    width: 1448,
+    height: 1086,
+    alt: "",
+    focus: "center 38%",
+  },
+  politician: {
+    src: "/visuals/careers/career-politician.webp",
+    width: 1448,
+    height: 1086,
+    alt: "",
+    focus: "center 35%",
+  },
+  engineer: {
+    src: "/visuals/careers/career-engineer.webp",
+    width: 1448,
+    height: 1086,
+    alt: "",
+    focus: "center 38%",
   },
 };
 

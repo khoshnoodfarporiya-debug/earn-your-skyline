@@ -41,6 +41,13 @@ export interface StartOptions {
   background?: BackgroundId;
   legacy?: LegacyGrant | null;
   ambition?: AmbitionId | null;
+  /**
+   * Where the run begins, for a career that offers a choice.
+   *
+   * An id the career does not know falls back to its default city rather than
+   * throwing — this arrives from the UI and, one day, from a shared link.
+   */
+  city?: string;
 }
 
 export function startRun(
@@ -118,6 +125,27 @@ export function startRun(
     "You qualified",
     `${career.label}. ${career.tagline}`,
   );
+
+  /* ------------------------------------------------------ start city */
+  /*
+   * Applied before the background and the legacy, because both of those add
+   * to a starting position and the city is what that position *is*. A career
+   * with one place skips this entirely, and an unrecognised id lands on the
+   * career's default rather than leaving a run half-placed.
+   */
+  const cities = career.startCities ?? [];
+  if (cities.length > 0) {
+    const chosen = cities.find((c) => c.id === opts.city) ?? cities[0];
+    s.startCity = chosen.id;
+    career.applyStartCity?.(s, chosen.id);
+    mark(
+      s,
+      "startcity",
+      "start",
+      `${chosen.name}, ${chosen.country}`,
+      chosen.blurb,
+    );
+  }
 
   /* ------------------------------------------------------- background */
   const bg = opts.background ? BACKGROUND_BY_ID.get(opts.background) : undefined;
@@ -221,6 +249,14 @@ function cloneState(s: RunState): RunState {
     /* Same reason as `people`: `tickSetbacks` mutates grip in place, and a
        shallow copy would write back through into the caller's state. */
     setbacks: structuredClone(s.setbacks ?? []),
+    /*
+     * And again, and this one was actually wrong until a second career got
+     * crises and a test caught it: `crisisChoice` mutates severity, stage and
+     * `taken` in place, so a shallow copy meant answering a crisis also
+     * answered it in the state the caller still held. Two commands run against
+     * the same state disagreed about which stage the crisis was on.
+     */
+    crises: structuredClone(s.crises ?? []),
     setbacksSurvived: [...(s.setbacksSurvived ?? [])],
     ambitionsDone: [...(s.ambitionsDone ?? [])],
     traits: [...(s.traits ?? [])],
@@ -313,6 +349,24 @@ export function advanceWeek(
 
   // 4. People drift when you neglect them.
   driftPeople(s);
+
+  /*
+   * 4b. And people arrive when the run finally gives them a reason to.
+   *
+   * `PersonDef.appears` was evaluated once, at `startRun`, and never again —
+   * so every gated cast member was written, documented as arriving later, and
+   * then never arrived at all. The Physician's cast has said "an investor does
+   * not call a one-room practice" since it was authored, and the investor
+   * never called a practice of any size.
+   *
+   * Additive on purpose: somebody already in your life keeps the standing they
+   * have earned. The only thing this can do is introduce somebody new.
+   */
+  for (const def of career.cast ?? []) {
+    if (def.appears && !def.appears(s)) continue;
+    if ((s.people ?? []).some((p) => p.id === def.id)) continue;
+    s.people = [...(s.people ?? []), initialPerson(def)];
+  }
 
   /*
    * 5. Events.

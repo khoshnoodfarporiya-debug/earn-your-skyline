@@ -18,6 +18,10 @@ import { OUTBREAK_VISUAL } from "@/lib/ui/visuals";
 import { ArtFrame } from "../visuals/ArtFrame";
 import { DEPARTMENT_BY_ID } from "@/lib/ui/departments";
 import { MedIcon } from "../visuals/MedIcon";
+import {
+  OUTBREAK_CONTAINMENT_ART,
+  asBanner,
+} from "@/lib/ui/careerSceneArt";
 
 const SEVERITY_TONE = [
   "",
@@ -103,6 +107,7 @@ export function OutbreakPanel({
 }) {
   const m = med(state);
   const hasPharmacy = m.equipment.includes("pharmacy");
+  const containmentUnderway = m.outbreaks.some((o) => o.contained);
 
   return (
     <div className="space-y-4">
@@ -115,7 +120,11 @@ export function OutbreakPanel({
          */}
         {m.outbreaks.length > 0 && (
           <ArtFrame
-            visual={OUTBREAK_VISUAL}
+            visual={
+              containmentUnderway
+                ? asBanner(OUTBREAK_CONTAINMENT_ART)
+                : OUTBREAK_VISUAL
+            }
             ratio="aspect-[21/9] sm:aspect-[21/6]"
             scrim="bottom"
             sizes="(min-width: 1152px) 1104px, 100vw"
@@ -123,7 +132,7 @@ export function OutbreakPanel({
           >
             <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 p-3.5 sm:px-5">
               <p className="display text-2xl leading-none text-ink drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                Outbreak response
+                {containmentUnderway ? "Containment underway" : "Outbreak response"}
               </p>
               <p className="num text-[12.5px] text-alarm drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
                 {m.outbreaks.length} running in{" "}
