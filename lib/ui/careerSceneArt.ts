@@ -105,5 +105,53 @@ export const SOLICITOR_ART: Record<SolicitorSceneId, SceneArt> = {
   ),
 };
 
+/**
+ * Career-screen scenes for the four newer careers.
+ *
+ * The screen id is deliberately the lookup key: navigation decides where the
+ * player is, while this registry only decides which decorative environment
+ * belongs there. Keeping that relationship here prevents screen components
+ * from accumulating image paths and crop values.
+ */
+export type IllustratedCareerId =
+  | "founder"
+  | "politician"
+  | "architect"
+  | "engineer";
+
+export const CAREER_SCREEN_ART: Record<
+  IllustratedCareerId,
+  Record<string, SceneArt>
+> = {
+  founder: {
+    runway: scene("careers", "founder-runway", "center 50%"),
+    crew: scene("careers", "founder-team", "center 48%"),
+    raising: scene("careers", "founder-raising", "center 48%"),
+  },
+  politician: {
+    polling: scene("careers", "politician-polling", "center 48%"),
+    blocs: scene("careers", "politician-electorate", "center 50%"),
+    positions: scene("careers", "politician-positions", "center 48%"),
+    office: scene("careers", "politician-office", "center 45%"),
+  },
+  architect: {
+    boards: scene("careers", "architect-boards", "center 50%"),
+    offers: scene("careers", "architect-offers", "center 48%"),
+    competitions: scene("careers", "architect-competitions", "center 48%"),
+    atelier: scene("careers", "architect-studio", "center 50%"),
+  },
+  engineer: {
+    bench: scene("careers", "engineer-bench", "center 48%"),
+    newbuild: scene("careers", "engineer-newbuild", "center 50%"),
+  },
+};
+
+export function careerScreenArt(
+  careerId: IllustratedCareerId,
+  screen: string,
+): SceneArt | null {
+  return CAREER_SCREEN_ART[careerId][screen] ?? null;
+}
+
 /** Use the larger derivative when a scene becomes a full-width banner. */
 export const asBanner = (art: SceneArt): Visual => ({ ...art, src: art.large });

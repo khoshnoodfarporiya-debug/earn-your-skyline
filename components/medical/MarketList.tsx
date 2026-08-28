@@ -39,11 +39,16 @@ export function MarketList({
   reputation,
   selected,
   onSelect,
+  compare,
+  onToggleCompare,
 }: {
   m: MedicalState;
   reputation: number;
   selected: CityId;
   onSelect: (id: CityId) => void;
+  /** Markets currently held side by side, capped at three by the owner. */
+  compare: CityId[];
+  onToggleCompare: (id: CityId) => void;
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
@@ -146,13 +151,18 @@ export function MarketList({
           {rows.map((n) => {
             const c = cityOf(n.id);
             const isSelected = n.id === selected;
+            const inCompare = compare.includes(n.id);
+            const compareFull = compare.length >= 3 && !inCompare;
             return (
-              <li key={n.id}>
+              /* The compare toggle is a SIBLING of the row button, never a
+                 child: a button inside a button is a hydration error this
+                 codebase has already paid for once. */
+              <li key={n.id} className="flex items-stretch">
                 <button
                   type="button"
                   onClick={() => onSelect(n.id)}
                   aria-current={isSelected ? "true" : undefined}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition ${
+                  className={`flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition ${
                     isSelected ? "bg-clinical-tint" : "hover:bg-paper"
                   }`}
                 >
@@ -233,6 +243,25 @@ export function MarketList({
                       </span>
                     </span>
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleCompare(n.id)}
+                  aria-pressed={inCompare}
+                  disabled={compareFull}
+                  title={
+                    compareFull
+                      ? "Three markets is the comparison's width"
+                      : undefined
+                  }
+                  className={`sign my-2 mr-3 shrink-0 self-center rounded-form border px-2.5 py-1.5 text-[11px] transition ${
+                    inCompare
+                      ? "border-clinical bg-clinical-tint text-clinical"
+                      : "border-rule bg-card text-ink-faint hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rule disabled:hover:text-ink-faint"
+                  }`}
+                >
+                  {inCompare ? "comparing" : "compare"}
+                  <span className="sr-only">{` ${n.name}`}</span>
                 </button>
               </li>
             );

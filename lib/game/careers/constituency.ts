@@ -1,4 +1,6 @@
 import type { StartCity } from "../types";
+import type { PhoneState } from "../medical/types";
+import type { RunState } from "../types";
 
 /**
  * THE SEAT
@@ -393,6 +395,11 @@ export interface ElectionResult {
 }
 
 export interface CampaignState {
+  /**
+   * The handset. Optional so a save from before this career had one
+   * still loads; it is created on first touch.
+   */
+  phone?: PhoneState;
   seat: string;
   office: string;
   /** Where you are with each bloc, right now. Decays toward `lean`. */
@@ -408,6 +415,145 @@ export interface CampaignState {
   results: ElectionResult[];
   /** Set the week an election is lost, so the UI can say what happened. */
   outOfOffice?: boolean;
+  /*
+   * PHASE 5, ALL OPTIONAL: a save written before the ground game still
+   * loads, and absence means "never engaged", which changes nothing.
+   */
+  /** Named constituents whose cases are open on your desk. */
+  constituents?: ConstituentCase[];
+  /** Cases delivered, per bloc — the permanent half of support. */
+  record?: Record<string, number>;
+  /** People who knock doors for you. They drift away if not organised. */
+  volunteers?: number;
+  /** The campaign fund. Donations in, campaigning out — never the rent. */
+  warchest?: number;
+  /** The week until which the last focus group still reads the room. */
+  focusUntil?: number;
+}
+
+/**
+ * A named person with a problem only their representative can chase.
+ *
+ * The counterweight to the drift: campaigning is a loan against where your
+ * positions have left you, but a case *delivered* is remembered — it moves
+ * the lean itself, permanently, one small piece at a time. Ignoring a case
+ * costs nothing except the chance; nobody punishes an office for a letter
+ * it never answered, they simply stop being moved by you.
+ */
+export interface ConstituentCase {
+  id: string;
+  /** Who is asking. A name, because "the electorate" never wrote to anyone. */
+  name: string;
+  bloc: string;
+  /** What they need, in their words. */
+  matter: string;
+  arrived: number;
+  /** The week the case stops being winnable. */
+  deadline: number;
+}
+
+export const constituentsOf = (c: CampaignState): ConstituentCase[] =>
+  c.constituents ?? [];
+export const recordOf = (c: CampaignState): Record<string, number> =>
+  c.record ?? {};
+export const volunteersOf = (c: CampaignState): number => c.volunteers ?? 0;
+export const warchestOf = (c: CampaignState): number => c.warchest ?? 0;
+
+/** How much a bloc's lean can ever owe to delivered casework. */
+export const RECORD_CAP = 12;
+
+/** How many cases fit on one member's desk. The rest are referred on. */
+export const CASE_DESK = 6;
+
+/** What campaigning gains when there are volunteers carrying boards too.
+    Zero volunteers multiplies by exactly one. */
+export const volunteerLift = (c: CampaignState): number =>
+  1 + Math.min(60, volunteersOf(c)) * 0.006;
+
+/** The turnout operation on the day: knocked doors become cast votes.
+    Two points of share at a hundred volunteers, and none at none. */
+export const gotvBonus = (c: CampaignState): number =>
+  Math.min(0.02, volunteersOf(c) * 0.0002);
+
+/**
+ * THE COUNT IS A BAND, NOT A NUMBER
+ *
+ * Nobody knows the share to a decimal — least of all this far out. The
+ * margin tightens as polling day approaches, and a recent focus group
+ * tightens it further. Display honesty only: the simulation always knows
+ * the true figure, the *player* is told what a campaign would actually
+ * know.
+ */
+export const pollBandOf = (c: CampaignState, week: number): number => {
+  const out = 2 + Math.min(4, weeksToPoll(c, week) * 0.15);
+  const focused = (c.focusUntil ?? -1) >= week ? 1.5 : 0;
+  return Math.max(1, out - focused);
+};
+
+/** What a focus group costs, from the war chest and nowhere else. */
+export const FOCUS_GROUP_COST = 900;
+
+/* ----------------------------------------------- the postbag's contents */
+
+const CASE_NAMES = [
+  "Mrs. Adeyemi",
+  "Mr. Kowalski",
+  "Miss Haddad",
+  "Mr. Ferreira",
+  "Mrs. Lindqvist",
+  "Mr. O'Donnell",
+  "Mrs. Bakshi",
+  "Mr. Yeboah",
+  "Miss Novak",
+  "Mrs. Petit",
+  "Mr. Aliyev",
+  "Miss Okafor",
+] as const;
+
+const CASE_MATTERS: Record<string, string[]> = {
+  retired: [
+    "a pension payment that stopped without a letter",
+    "a hospital transport route that was quietly cut",
+  ],
+  families: [
+    "a school place given and then withdrawn",
+    "a housing repair open since last winter",
+  ],
+  workers: [
+    "wages unpaid since the depot changed hands",
+    "a bus route that no longer meets the early shift",
+  ],
+  business: [
+    "a licence renewal lost somewhere in the post",
+    "roadworks with no end date outside the shop",
+  ],
+  professional: [
+    "a visa sponsorship stuck in review",
+    "a planning objection nobody acknowledged",
+  ],
+  students: [
+    "a landlord holding a deposit hostage",
+    "a support grant suspended over a form",
+  ],
+};
+
+/** Deterministic case for a derived stream — the caller owns the rng. */
+export function drawCase(
+  c: CampaignState,
+  week: number,
+  n: number,
+  rng: { next(): number },
+): ConstituentCase {
+  const bloc = BLOCS[Math.floor(rng.next() * BLOCS.length)].id;
+  const matters = CASE_MATTERS[bloc] ?? ["a matter for the office"];
+  return {
+    id: `case-${week}-${n}`,
+    name: CASE_NAMES[Math.floor(rng.next() * CASE_NAMES.length)],
+    bloc,
+    matter: matters[Math.floor(rng.next() * matters.length)],
+    arrived: week,
+    deadline: week + 5,
+  };
 }
 
 export function initialCampaign(): CampaignState {
@@ -443,6 +589,13 @@ export function leanOf(c: CampaignState): Record<string, number> {
     for (const [bloc, delta] of Object.entries(stance.effects)) {
       out[bloc] = (out[bloc] ?? 0) + delta;
     }
+  }
+  /* Casework delivered is the one thing that moves the lean itself:
+     capped, earned one case at a time, and absent for anybody who never
+     opened the postbag. */
+  const record = recordOf(c);
+  for (const b of BLOCS) {
+    out[b.id] = (out[b.id] ?? 0) + Math.min(RECORD_CAP, record[b.id] ?? 0);
   }
   /* Being seen to change your mind is its own position, and a bad one. */
   const cost = c.reversals.length * 6;
@@ -520,3 +673,14 @@ export function driftTable(
     return { bloc: b, now, lean: to, gap: now - to };
   });
 }
+
+/**
+ * This career's slice of the run.
+ *
+ * It lives here rather than beside the CareerDef because it is about
+ * the *state shape*, and because anything that needs it — the event
+ * catalogue, the voice pack — would otherwise have to import the
+ * career module and form an import cycle with it.
+ */
+export const campaign = (s: RunState): CampaignState =>
+  s.data.campaign as CampaignState;

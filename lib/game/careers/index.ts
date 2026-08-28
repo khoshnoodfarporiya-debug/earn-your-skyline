@@ -108,6 +108,25 @@ export const CAREER_PREVIEWS: CareerPreview[] = [
     ],
   },
   {
+    id: lawyer.id,
+    label: lawyer.label,
+    icon: lawyer.icon,
+    tagline: lawyer.tagline,
+    distinctRule: lawyer.distinctRule,
+    available: true,
+    difficulty: "Punishing",
+    advantages: [
+      "One won case can fund a year of the firm",
+      "Every live case carries a settlement you can take instead",
+      "Standing decides the size of the work you are offered",
+    ],
+    risks: [
+      "Nothing pays until it settles, and the rent does not wait",
+      "A case can be lost after months of work and bills nothing",
+      "Miss a deadline and the hours already sunk are simply gone",
+    ],
+  },
+  {
     id: founder.id,
     label: founder.label,
     icon: founder.icon,
@@ -183,33 +202,25 @@ export const CAREER_PREVIEWS: CareerPreview[] = [
       "Faults arrive weeks after you shipped, priced by how well it sold",
     ],
   },
-  {
-    id: lawyer.id,
-    label: lawyer.label,
-    icon: lawyer.icon,
-    tagline: lawyer.tagline,
-    distinctRule: lawyer.distinctRule,
-    available: true,
-    difficulty: "Punishing",
-    advantages: [
-      "One won case can fund a year of the firm",
-      "Every live case carries a settlement you can take instead",
-      "Standing decides the size of the work you are offered",
-    ],
-    risks: [
-      "Nothing pays until it settles, and the rent does not wait",
-      "A case can be lost after months of work and bills nothing",
-      "Miss a deadline and the hours already sunk are simply gone",
-    ],
-  },
-
-  /* ------------------------------------------------- designed, not built */
-
-
-
-
 
 ];
+
+/**
+ * WHERE TO START, FOR SOMEBODY WHO HAS NEVER PLAYED THIS
+ *
+ * Seven cards, each with its own vocabulary and its own way of failing, is a
+ * lot to meet at once. This is not a difficulty rating — it is the answer to
+ * "which of these teaches me the game".
+ *
+ * The Chef, because its loop closes fastest. Takings clear the same night you
+ * serve, so a decision on Monday is judged by Friday, and a player learns what
+ * the week actually *is* before they have to hold a three-year commission or a
+ * fault they cannot see in their head.
+ */
+export const SUGGESTED_FIRST = "chef";
+
+export const suggestedReason =
+  "Its week closes fastest — you serve on the night and find out the same night, so the loop teaches itself.";
 
 export function getCareer(id: string): CareerDef | undefined {
   return CAREERS.find((c) => c.id === id);

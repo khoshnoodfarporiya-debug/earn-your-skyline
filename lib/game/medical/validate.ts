@@ -1,3 +1,4 @@
+import { validatePhone } from "../phone/validate";
 import {
   every,
   inCatalogue,
@@ -34,17 +35,8 @@ import type { TriagePolicy } from "./types";
  * shape has not been pinned down yet.
  */
 
-const TONES = ["good", "bad", "neutral"] as const;
 const TRIAGE: readonly TriagePolicy[] = ["urgent", "profitable", "volume"];
 const BLOCKED_BY = ["capacity", "department", "equipment", "staff"] as const;
-const MESSAGE_ROLES = [
-  "staff",
-  "recruiter",
-  "journalist",
-  "regulator",
-  "rival",
-  "peer",
-] as const;
 
 export function validateMedicalData(data: unknown): boolean {
   if (!isObj(data)) return false;
@@ -183,69 +175,13 @@ export function validateMedicalData(data: unknown): boolean {
   if (!oneOf(m.triage, TRIAGE)) return false;
 
   // ----------------------------------------------------------------- phone
-  const phone = m.phone;
-  if (!isObj(phone)) return false;
-  if (!numbers(phone.social, ["followers", "trust", "sentiment", "scrutiny"])) {
-    return false;
-  }
-  if (!isInt(phone.lastPostWeek) || phone.lastPostWeek < 0) return false;
-  if (!numbers(phone, ["recruitBoost"])) return false;
-  if (!every(phone.postsMade, isStr)) return false;
-
-  if (
-    !every(
-      phone.feed,
-      (p) =>
-        isObj(p) &&
-        isStr(p.id) &&
-        isInt(p.week) &&
-        isStr(p.author) &&
-        isStr(p.handle) &&
-        isStr(p.body) &&
-        oneOf(p.kind, ["player", "world"]) &&
-        numbers(p, ["likes"]) &&
-        oneOf(p.tone, TONES) &&
-        every(p.comments, isObj),
-    )
-  ) {
-    return false;
-  }
-
-  if (
-    !every(
-      phone.messages,
-      (x) =>
-        isObj(x) &&
-        isStr(x.id) &&
-        isInt(x.week) &&
-        isStr(x.from) &&
-        isStr(x.handle) &&
-        isStr(x.body) &&
-        oneOf(x.role, MESSAGE_ROLES) &&
-        typeof x.read === "boolean" &&
-        (x.choices === undefined || every(x.choices, isObj)) &&
-        (x.answered === undefined || isInt(x.answered)),
-    )
-  ) {
-    return false;
-  }
-
-  if (
-    !every(
-      phone.news,
-      (n) =>
-        isObj(n) &&
-        isStr(n.id) &&
-        isInt(n.week) &&
-        isStr(n.outlet) &&
-        isStr(n.headline) &&
-        isStr(n.body) &&
-        oneOf(n.tone, TONES) &&
-        typeof n.read === "boolean",
-    )
-  ) {
-    return false;
-  }
+  /*
+   * Delegated to the shared validator every career now uses. This block
+   * used to hold its own copy of these checks — and its own gaps: any
+   * object passed as a choice, and `answered` was any integer, which the
+   * thread view then dereferenced. One validator, one set of claims.
+   */
+  if (!validatePhone(m.phone)) return false;
 
   // -------------------------------------------------------------- supplies
   const supplies = m.supplies;

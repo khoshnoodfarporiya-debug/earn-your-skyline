@@ -42,7 +42,7 @@ export function PrimaryNav({
           return (
             <li key={section.id} className="flex-1">
               <button
-                onClick={() => onNavigate(defaultScreen(section.id))}
+                onClick={() => onNavigate(defaultScreen(section.id, careerId))}
                 aria-current={isActive ? "page" : undefined}
                 className={`relative flex min-h-[56px] w-full flex-col items-center justify-center gap-1 px-1 py-2 transition lg:min-h-[44px] lg:flex-row lg:gap-2.5 lg:rounded-form lg:px-4 lg:py-2.5 ${
                   isActive

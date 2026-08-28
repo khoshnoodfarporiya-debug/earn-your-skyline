@@ -120,7 +120,7 @@ export function Avatar({
 
   /* ------------------------------------------------------------ initials */
   const key = handle ?? personId ?? name;
-  const tint = you ? "#2DD4BF" : TINTS[hashOf(key) % TINTS.length];
+  const tint = you ? "rgb(var(--accent))" : TINTS[hashOf(key) % TINTS.length];
 
   return (
     <span

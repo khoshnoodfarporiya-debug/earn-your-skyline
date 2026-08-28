@@ -2,6 +2,15 @@ import type { CareerDef, LedgerLine, RunState } from "../types";
 import type { SetbackKind } from "../setbacks";
 import { money } from "../format";
 import { pushLog } from "../engine";
+import { validatePhone } from "../phone/validate";
+import { makeRng } from "../rng";
+import { WORKSHOP_EVENTS } from "./newEvents";
+import {
+  generateWeekFrom,
+  initialPhoneFrom,
+  publishFrom,
+} from "../phone/voicePack";
+import { ENGINEER_PACK } from "../phone/packs";
 import {
   PRODUCT_BY_ID,
   WORKSHOP_CITIES,
@@ -9,7 +18,6 @@ import {
   buildableKinds,
   certWeeksFor,
   confidenceOf,
-  designNeeded,
   designProgress,
   estimateOf,
   faultCost,
@@ -20,12 +28,26 @@ import {
   revenueOf,
   shippedProducts,
   surfaceChance,
-  testYield,
   workshopCityOf,
   workshopRevenue,
   wouldCertify,
   type Product,
   type WorkshopState,
+  workshop,
+  ARCHITECTURES,
+  BENCH_ROLE_BY_ID,
+  RIG_BY_ID,
+  SPECS,
+  benchOf,
+  benchOutput,
+  benchSalary,
+  benchWages,
+  designNeededFor,
+  hasRig,
+  prototypeCost,
+  rigCost,
+  rigsOf,
+  testYieldFor,
 } from "./workshop";
 
 /**
@@ -50,8 +72,9 @@ import {
 const START_CASH = 24_000;
 const START_DEBT = 30_000;
 
-export const workshop = (s: RunState): WorkshopState =>
-  s.data.workshop as WorkshopState;
+/* Defined with the model; re-exported so every existing import of it
+   from this module keeps working. */
+export { workshop };
 
 const goalFor = (s: RunState): number =>
   Math.round(700_000 * workshopCityOf(workshop(s)).revenueIndex);
@@ -62,6 +85,30 @@ function focused(w: WorkshopState): Product | undefined {
   const live = w.products.filter((p) => p.stage !== "withdrawn");
   return live.find((p) => p.id === w.focus) ?? live[0];
 }
+
+/**
+ * The phone, created on first touch.
+ *
+ * Optional on the state so an older save loads; created here so that
+ * save gains a handset rather than being rejected for not having one.
+ */
+function ensurePhone(s: RunState) {
+  const st = workshop(s);
+  if (!st.phone) st.phone = initialPhoneFrom(ENGINEER_PACK);
+  return st.phone;
+}
+
+const BENCH_NAMES = [
+  "R. Osei",
+  "M. Lindgren",
+  "K. Tanaka",
+  "A. Sharma",
+  "J. Novak",
+  "L. Moreau",
+  "D. Adeyemi",
+  "S. Petrov",
+] as const;
+const benchName = (n: number) => BENCH_NAMES[n % BENCH_NAMES.length];
 
 export const engineer: CareerDef = {
   id: "engineer",
@@ -141,7 +188,7 @@ export const engineer: CareerDef = {
         if (!kind) return [];
         const added = kind.complexity * Math.max(0.35, 1 - s.r.skill / 160);
         return [
-          `Design ${Math.min(designNeeded(kind), p.design + 1)} of ${designNeeded(kind)} weeks`,
+          `Design ${Math.min(designNeededFor(p, kind), p.design + 1)} of ${designNeededFor(p, kind)} weeks`,
           `And roughly ${added.toFixed(1)} more faults in it — craft reduces this, never to zero`,
         ];
       },
@@ -158,7 +205,7 @@ export const engineer: CareerDef = {
         const p = focused(w);
         if (!p) return ["Nothing to test."];
         return [
-          `Finds and fixes about ${testYield(p).toFixed(1)} faults`,
+          `Finds and fixes about ${testYieldFor(w, p).toFixed(1)} faults`,
           `Confidence ${confidenceOf(p)}% → ${confidenceOf({ ...p, tested: p.tested + 1 })}%`,
         ];
       },
@@ -207,7 +254,7 @@ export const engineer: CareerDef = {
     },
   ],
 
-  events: [],
+  events: WORKSHOP_EVENTS,
 
   initialResources: () => ({
     cash: START_CASH,
@@ -219,7 +266,13 @@ export const engineer: CareerDef = {
     _burnoutPeak: 0,
   }),
 
-  initialData: () => ({ workshop: initialWorkshop() }),
+  initialData: () => {
+    /* The handset exists from week one, so the button is there the
+       first time anybody looks for it. */
+    const st = initialWorkshop();
+    st.phone = initialPhoneFrom(ENGINEER_PACK);
+    return { workshop: st };
+  },
 
   startCities: WORKSHOP_CITIES,
 
@@ -234,6 +287,32 @@ export const engineer: CareerDef = {
   command: (s, cmd, arg) => {
     const w = workshop(s);
     switch (cmd) {
+      /*
+       * THE HANDSET.
+       *
+       * Four commands, identical in every career that has a phone.
+       * The content differs; the transaction does not.
+       */
+      case "post": {
+        const phone = ensurePhone(s);
+        publishFrom(
+          ENGINEER_PACK,
+          phone,
+          s,
+          arg,
+          makeRng((s.seed ^ (s.week * 0x2f6f2b79)) >>> 0),
+        );
+        break;
+      }
+      case "readMessages": {
+        for (const m of ensurePhone(s).messages) m.read = true;
+        break;
+      }
+      case "readNews": {
+        for (const n of ensurePhone(s).news) n.read = true;
+        break;
+      }
+
       case "startProduct": {
         const kind = PRODUCT_BY_ID.get(arg);
         if (!kind) return;
@@ -267,7 +346,7 @@ export const engineer: CareerDef = {
         const p = w.products.find((x) => x.id === arg);
         if (!p || p.stage !== "design") return;
         const kind = kindOf(p);
-        if (!kind || p.design < designNeeded(kind)) return;
+        if (!kind || p.design < designNeededFor(p, kind)) return;
         p.stage = "testing";
         break;
       }
@@ -282,7 +361,7 @@ export const engineer: CareerDef = {
         const p = w.products.find((x) => x.id === arg);
         if (!p || (p.stage !== "testing" && p.stage !== "design")) return;
         const kind = kindOf(p);
-        if (!kind || p.design < designNeeded(kind)) return;
+        if (!kind || p.design < designNeededFor(p, kind)) return;
         if (s.r.cash < kind.certCost) return;
         s.r.cash -= kind.certCost;
         p.stage = "certifying";
@@ -297,6 +376,115 @@ export const engineer: CareerDef = {
        * out — you are rebuilding the thing — and costs a fraction of the
        * standing that the same faults would have taken one at a time.
        */
+      /*
+       * THE SLICE'S COMMANDS. `arg` is "productId:choice" where a choice is
+       * being made; a bare id or role id otherwise. Spec and architecture
+       * are settled while the thing is still being designed — renegotiating
+       * requirements on a shipped product is called a recall.
+       */
+      case "setSpec": {
+        const [id, level] = arg.split(":");
+        const p = w.products.find((x) => x.id === id);
+        if (!p || p.stage !== "design" || p.spec !== undefined) return;
+        if (!SPECS[level as keyof typeof SPECS]) return;
+        p.spec = level as keyof typeof SPECS;
+        pushLog(
+          s,
+          `The ${p.name}'s requirements are agreed: ${SPECS[p.spec].label.toLowerCase()}. ${SPECS[p.spec].blurb}`,
+          "neutral",
+        );
+        break;
+      }
+
+      case "setArchitecture": {
+        const [id, archId] = arg.split(":");
+        const p = w.products.find((x) => x.id === id);
+        if (!p || p.stage !== "design" || p.architecture !== undefined) return;
+        if (!ARCHITECTURES[archId as keyof typeof ARCHITECTURES]) return;
+        p.architecture = archId as keyof typeof ARCHITECTURES;
+        pushLog(
+          s,
+          `The ${p.name} will be ${ARCHITECTURES[p.architecture].label.toLowerCase()}. ${ARCHITECTURES[p.architecture].blurb}`,
+          "neutral",
+        );
+        break;
+      }
+
+      case "buildPrototype": {
+        const p = w.products.find((x) => x.id === arg);
+        const kind = p ? kindOf(p) : undefined;
+        if (!p || !kind || p.prototyped) return;
+        if (p.stage !== "design" && p.stage !== "testing") return;
+        const cost = prototypeCost(w, kind);
+        if (s.r.cash < cost) return;
+        s.r.cash -= cost;
+        p.prototyped = true;
+        /* A prototype is the certifier's rigour pointed earlier: it tells
+           you what is in there, and pulls one real fault out on the way. */
+        p.tested += 2;
+        p.latent = Math.max(0, p.latent - 1);
+        pushLog(
+          s,
+          `A ${p.name} prototype came off the bench: ${money(cost)}, one real fault found on the way, and an estimate you can finally lean on.`,
+          "good",
+        );
+        break;
+      }
+
+      case "buyRig": {
+        const rig = RIG_BY_ID.get(arg);
+        if (!rig || hasRig(w, rig.id)) return;
+        const cost = rigCost(w, rig);
+        if (s.r.cash < cost) return;
+        s.r.cash -= cost;
+        w.rigs = [...rigsOf(w), rig.id];
+        pushLog(
+          s,
+          `The ${rig.label.toLowerCase()} is in and bolted down. ${rig.blurb}`,
+          "good",
+        );
+        break;
+      }
+
+      case "hireBench": {
+        const role = BENCH_ROLE_BY_ID.get(arg);
+        if (!role) return;
+        /* One of each discipline. A second mechanical engineer is a
+           different company. */
+        if (benchOf(w).some((h) => h.role === role.id)) return;
+        const salary = benchSalary(w, role);
+        if (s.r.cash < salary * 4) return;
+        const n = w.nextId++;
+        w.team = [
+          ...benchOf(w),
+          {
+            id: `bh-${n}`,
+            name: benchName(n),
+            role: role.id,
+            salary,
+            since: s.week,
+          },
+        ];
+        pushLog(
+          s,
+          `${w.team[w.team.length - 1].name} joins the bench: ${role.label.toLowerCase()}, ${money(salary)} a week.`,
+          "neutral",
+        );
+        break;
+      }
+
+      case "letGoBench": {
+        const idx = benchOf(w).findIndex((h) => h.id === arg);
+        if (idx < 0) return;
+        const team = [...benchOf(w)];
+        const [gone] = team.splice(idx, 1);
+        w.team = team;
+        s.r.cash -= gone.salary * 2;
+        s.r.burnout = Math.min(100, s.r.burnout + 3);
+        pushLog(s, `You let ${gone.name} go. Two weeks' notice, paid.`, "bad");
+        break;
+      }
+
       case "recallProduct": {
         const p = w.products.find((x) => x.id === arg && x.stage === "shipped");
         if (!p) return;
@@ -338,9 +526,14 @@ export const engineer: CareerDef = {
         if (!p || (p.stage !== "design" && p.stage !== "testing")) return;
         const kind = kindOf(p);
         if (!kind) return;
-        if (p.design < designNeeded(kind)) {
+        if (p.design < designNeededFor(p, kind)) {
           p.design += 1;
-          p.latent += kind.complexity * Math.max(0.35, 1 - s.r.skill / 160);
+          /* A lean spec leaves more in there per week; a hardened one less.
+             Exactly one for the product that never negotiated. */
+          p.latent +=
+            kind.complexity *
+            Math.max(0.35, 1 - s.r.skill / 160) *
+            SPECS[p.spec ?? "standard"].seed;
         }
         s.r.skill = Math.min(100, s.r.skill + 0.3);
         s.r.burnout = Math.min(100, s.r.burnout + 3.5);
@@ -349,8 +542,8 @@ export const engineer: CareerDef = {
       case "test": {
         const p = focused(w);
         if (!p || (p.stage !== "testing" && p.stage !== "design")) return;
-        p.latent = Math.max(0, p.latent - testYield(p));
-        p.tested += 1;
+        p.latent = Math.max(0, p.latent - testYieldFor(w, p));
+        p.tested += hasRig(w, "shaker") ? 1.5 : 1;
         s.r.skill = Math.min(100, s.r.skill + 0.2);
         s.r.burnout = Math.min(100, s.r.burnout + 3);
         break;
@@ -380,8 +573,36 @@ export const engineer: CareerDef = {
 
   resolveWeek: (s, rng) => {
     const w = workshop(s);
+    /* The spec's fault seeding, shared with the design action. */
+    const specOfSeed = (p: Product) => SPECS[p.spec ?? "standard"].seed;
     const out: LedgerLine[] = [];
     const city = workshopCityOf(w);
+
+    /* -------------------------------------------------- the disciplines */
+    /* The bench works its own week: design and testing to the focused
+       product, reach to everything shipped. An empty team is a zero. */
+    {
+      const outp = benchOutput(w);
+      const target = w.products.find((x) => x.id === w.focus && x.stage !== "shipped")
+        ?? w.products.find((x) => x.stage === "design" || x.stage === "testing");
+      if (target) {
+        const kind = kindOf(target);
+        if (kind && outp.design > 0 && target.design < designNeededFor(target, kind)) {
+          target.design += outp.design;
+          target.latent +=
+            kind.complexity * Math.max(0.35, 1 - s.r.skill / 160) * outp.design * specOfSeed(target);
+        }
+        if (outp.test > 0 && (target.stage === "testing" || target.stage === "design")) {
+          target.latent = Math.max(0, target.latent - testYieldFor(w, target) * outp.test);
+          target.tested += outp.test;
+        }
+      }
+      if (outp.reach > 0) {
+        for (const sp of w.products) {
+          if (sp.stage === "shipped") sp.reach = Math.min(1, sp.reach + outp.reach);
+        }
+      }
+    }
 
     /* ----------------------------------------------------- certification */
     for (const p of w.products) {
@@ -482,8 +703,28 @@ export const engineer: CareerDef = {
       kind: "expense",
     });
     s.r.cash -= city.overhead;
+    {
+      const wages = benchWages(w);
+      if (wages > 0) {
+        out.push({
+          label: `The bench — ${benchOf(w).length} discipline${benchOf(w).length === 1 ? "" : "s"}`,
+          amount: -wages,
+          kind: "expense",
+        });
+        s.r.cash -= wages;
+      }
+    }
 
     s.r.burnout = Math.max(0, s.r.burnout - 1);
+    /* What the world says about the week that just happened. Its own
+       stream, so the phone can never disturb the simulation's dice. */
+    generateWeekFrom(
+      ENGINEER_PACK,
+      ensurePhone(s),
+      s,
+      makeRng((s.seed ^ (s.week * 0x3e8c5b41)) >>> 0),
+    );
+
     s.r._burnoutPeak = Math.max(s.r._burnoutPeak ?? 0, s.r.burnout);
     return out;
   },
@@ -504,11 +745,22 @@ export const engineer: CareerDef = {
     if (typeof d !== "object" || d === null) return false;
     const w = d.workshop as WorkshopState | undefined;
     if (typeof w !== "object" || w === null) return false;
+    /* The phone is optional — a save from before this career had one
+       still loads — but a present one must be the real shape. This
+       career previously did not look at it at all. */
+    if (w.phone !== undefined && !validatePhone(w.phone)) {
+      return false;
+    }
     if (!WORKSHOP_CITY_BY_ID.has(w.city)) return false;
     if (!Array.isArray(w.products)) return false;
     const stages = ["design", "testing", "certifying", "shipped", "withdrawn"];
     for (const p of w.products) {
       if (!PRODUCT_BY_ID.has(p.kind)) return false;
+      /* Phase 5 fields, optional to the last. */
+      if (p.spec !== undefined && !SPECS[p.spec]) return false;
+      if (p.architecture !== undefined && !ARCHITECTURES[p.architecture]) {
+        return false;
+      }
       if (!stages.includes(p.stage)) return false;
       if (
         [p.design, p.tested, p.latent, p.reach].some(
@@ -518,6 +770,14 @@ export const engineer: CareerDef = {
         return false;
       }
       if (p.latent < 0) return false;
+    }
+    if (w.rigs !== undefined) {
+      if (!Array.isArray(w.rigs)) return false;
+      if (w.rigs.some((r) => !RIG_BY_ID.has(r))) return false;
+    }
+    if (w.team !== undefined) {
+      if (!Array.isArray(w.team)) return false;
+      if (w.team.some((h) => !BENCH_ROLE_BY_ID.has(h.role))) return false;
     }
     return true;
   },
@@ -557,13 +817,13 @@ export const engineer: CareerDef = {
     const designBlocks = alloc.design ?? 0;
     const testBlocks = alloc.test ?? 0;
     for (let i = 0; i < designBlocks; i++) {
-      if (projected.design < designNeeded(kind)) {
+      if (projected.design < designNeededFor(projected, kind)) {
         projected.design += 1;
         projected.latent += kind.complexity * Math.max(0.35, 1 - s.r.skill / 160);
       }
     }
     for (let i = 0; i < testBlocks; i++) {
-      projected.latent = Math.max(0, projected.latent - testYield(projected));
+      projected.latent = Math.max(0, projected.latent - testYieldFor(w, projected));
       projected.tested += 1;
     }
     const est = estimateOf(projected);
@@ -585,7 +845,7 @@ export const engineer: CareerDef = {
         value:
           p.stage === "shipped"
             ? `${Math.round(p.reach * 100)}%`
-            : `${Math.min(designNeeded(kind), projected.design)} of ${designNeeded(kind)} weeks`,
+            : `${Math.min(designNeededFor(projected, kind), projected.design)} of ${designNeededFor(projected, kind)} weeks`,
         tone:
           p.stage === "shipped"
             ? ("neutral" as const)

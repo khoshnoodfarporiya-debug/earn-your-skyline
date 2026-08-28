@@ -52,10 +52,18 @@ export default {
         "ink-faint": "#71829B",
 
         /* ---------------------------------------------------- the accents */
-        /** Primary action, active state, things you own. */
-        clinical: "#2DD4BF",
-        "clinical-hover": "#5EEAD4",
-        "clinical-tint": "#0E2B2C",
+        /**
+         * Primary action, active state, things you own.
+         *
+         * Since Phase 4 this is the CAREER ACCENT: the raw values live in
+         * globals.css keyed by `data-career` on the game's root, teal when
+         * nobody is signed in. The token kept its name so the whole
+         * interface re-skins from the variables rather than from four
+         * hundred call sites.
+         */
+        clinical: "rgb(var(--accent) / <alpha-value>)",
+        "clinical-hover": "rgb(var(--accent-hover) / <alpha-value>)",
+        "clinical-tint": "rgb(var(--accent-tint) / <alpha-value>)",
         /** Dark ink for use ON teal or gold. */
         "on-accent": "#042420",
 

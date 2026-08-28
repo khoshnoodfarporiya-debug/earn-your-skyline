@@ -2,7 +2,12 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { CAREER_PREVIEWS, getCareer } from "@/lib/game/careers";
+import {
+  CAREER_PREVIEWS,
+  SUGGESTED_FIRST,
+  getCareer,
+  suggestedReason,
+} from "@/lib/game/careers";
 import { careerVisual } from "@/lib/ui/visuals";
 import { CareerIcon } from "./Icons";
 import { ArtFrame } from "./visuals/ArtFrame";
@@ -30,10 +35,15 @@ export function CareerSelect({
   onPick,
   hasSave,
   onContinue,
+  playerName = "",
+  onSignOut,
 }: {
   onPick: (careerId: string, cityId?: string) => void;
   hasSave: boolean;
   onContinue: () => void;
+  /** Who is signed in, for the greeting. Empty is a valid state. */
+  playerName?: string;
+  onSignOut?: () => void;
 }) {
   const [armed, setArmed] = useState<string | null>(null);
   /* The career whose start city is being chosen, if we are on that step. */
@@ -90,6 +100,45 @@ export function CareerSelect({
           own resources, its own ways of coming apart. Nothing here ends your
           run except you deciding it is finished.
         </p>
+
+        {/*
+          Who is playing, and the way out.
+          Accounts exist now, and a signed-in game with no way to say "not me"
+          is a trap for anybody sharing a computer — which is the whole reason
+          the accounts are there.
+        */}
+        {/*
+          The steer. Seven careers, each with their own vocabulary, is a lot to
+          meet at once — and "which one teaches me the game" is a fair question
+          that the screen should simply answer.
+        */}
+        {!hasSave && (
+          <p className="mt-4 max-w-xl rounded-form border border-gold/40 bg-gold-tint px-3.5 py-2.5 text-[13px] leading-relaxed text-ink-soft">
+            <span className="font-medium text-gold">New here?</span> Start with
+            the Chef. {suggestedReason}
+          </p>
+        )}
+
+        {playerName && (
+          <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-faint">
+            <span>
+              Signed in as{" "}
+              <span className="font-medium text-ink">{playerName}</span>
+            </span>
+            {onSignOut && (
+              <>
+                <span aria-hidden>·</span>
+                <button
+                  type="button"
+                  onClick={onSignOut}
+                  className="rounded-form px-1 text-clinical underline-offset-2 transition hover:underline"
+                >
+                  Not you?
+                </button>
+              </>
+            )}
+          </p>
+        )}
       </header>
 
       {hasSave && (
@@ -104,6 +153,7 @@ export function CareerSelect({
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {CAREER_PREVIEWS.map((c, i) => {
           const selected = armed === c.id;
+          const suggested = c.id === SUGGESTED_FIRST;
           return (
             <button
               key={c.id}
@@ -171,6 +221,25 @@ export function CareerSelect({
                   >
                     {c.available ? "OPEN" : "CLOSED"}
                   </span>
+                  {/* The one card a newcomer should look at first. Marked
+                      rather than reordered, so the list stays stable. */}
+                  {/*
+                    `aria-hidden` on purpose. This badge is a visual echo of
+                    the "New here? Start with the Chef" line in the header,
+                    which a screen reader already reads — and anything inside
+                    this button becomes part of its accessible name, so an
+                    un-hidden badge would rename the card to "OPEN START HERE
+                    Chef" for assistive tech and for every test that finds it
+                    by name.
+                  */}
+                  {suggested && (
+                    <span
+                      aria-hidden
+                      className="rounded-full border border-gold/60 bg-[#070E19]/70 px-2 py-0.5 text-[11.5px] tracking-widest text-gold"
+                    >
+                      START HERE
+                    </span>
+                  )}
                   <span
                     className={c.available ? "text-clinical" : "text-ink-faint"}
                   >
@@ -262,10 +331,16 @@ export function CareerSelect({
         })}
       </div>
 
+      {/*
+        This line used to say that four of the careers above were designs
+        rather than implementations. They were, and then they were built, and
+        the note sat here contradicting seven cards that all say OPEN. What it
+        says now is the thing that is still true and still worth knowing.
+      */}
       <p className="mt-8 max-w-xl text-xs leading-relaxed text-ink-faint">
-        Architect, Founder, Politician and Engineer are designed, not built.
-        The engine already supports them — each is one{" "}
-        <span className="num">CareerDef</span> away.
+        Seven careers, seven different ways of coming apart. Adding an eighth
+        is one <span className="num">CareerDef</span> — the engine adapts to
+        it without changes anywhere else.
       </p>
     </main>
   );

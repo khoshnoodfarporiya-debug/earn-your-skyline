@@ -40,6 +40,7 @@ import {
 import { Avatar } from "../ui/Avatar";
 import { EndOfList } from "./EndOfList";
 import { PostComposer } from "./PostComposer";
+import { packFor } from "@/lib/game/phone/packs";
 
 /**
  * Pulse: your standing, the composer, and the feed.
@@ -62,6 +63,12 @@ export function PulseApp({
    */
   const isChef = state.careerId === "chef";
   const isLawyer = state.careerId === "lawyer";
+  /*
+   * The four careers whose phone is built from a voice pack. Their posts are
+   * a table rather than a hand-written catalogue, and the composer is generic
+   * over the context type, so the whole thing drops straight in.
+   */
+  const pack = packFor(state.careerId);
   const phone = phoneOf(state);
   const social = phone?.social ?? {
     followers: 0,
@@ -70,15 +77,26 @@ export function PulseApp({
     scrutiny: 0,
   };
   const feed = phone?.feed ?? [];
-  const identity = isChef
-    ? chefIdentityOf(social)
-    : isLawyer
-      ? lawyerIdentityOf(social)
-      : identityOf(social);
+  const identity = pack
+    ? pack.identity(social)
+    : isChef
+      ? chefIdentityOf(social)
+      : isLawyer
+        ? lawyerIdentityOf(social)
+        : identityOf(social);
+
+  /* A packed career's posts, gated on the run exactly like the others. */
+  const packPosts = pack
+    ? pack.posts.filter(
+        (x) =>
+          x.available(state) &&
+          !(x.once && (phone?.postsMade ?? []).includes(x.id)),
+      )
+    : [];
 
   /* The doctor's composer inputs. Only computed for a doctor — `med(state)`
      would throw on anyone else's save. */
-  const m = isChef || isLawyer ? null : med(state);
+  const m = isChef || isLawyer || pack ? null : med(state);
   const ctx = m
     ? postContext(m, { week: state.week, panel: state.r.panel })
     : null;
@@ -265,7 +283,16 @@ export function PulseApp({
 
       {/* Same composer, per-career catalogue. The generic keeps each
           catalogue honest against its own context type. */}
-      {isChef && chefCtx ? (
+      {pack ? (
+        <PostComposer
+          posts={packPosts.map((x) => ({ ...x, category: x.category ?? "post" }))}
+          context={state}
+          canPost={(phone?.lastPostWeek ?? 0) < state.week}
+          week={state.week}
+          emptyLine={composerEmptyLine(state.careerId)}
+          onPublish={(id) => dispatch("post", id)}
+        />
+      ) : isChef && chefCtx ? (
         <PostComposer
           posts={chefPosts}
           context={chefCtx}
@@ -302,7 +329,9 @@ export function PulseApp({
             ? "the city eats out and talks about it"
             : isLawyer
               ? "the profession talks about who won what"
-              : "the profession talks"}{" "}
+              : pack
+                ? `${pack.world} talks`
+                : "the profession talks"}{" "}
           whether or not you join in.
         </p>
       ) : (

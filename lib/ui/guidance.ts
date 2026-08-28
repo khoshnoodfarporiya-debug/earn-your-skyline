@@ -4,6 +4,10 @@ import { activeCities, capacityIn } from "../game/medical/sim";
 import type { ScreenId } from "./navigation";
 import { chefStep } from "./chefHelp";
 import { lawyerStep } from "./lawyerHelp";
+import { founderStep } from "./founderHelp";
+import { politicianStep } from "./politicianHelp";
+import { architectStep } from "./architectHelp";
+import { engineerStep } from "./engineerHelp";
 
 /**
  * Progressive disclosure, done as one sentence at a time.
@@ -86,6 +90,10 @@ export function nextStep(
   /* Past the plan, the next step is entirely the career's own business. */
   if (state.careerId === "chef") return chefStep(state, alloc);
   if (state.careerId === "lawyer") return lawyerStep(state, alloc);
+  if (state.careerId === "founder") return founderStep(state, alloc);
+  if (state.careerId === "politician") return politicianStep(state, alloc);
+  if (state.careerId === "architect") return architectStep(state, alloc);
+  if (state.careerId === "engineer") return engineerStep(state, alloc);
   if (state.careerId !== "doctor") return null;
 
   const m = med(state);

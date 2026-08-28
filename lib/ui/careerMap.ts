@@ -35,6 +35,14 @@ export const HORIZON: Record<string, string> = {
   chef: "One kitchen, and you do not move it. A second site — and the question of whether a brigade can run without you in the room — is not built yet.",
   lawyer:
     "One set of chambers, and you do not move them. Regional offices, and instructions that arrive from somewhere other than here, are not built yet.",
+  founder:
+    "One market, and you do not relocate the company. Opening a second office — and the question of whether a team ships anything in the month it moves — is not built yet.",
+  politician:
+    "One seat, and you do not switch to a safer one. Standing somewhere else, and the reputation for doing it, are not built yet.",
+  architect:
+    "One studio, and the work comes to it. A second office in another country — and drawings signed off by somebody you have never met — is not built yet.",
+  engineer:
+    "One workshop, and one certifier. Selling into a second market means a second certification, with its own tolerance and its own queue, and that is not built yet.",
 };
 
 export const horizonFor = (careerId: string): string | null =>

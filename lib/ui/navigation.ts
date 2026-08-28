@@ -1,18 +1,35 @@
 /**
  * Navigation model.
  *
- * Nine equally-weighted tabs told a new player nothing about what mattered.
- * They are now five destinations, each answering a different question:
+ * PHASE 4: ONE INFORMATION ARCHITECTURE, SEVEN VOICES
  *
- *   Overview  — what do I do this week?
- *   Practice  — what am I able to treat?
- *   Network   — where am I, and what is happening out there?
- *   Career    — what am I qualified to do myself?
- *   Life      — what is all this for?
+ * Every career now shares the same five destinations, in the same order,
+ * with the same meanings:
  *
- * Every former tab is still reachable; the ones that are consequences of
- * other decisions (Caseload, Growth) now sit inside the section that causes
- * them rather than competing with it.
+ *   Week    — what do I do this week? Plan, constraints, commit, review.
+ *   Work    — the profession's own simulation: the practice, the kitchen,
+ *             the chambers, the company, the seat, the boards, the bench.
+ *   World   — where am I, and what is happening out there? Map, cities,
+ *             rivals, opportunities.
+ *   Career  — what am I becoming? Progression, standing, people, milestones.
+ *   Life    — what is all this for?
+ *
+ * The voice stays with the career: the destinations carry neutral names, and
+ * everything inside them keeps its own vocabulary — a Chef's Work is a larder
+ * and a pass, a Solicitor's is instructions and casework. What is stable is
+ * the *shape*: a player who has run one career knows where everything is in
+ * the next one.
+ *
+ * Not every career has all five yet. Career and Life exist where there is
+ * something real behind them (the Physician has both, the Chef has Career);
+ * a destination with nothing behind it would be a tab that lies, so the
+ * others simply do not show it until its systems exist. The order never
+ * changes — a missing destination is skipped, not reshuffled.
+ *
+ * Before this, each career named its own bar (Overview / Kitchen / You /
+ * Map…). Every screen id below predates the change and is unchanged: saves,
+ * lessons, alerts and tests all address screens, and screens did not move
+ * ids — only the destinations grouping them were renamed and re-ordered.
  */
 
 export type ScreenId =
@@ -60,26 +77,38 @@ export type ScreenId =
   | "instructions"
   | "casework"
   | "ledger"
-  | "firm";
+  | "firm"
+  /* The Founder's own screens. `runway` is the career's binding constraint and
+     deliberately not the Physician's `money`; `crew` is deliberately not
+     `team`, which the Physician already owns. */
+  | "runway"
+  | "crew"
+  | "raising"
+  /* Phase 5: the product itself — discovery, the roadmap, experiments. */
+  | "product"
+  /* The Politician's own screens. `positions` is deliberately not the
+     Physician's `standing`, which means something else entirely. */
+  | "polling"
+  | "blocs"
+  | "positions"
+  | "office"
+  /* Phase 5: named constituents, the ground game and the fund. */
+  | "constituents"
+  /* The Architect's own screens. `boards` is deliberately not the Physician's
+     `build`, and `atelier` is deliberately not the Chef's `kitchen`. */
+  | "boards"
+  | "offers"
+  | "competitions"
+  | "atelier"
+  /* The Engineer's own two. */
+  | "bench"
+  | "newbuild";
 
-export type SectionId =
-  | "overview"
-  | "practice"
-  | "network"
-  | "career"
-  | "life"
-  /* The generic shell's own destinations. Deliberately not "practice" and
-     "network": those ids belong to the Physician, and `defaultScreen` would
-     route a Chef to the medical Build screen — which is exactly what it did
-     the first time this was wired up. */
-  | "business"
-  | "where"
-  /* The Chef's one content destination, holding five screens. */
-  | "kitchen"
-  /* And the one that is about the chef rather than the restaurant. */
-  | "chef"
-  /* The Solicitor's one content destination, holding four screens. */
-  | "chambers";
+/**
+ * The five stable destinations. Every career's bar is a subsequence of this
+ * list, in this order — never a reordering, never an addition.
+ */
+export type SectionId = "week" | "work" | "world" | "career" | "life";
 
 export interface ScreenDef {
   id: ScreenId;
@@ -96,22 +125,49 @@ export interface SectionDef {
   screens: ScreenDef[];
 }
 
+/** The Week destination is identical for every career, so it is written once.
+    The screen keeps its historical id — `overview` is what saves, lessons and
+    a hundred tests address. */
+const WEEK: SectionDef = {
+  id: "week",
+  label: "Week",
+  icon: "pulse",
+  screens: [
+    {
+      id: "overview",
+      label: "Week",
+      purpose: "Your week, and everything that needs a decision.",
+    },
+  ],
+};
+
+/** The World destination for a career whose world is one map. */
+const WORLD_MAP_ONLY: SectionDef = {
+  id: "world",
+  label: "World",
+  icon: "globe",
+  screens: [
+    {
+      id: "home",
+      label: "Map",
+      purpose: "Where you work, and how far that currently reaches.",
+    },
+  ],
+};
+
+/**
+ * THE PHYSICIAN
+ *
+ * The oldest career and the largest section set — and, since Phase 4, no
+ * longer a different shape: what was Overview / Practice / Network / Career /
+ * Life is now Week / Work / World / Career / Life, the same frame every other
+ * career uses. Nothing behind the destinations moved.
+ */
 export const SECTIONS: SectionDef[] = [
+  WEEK,
   {
-    id: "overview",
-    label: "Overview",
-    icon: "pulse",
-    screens: [
-      {
-        id: "overview",
-        label: "Overview",
-        purpose: "Your week, and everything that needs a decision.",
-      },
-    ],
-  },
-  {
-    id: "practice",
-    label: "Practice",
+    id: "work",
+    label: "Work",
     icon: "building",
     screens: [
       {
@@ -137,7 +193,7 @@ export const SECTIONS: SectionDef[] = [
       },
       {
         id: "contracts",
-        label: "Work",
+        label: "Assignments",
         purpose: "Assignments on offer, what you are carrying, and how it is going.",
       },
       {
@@ -153,8 +209,8 @@ export const SECTIONS: SectionDef[] = [
     ],
   },
   {
-    id: "network",
-    label: "Network",
+    id: "world",
+    label: "World",
     icon: "globe",
     screens: [
       {
@@ -226,39 +282,23 @@ export const SECTIONS: SectionDef[] = [
 ];
 
 /**
- * NAVIGATION FOR A CAREER THAT IS NOT THE PHYSICIAN
+ * NAVIGATION FOR A CAREER THAT IS NOT YET ANYTHING IN PARTICULAR
  *
- * `SECTIONS` above is a medical vocabulary — Caseload, Supplies, Outbreaks —
- * and eighteen months of Physician-specific screens sit behind it. A second
- * career cannot borrow that and should not pretend to.
+ * A career the app has no bespoke screens for gets three destinations: the
+ * week, the work, and the world — the planner, the ledger and the events are
+ * engine-level and already career-agnostic, and the one Work screen carries
+ * the mechanic that makes the career different from the others.
  *
- * So a career the app has no bespoke screens for gets two destinations: the
- * week, and the thing the career is about — the planner, the ledger and the
- * events are engine-level and already career-agnostic, and the one screen
- * carries the mechanic that makes the career different from the others.
- *
- * Both careers that have ever used this have since outgrown it: the Chef
- * first (`CHEF_SECTIONS`), the Solicitor after (`LAWYER_SECTIONS`). What is
- * left here is the landing place for the *next* career, which is the job it
- * was written for. It is honestly a smaller shell than the Physician's, not a
+ * Every career that has ever used this has since outgrown it. What is left
+ * here is the landing place for the *next* career, which is the job it was
+ * written for. It is honestly a smaller shell than a finished career's, not a
  * claim of parity.
  */
 const GENERIC_SECTIONS: SectionDef[] = [
+  WEEK,
   {
-    id: "overview",
-    label: "Overview",
-    icon: "pulse",
-    screens: [
-      {
-        id: "overview",
-        label: "Overview",
-        purpose: "Your week, and everything that needs a decision.",
-      },
-    ],
-  },
-  {
-    id: "business",
-    label: "Business",
+    id: "work",
+    label: "Work",
     icon: "building",
     screens: [
       {
@@ -268,58 +308,25 @@ const GENERIC_SECTIONS: SectionDef[] = [
       },
     ],
   },
-  {
-    id: "where",
-    label: "Map",
-    icon: "globe",
-    screens: [
-      {
-        id: "home",
-        label: "Map",
-        purpose: "Where you work, and how far that currently reaches.",
-      },
-    ],
-  },
+  WORLD_MAP_ONLY,
 ];
 
 /**
- * NAVIGATION FOR THE CHEF
+ * THE CHEF
  *
- * The Chef outgrew the generic shell first. One "Business" screen carried the
- * book, the larder, six suppliers, the kit list, the brigade and the service
- * report in a single column — about two thousand pixels of scrolling on a
- * phone, with the decision you opened it to make somewhere in the middle.
- *
- * It is still one destination in the bar, because a Chef runs one restaurant
- * and a second primary tab would imply a second business. What changed is that
- * the destination now has screens, each answering a question the career
- * actually asks:
- *
- *   The room    what can this building do?
- *   Larder      what is in it, how long has it got, and who brings more?
- *   The pass    what am I able to serve, and how did the last night go?
- *   Brigade     who is on the line, and are they staying?
- *   Money       what is coming in, what leaves anyway, and what is it worth?
- *
- * No mechanic moved. This is the same state, split at the seams it already
- * had.
+ * The Chef outgrew the generic shell first, and under the old bar its fourth
+ * destination was called "You" — the craft and the work beyond the kitchen,
+ * the things that travel with the person rather than the premises. That is
+ * exactly what Career means in the shared frame, so the destination kept its
+ * two screens and took the shared name. The scene — who eats out in this
+ * city, and the rivals cooking for them — lives in World beside the map,
+ * which is where a Physician finds the same subjects.
  */
 const CHEF_SECTIONS: SectionDef[] = [
+  WEEK,
   {
-    id: "overview",
-    label: "Overview",
-    icon: "pulse",
-    screens: [
-      {
-        id: "overview",
-        label: "Overview",
-        purpose: "Your week, and everything that needs a decision.",
-      },
-    ],
-  },
-  {
-    id: "kitchen",
-    label: "Kitchen",
+    id: "work",
+    label: "Work",
     icon: "building",
     screens: [
       {
@@ -364,22 +371,27 @@ const CHEF_SECTIONS: SectionDef[] = [
       },
     ],
   },
-  /*
-   * THE FOURTH DESTINATION, AND WHY IT IS NOT PART OF THE KITCHEN
-   *
-   * Everything under Kitchen is a property of the restaurant: the room, the
-   * stock, the menu, the brigade, the book. These two are properties of the
-   * *chef* — what they can personally do, and the work they are offered
-   * because of it — and they travel with the person rather than the premises.
-   *
-   * The Physician has had exactly this separation since it shipped, under
-   * "Career". It is the same distinction and it earns its own tab for the same
-   * reason: a player deciding whether to spend a week learning to fillet fish
-   * is not thinking about their larder.
-   */
   {
-    id: "chef",
-    label: "You",
+    id: "world",
+    label: "World",
+    icon: "globe",
+    screens: [
+      {
+        id: "home",
+        label: "Map",
+        purpose: "Where you work, and how far that currently reaches.",
+      },
+      {
+        id: "scene",
+        label: "The scene",
+        purpose:
+          "Who eats out in this city, what the season is doing, and the three restaurants competing for them.",
+      },
+    ],
+  },
+  {
+    id: "career",
+    label: "Career",
     icon: "certificate",
     screens: [
       {
@@ -396,40 +408,13 @@ const CHEF_SECTIONS: SectionDef[] = [
       },
     ],
   },
-  {
-    id: "where",
-    label: "Map",
-    icon: "globe",
-    screens: [
-      {
-        id: "home",
-        label: "Map",
-        purpose: "Where you work, and how far that currently reaches.",
-      },
-      {
-        id: "scene",
-        label: "The scene",
-        purpose:
-          "Who eats out in this city, what the season is doing, and the three restaurants competing for them.",
-      },
-    ],
-  },
 ];
 
 /**
- * NAVIGATION FOR THE SOLICITOR
+ * THE SOLICITOR
  *
- * The Solicitor was the last career on the generic shell, and it showed. One
- * "Business" screen carried the live files, the instructions on the table and
- * the hire shelf in a single column — so the decision the whole career is
- * built around, whether to settle or go to the door, sat below two other
- * things on a phone.
- *
- * It is still one destination in the bar, because a solicitor runs one
- * practice and a second primary tab would imply a second firm. What changed is
- * that the destination now has screens, each answering a question the career
- * actually asks — and, crucially, the *reports* are split from the
- * *transactions*:
+ * Work is the practice, split at the seams the career actually has — and,
+ * crucially, the *reports* split from the *transactions*:
  *
  *   Instructions   what is on the table, who pays and when, what to decline
  *   Casework       what you are carrying, and what settling it pays today
@@ -437,25 +422,13 @@ const CHEF_SECTIONS: SectionDef[] = [
  *   The firm       who is billing hours, and what they cost every week
  *
  * Hiring and briefing counsel are not here: those are calls you make, and
- * they live on the handset under Roll and Listings. The same split the Chef's
- * market and agency went through, for the same reason.
+ * they live on the handset under Roll and Listings.
  */
 const LAWYER_SECTIONS: SectionDef[] = [
+  WEEK,
   {
-    id: "overview",
-    label: "Overview",
-    icon: "pulse",
-    screens: [
-      {
-        id: "overview",
-        label: "Overview",
-        purpose: "Your week, and everything that needs a decision.",
-      },
-    ],
-  },
-  {
-    id: "chambers",
-    label: "Chambers",
+    id: "work",
+    label: "Work",
     icon: "building",
     screens: [
       {
@@ -484,37 +457,221 @@ const LAWYER_SECTIONS: SectionDef[] = [
       },
     ],
   },
+  WORLD_MAP_ONLY,
+];
+
+/**
+ * THE FOUNDER
+ *
+ * This career shipped as a single scrolling page, with a note at the top of
+ * `FounderScreens.tsx` defending it: the run has one question in it — how many
+ * weeks are left and what you are spending them on — and splitting that across
+ * tabs would hide the arithmetic that makes each option a decision.
+ *
+ * That argument is right about the arithmetic and wrong about the tabs. What
+ * makes a hire a decision is the line under it reading "costs you about three
+ * weeks of runway", and that line is computed per-option, next to the option,
+ * so it survives being moved. What does not survive is the *summary* — burn,
+ * revenue, customers, equity — which is why every screen in this section
+ * carries the runway strip at the top rather than leaving it behind on one.
+ */
+const FOUNDER_SECTIONS: SectionDef[] = [
+  WEEK,
   {
-    id: "where",
-    label: "Map",
-    icon: "globe",
+    id: "work",
+    label: "Work",
+    icon: "building",
     screens: [
       {
-        id: "home",
-        label: "Map",
-        purpose: "Where you work, and how far that currently reaches.",
+        id: "runway",
+        label: "Runway",
+        purpose:
+          "How many weeks are left, where the customers come from, and what you charge them.",
+      },
+      {
+        id: "product",
+        label: "The product",
+        purpose:
+          "What you know about your customers, the pace you build at, and the tests that move the funnel.",
+      },
+      {
+        id: "crew",
+        label: "Team",
+        purpose:
+          "Who is on the payroll, what they cost every week, and what taking somebody on costs in weeks.",
+      },
+      {
+        id: "raising",
+        label: "Raising",
+        purpose:
+          "What the company is worth, what a round would buy, and the share of it you would never get back.",
       },
     ],
   },
+  WORLD_MAP_ONLY,
 ];
 
-/** The destinations this career actually has. */
+/**
+ * THE POLITICIAN
+ *
+ * Support drifts every week toward wherever the positions have left it, and
+ * none of it is banked until polling day — so a screen showing what a stance
+ * does to the farmers is unreadable without the count it will be measured at.
+ * The count therefore rides on every screen but its own, exactly as the
+ * runway does for the Founder.
+ */
+const POLITICIAN_SECTIONS: SectionDef[] = [
+  WEEK,
+  {
+    id: "work",
+    label: "Work",
+    icon: "building",
+    screens: [
+      {
+        id: "polling",
+        label: "The count",
+        purpose:
+          "What you would take if the vote were today, the bar you must clear, and every count so far.",
+      },
+      {
+        id: "blocs",
+        label: "The electorate",
+        purpose:
+          "Who is in this seat, where each bloc sits today, and which way it is drifting without you.",
+      },
+      {
+        id: "constituents",
+        label: "The postbag",
+        purpose:
+          "Named cases on your desk, the volunteers who knock doors, and the fund that pays for the campaign.",
+      },
+      {
+        id: "positions",
+        label: "Where you stand",
+        purpose:
+          "The questions you have answered in public, what each answer costs, and what changing it would.",
+      },
+      {
+        id: "office",
+        label: "The ladder",
+        purpose:
+          "The office above this one, what it pays, and how much harder its seat is to hold.",
+      },
+    ],
+  },
+  WORLD_MAP_ONLY,
+];
+
+/**
+ * THE ARCHITECT
+ *
+ * The career is paid in stages and its risk is being made to draw one twice,
+ * so the question behind every screen is the same: how much of the fee is
+ * still unearned, and how much of it has already been redrawn. That pair
+ * rides on every screen but the boards, which state it in full. The
+ * portfolio sits with the boards rather than on a tab of its own — what you
+ * have built is the reason you are offered what you are offered, and it
+ * reads as the finished end of the same list.
+ */
+const ARCHITECT_SECTIONS: SectionDef[] = [
+  WEEK,
+  {
+    id: "work",
+    label: "Work",
+    icon: "building",
+    screens: [
+      {
+        id: "boards",
+        label: "On the boards",
+        purpose:
+          "What you are drawing, which stage each building is at, and how likely the client is to send it back.",
+      },
+      {
+        id: "offers",
+        label: "Offered",
+        purpose:
+          "What you are being asked for, what it pays, and what turning it down costs you.",
+      },
+      {
+        id: "competitions",
+        label: "Competitions",
+        purpose:
+          "Months of unpaid drawing for a building nobody has promised you — and the only route to the ones that matter.",
+      },
+      {
+        id: "atelier",
+        label: "The studio",
+        purpose:
+          "Who draws for you, what they cost every week, and the one hire that is really about the clients.",
+      },
+    ],
+  },
+  WORLD_MAP_ONLY,
+];
+
+/**
+ * THE ENGINEER
+ *
+ * The thinnest Work of the seven, and deliberately so: this career has two
+ * subjects, not four. What is on the bench, and what could go on it.
+ * Inventing a third to match the others would be a tab with nothing behind
+ * it. What travels between them is the certifier — how many faults this
+ * market accepts and how long it takes to say so.
+ */
+const ENGINEER_SECTIONS: SectionDef[] = [
+  WEEK,
+  {
+    id: "work",
+    label: "Work",
+    icon: "building",
+    screens: [
+      {
+        id: "bench",
+        label: "The bench",
+        purpose:
+          "What you are building, how many faults are estimated to be in it, and what the certifier will accept.",
+      },
+      {
+        id: "newbuild",
+        label: "What you could build",
+        purpose:
+          "What is open to you, what each would earn, and what one fault in it would cost in the field.",
+      },
+    ],
+  },
+  WORLD_MAP_ONLY,
+];
+
 export function sectionsFor(careerId: string): SectionDef[] {
   if (careerId === "doctor") return SECTIONS;
   if (careerId === "chef") return CHEF_SECTIONS;
   if (careerId === "lawyer") return LAWYER_SECTIONS;
+  if (careerId === "founder") return FOUNDER_SECTIONS;
+  if (careerId === "politician") return POLITICIAN_SECTIONS;
+  if (careerId === "architect") return ARCHITECT_SECTIONS;
+  if (careerId === "engineer") return ENGINEER_SECTIONS;
   return GENERIC_SECTIONS;
 }
 
+const ALL_SECTION_SETS = [
+  SECTIONS,
+  GENERIC_SECTIONS,
+  CHEF_SECTIONS,
+  LAWYER_SECTIONS,
+  FOUNDER_SECTIONS,
+  POLITICIAN_SECTIONS,
+  ARCHITECT_SECTIONS,
+  ENGINEER_SECTIONS,
+];
+
 const SCREEN_INDEX = new Map<ScreenId, { section: SectionDef; screen: ScreenDef }>();
-for (const section of [
-  ...SECTIONS,
-  ...GENERIC_SECTIONS,
-  ...CHEF_SECTIONS,
-  ...LAWYER_SECTIONS,
-]) {
-  for (const screen of section.screens) {
-    if (!SCREEN_INDEX.has(screen.id)) SCREEN_INDEX.set(screen.id, { section, screen });
+for (const set of ALL_SECTION_SETS) {
+  for (const section of set) {
+    for (const screen of section.screens) {
+      if (!SCREEN_INDEX.has(screen.id)) {
+        SCREEN_INDEX.set(screen.id, { section, screen });
+      }
+    }
   }
 }
 
@@ -522,15 +679,11 @@ for (const section of [
  * The section a screen belongs to.
  *
  * `careerId` matters whenever two careers share a screen id, which `home` and
- * `overview` both do. The Chef's Map destination carries two screens and the
- * Solicitor's carries one, and the flat index answers with whichever was
- * registered first — so without the career, a Chef standing on the map was
- * told their section had a single screen and the sub-navigation refused to
- * render. The scene screen was unreachable, and a Playwright run found it.
- *
- * The argument is optional so every existing caller still compiles, and the
- * flat index remains the fallback for anything that genuinely does not know
- * which career it is looking at.
+ * `overview` both do: the flat index answers with whichever career registered
+ * first, and its section may carry different sibling screens (the Chef's
+ * World has two, most others have one). Since Phase 4 the section *id* is at
+ * least stable either way — every career's map lives under `world` — but the
+ * sibling list still needs the right career, so pass it whenever you have it.
  */
 export function sectionOf(screen: ScreenId, careerId?: string): SectionDef {
   if (careerId) {
@@ -546,14 +699,22 @@ export function screenOf(screen: ScreenId): ScreenDef {
   return SCREEN_INDEX.get(screen)?.screen ?? SECTIONS[0].screens[0];
 }
 
-/** Landing screen when a primary destination is tapped. */
-export function defaultScreen(section: SectionId): ScreenId {
+/**
+ * Landing screen when a primary destination is tapped.
+ *
+ * Career-aware since Phase 4, and it has to be: `work` is every career's
+ * section id now, and tapping it must land a Chef in the kitchen and a
+ * Solicitor at the instructions — not whichever career registered the id
+ * first. The flat fallback remains for callers that genuinely do not know
+ * who is asking.
+ */
+export function defaultScreen(section: SectionId, careerId?: string): ScreenId {
+  if (careerId) {
+    const owned = sectionsFor(careerId).find((s) => s.id === section);
+    if (owned) return owned.screens[0].id;
+  }
   return (
-    [
-      ...SECTIONS,
-      ...GENERIC_SECTIONS,
-      ...CHEF_SECTIONS,
-      ...LAWYER_SECTIONS,
-    ].find((s) => s.id === section)?.screens[0].id ?? "overview"
+    ALL_SECTION_SETS.flat().find((s) => s.id === section)?.screens[0].id ??
+    "overview"
   );
 }

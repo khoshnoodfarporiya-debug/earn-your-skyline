@@ -2,6 +2,15 @@ import type { CareerDef, LedgerLine, RunState } from "../types";
 import type { SetbackKind } from "../setbacks";
 import { money } from "../format";
 import { pushLog } from "../engine";
+import { validatePhone } from "../phone/validate";
+import { makeRng } from "../rng";
+import { FOUNDER_EVENTS } from "./newEvents";
+import {
+  generateWeekFrom,
+  initialPhoneFrom,
+  publishFrom,
+} from "../phone/voicePack";
+import { FOUNDER_PACK } from "../phone/packs";
 import {
   BRAND_DECAY,
   ROUND_BY_ID,
@@ -28,6 +37,17 @@ import {
   valuationOf,
   type Hire,
   type VentureState,
+  venture,
+  EXPERIMENT_BY_ID,
+  STANCES,
+  buildLiftOf,
+  experimentCost,
+  experimentsOf,
+  funnelOf,
+  insightOf,
+  stanceOf,
+  techDebtOf,
+  unitEconomicsOf,
 } from "./startup";
 
 /**
@@ -59,14 +79,55 @@ const NAMES = [
   "Elin Dahl", "Omar Haddad",
 ];
 
-export const venture = (s: RunState): VentureState =>
-  s.data.venture as VentureState;
+/* Defined with the model; re-exported so every existing import of it
+   from this module keeps working. */
+export { venture };
 
 const hireName = (n: number) => NAMES[n % NAMES.length];
 
-/** The goal scales with where you started, like every other career's. */
-const goalFor = (s: RunState): number =>
-  Math.round(1_500_000 * startupCityOf(venture(s)).salaryIndex);
+/**
+ * The goal scales with where you started, like every other career's.
+ *
+ * Four million, not the original one and a half: the balance bots reached
+ * the old number in every city, every seed, by week ~80 — a plain company
+ * at fifteen per cent market penetration already valued past it. At four
+ * million the same bot lands at roughly half to two-thirds progress over
+ * 120 weeks, which is what a three-year yardstick is supposed to feel like
+ * from the floor.
+ */
+const goalFor = (s: RunState): number => {
+  /*
+   * Scaled by the market's ceiling, not by local wages. Scaling by the
+   * salary index gave Mumbai — the largest market on the board — the
+   * smallest goal, and the balance bot reached it every seed while the
+   * expensive cities held. The yardstick is now 45% of what a saturated,
+   * finished product would be worth here: reaching it means winning a
+   * meaningful share of THIS market, whichever market that is.
+   */
+  const city = startupCityOf(venture(s));
+  const priceHere = Math.round(24 * (0.8 + city.salaryIndex * 0.25));
+  const saturated = ((city.market * priceHere) / 4.33) * 52 * 3;
+  /*
+   * Eighty per cent of the ceiling, because the measurement showed a plain
+   * bot capturing ~70% of it by week 120 — a goal much below that is reached
+   * on autopilot. At 0.8 the gentle city stays winnable for an ordinary
+   * operator, the even cities read ~70-80% at the horizon, and the hard one
+   * makes you fight the slow capital for it.
+   */
+  return Math.round(saturated * 0.8);
+};
+
+/**
+ * The phone, created on first touch.
+ *
+ * Optional on the state so an older save loads; created here so that
+ * save gains a handset rather than being rejected for not having one.
+ */
+function ensurePhone(s: RunState) {
+  const st = venture(s);
+  if (!st.phone) st.phone = initialPhoneFrom(FOUNDER_PACK);
+  return st.phone;
+}
 
 export const founder: CareerDef = {
   id: "founder",
@@ -140,7 +201,7 @@ export const founder: CareerDef = {
       cashCost: 0,
       preview: (s) => {
         const v = venture(s);
-        const gain = 2.4 + s.r.skill * 0.03;
+        const gain = 0.25 * (2.4 + s.r.skill * 0.03);
         return [
           `Product +${gain.toFixed(1)}`,
           `Churn is ${(churnRate(v) * 100).toFixed(1)}% a week and falls as this rises`,
@@ -197,6 +258,24 @@ export const founder: CareerDef = {
       },
     },
     {
+      id: "interview",
+      label: "Talk to customers",
+      blurb:
+        "An hour each with people who use it, nearly used it, or left. Nothing ships, and everything you ship after lands better.",
+      timeCost: 1,
+      cashCost: 0,
+      preview: (s) => {
+        const v = venture(s);
+        const gain = 5.5 + s.r.skill * 0.04;
+        return [
+          `Insight +${gain.toFixed(1)} of 100, and it fades if you stop asking`,
+          `Right now building lands at ${Math.round(buildLiftOf(v) * 100)}% and ${Math.round(
+            (funnelOf(v).buyRate / 0.24 - 1) * 100,
+          )}% more trials convert`,
+        ];
+      },
+    },
+    {
       id: "rest",
       label: "Step away",
       blurb: "The company survives a week of you being a person.",
@@ -206,7 +285,7 @@ export const founder: CareerDef = {
     },
   ],
 
-  events: [],
+  events: FOUNDER_EVENTS,
 
   initialResources: () => ({
     cash: START_CASH,
@@ -218,7 +297,13 @@ export const founder: CareerDef = {
     _burnoutPeak: 0,
   }),
 
-  initialData: () => ({ venture: initialVenture() }),
+  initialData: () => {
+    /* The handset exists from week one, so the button is there the
+       first time anybody looks for it. */
+    const st = initialVenture();
+    st.phone = initialPhoneFrom(FOUNDER_PACK);
+    return { venture: st };
+  },
 
   startCities: STARTUP_CITIES,
 
@@ -239,6 +324,32 @@ export const founder: CareerDef = {
   command: (s, cmd, arg) => {
     const v = venture(s);
     switch (cmd) {
+      /*
+       * THE HANDSET.
+       *
+       * Four commands, identical in every career that has a phone.
+       * The content differs; the transaction does not.
+       */
+      case "post": {
+        const phone = ensurePhone(s);
+        publishFrom(
+          FOUNDER_PACK,
+          phone,
+          s,
+          arg,
+          makeRng((s.seed ^ (s.week * 0x2f6f2b79)) >>> 0),
+        );
+        break;
+      }
+      case "readMessages": {
+        for (const m of ensurePhone(s).messages) m.read = true;
+        break;
+      }
+      case "readNews": {
+        for (const n of ensurePhone(s).news) n.read = true;
+        break;
+      }
+
       /* Take somebody on. Capacity now, burn forever. */
       case "hireVenture": {
         const role = STARTUP_ROLE_BY_ID.get(arg);
@@ -293,6 +404,42 @@ export const founder: CareerDef = {
       }
 
       /* What you charge. Raising it loses people; lowering it wins a few. */
+      case "setRoadmap": {
+        const stance = arg as keyof typeof STANCES;
+        if (!STANCES[stance]) return;
+        if (stanceOf(v) === stance) return;
+        v.stance = stance;
+        pushLog(
+          s,
+          stance === "ship"
+            ? "The roadmap now says ship. Everything moves faster, and the corners you cut stay cut."
+            : stance === "stability"
+              ? "The roadmap now says stability. Refactor weeks — little ships, and the debt comes down."
+              : "The roadmap is back to steady: the pace the code can carry.",
+          "neutral",
+        );
+        break;
+      }
+
+      case "runExperiment": {
+        const def = EXPERIMENT_BY_ID.get(arg);
+        if (!def) return;
+        /* One test at a time — two running make both unreadable — and each
+           runs once: the second rewrite is a redesign, not an experiment. */
+        if (v.experimentRun) return;
+        if (experimentsOf(v).some((e) => e.id === def.id)) return;
+        const cost = experimentCost(v, def);
+        if (s.r.cash < cost) return;
+        s.r.cash -= cost;
+        v.experimentRun = { id: def.id, started: s.week };
+        pushLog(
+          s,
+          `${def.label} is live: ${money(cost)}, and about two weeks before the numbers mean anything.`,
+          "neutral",
+        );
+        break;
+      }
+
       case "setPrice": {
         const next = Number(arg);
         if (!Number.isFinite(next) || next < 4 || next > 400) return;
@@ -312,9 +459,27 @@ export const founder: CareerDef = {
     const v = venture(s);
     switch (actionId) {
       case "build": {
-        v.product = Math.min(100, v.product + 2.4 + s.r.skill * 0.03);
+        /*
+         * A quarter of the old rate. The balance trace showed the product at
+         * 100 by week twenty — which flattened churn, fattened the sell
+         * yield and maxed the valuation multiple all in the first act. A
+         * product is now roughly a year of focused building, which is what
+         * the roadmap events were priced against all along.
+         *
+         * Times the roadmap's pace and what you know about the customer —
+         * both exactly 1 for a founder who has touched neither.
+         */
+        v.product = Math.min(
+          100,
+          v.product + 0.25 * (2.4 + s.r.skill * 0.03) * buildLiftOf(v),
+        );
         s.r.skill = Math.min(100, s.r.skill + 0.35);
         s.r.burnout = Math.min(100, s.r.burnout + 3.5);
+        break;
+      }
+      case "interview": {
+        v.insight = Math.min(100, insightOf(v) + 5.5 + s.r.skill * 0.04);
+        s.r.burnout = Math.min(100, s.r.burnout + 2);
         break;
       }
       case "sell": {
@@ -352,7 +517,9 @@ export const founder: CareerDef = {
     /* ------------------------------------------------ the team's own week */
     const team = teamOutput(v);
     if (team.build > 0) {
-      v.product = Math.min(100, v.product + team.build);
+      /* The team ships at the roadmap's pace too — a stance is the whole
+         engineering organisation's answer, not a personal habit. */
+      v.product = Math.min(100, v.product + team.build * buildLiftOf(v));
     }
     if (team.market > 0) {
       v.brand = Math.min(100, v.brand + team.market);
@@ -368,10 +535,56 @@ export const founder: CareerDef = {
     /* Attention is a stock and it leaks. Stop marketing and it drains. */
     v.brand = Math.max(0, v.brand * (1 - BRAND_DECAY));
 
+    /* ------------------------------------------------------ the product work */
+    /* The roadmap's bill. Ship accrues, stability pays down, steady is
+       exactly neutral — the compatibility promise for every old save. */
+    const debtDelta = STANCES[stanceOf(v)].debtPerWeek;
+    if (debtDelta !== 0) {
+      v.techDebt = Math.max(0, Math.min(100, techDebtOf(v) + debtDelta));
+    }
+    /* What you knew about the market last quarter is not what is true now. */
+    if (insightOf(v) > 0) {
+      v.insight = Math.max(0, insightOf(v) * 0.98);
+    }
+
+    /* An experiment reads out after two weeks: the lift is measured, not
+       promised, and most of the measurement is how well you knew what to
+       test. The result is permanent on its stage of the funnel. */
+    if (v.experimentRun && s.week - v.experimentRun.started >= 2) {
+      const def = EXPERIMENT_BY_ID.get(v.experimentRun.id);
+      if (def) {
+        const informed = 0.5 + (insightOf(v) / 100) * 0.75;
+        const lift = def.baseLift * informed * (0.85 + rng.next() * 0.3);
+        v.experiments = [
+          ...experimentsOf(v),
+          { id: def.id, week: s.week, lift },
+        ];
+        out.push({
+          label: `${def.label} read out`,
+          kind: "info",
+          note: `${def.stage === "visitors" ? "Visits" : def.stage === "trials" ? "Trials" : "Conversion"} up ${(lift * 100).toFixed(0)}%, permanently.`,
+        });
+        pushLog(
+          s,
+          `The ${def.label.toLowerCase()} read out: ${(lift * 100).toFixed(0)}% more ${
+            def.stage === "visitors"
+              ? "people finding the product"
+              : def.stage === "trials"
+                ? "visitors trying it"
+                : "trials converting"
+          }. It stays.`,
+          "good",
+        );
+      }
+      v.experimentRun = undefined;
+    }
+
     /* ----------------------------------------------------------- the money */
     const revenue = revenueOf(v);
     const wages = payroll(v);
-    const infra = Math.round(v.users * 0.35);
+    /* Debt makes every server dearer: pages that load twice, jobs that
+       retry. Zero debt is exactly the old bill. */
+    const infra = Math.round(v.users * 0.35 * (1 + techDebtOf(v) / 250));
 
     if (revenue > 0) {
       out.push({
@@ -500,6 +713,15 @@ export const founder: CareerDef = {
     }
 
     s.r.burnout = Math.max(0, s.r.burnout - 1);
+    /* What the world says about the week that just happened. Its own
+       stream, so the phone can never disturb the simulation's dice. */
+    generateWeekFrom(
+      FOUNDER_PACK,
+      ensurePhone(s),
+      s,
+      makeRng((s.seed ^ (s.week * 0x51a3f27b)) >>> 0),
+    );
+
     s.r._burnoutPeak = Math.max(s.r._burnoutPeak ?? 0, s.r.burnout);
     return out;
   },
@@ -523,6 +745,12 @@ export const founder: CareerDef = {
     if (typeof d !== "object" || d === null) return false;
     const v = d.venture as VentureState | undefined;
     if (typeof v !== "object" || v === null) return false;
+    /* The phone is optional — a save from before this career had one
+       still loads — but a present one must be the real shape. This
+       career previously did not look at it at all. */
+    if (v.phone !== undefined && !validatePhone(v.phone)) {
+      return false;
+    }
     if (!STARTUP_CITY_BY_ID.has(v.city)) return false;
     if (
       [v.users, v.price, v.product, v.brand, v.equity, v.raised, v.pitch].some(
@@ -538,6 +766,44 @@ export const founder: CareerDef = {
     if (v.roundsClosed.some((id) => !ROUND_BY_ID.has(id))) return false;
     if (v.pitchRound !== undefined && !ROUND_BY_ID.has(v.pitchRound)) {
       return false;
+    }
+    /* Phase 5 fields, optional to the last: a save from before the product
+       work carries none of them and still loads. Present ones must be the
+       real shape — an insight of "lots" is a corrupted save, not a style. */
+    for (const n of [v.insight, v.techDebt]) {
+      if (
+        n !== undefined &&
+        (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 100)
+      ) {
+        return false;
+      }
+    }
+    if (v.stance !== undefined && !STANCES[v.stance]) return false;
+    if (v.experiments !== undefined) {
+      if (!Array.isArray(v.experiments)) return false;
+      for (const e of v.experiments) {
+        if (
+          typeof e !== "object" ||
+          e === null ||
+          !EXPERIMENT_BY_ID.has(e.id) ||
+          !Number.isInteger(e.week) ||
+          typeof e.lift !== "number" ||
+          !Number.isFinite(e.lift)
+        ) {
+          return false;
+        }
+      }
+    }
+    if (v.experimentRun !== undefined) {
+      const r = v.experimentRun;
+      if (
+        typeof r !== "object" ||
+        r === null ||
+        !EXPERIMENT_BY_ID.has(r.id) ||
+        !Number.isInteger(r.started)
+      ) {
+        return false;
+      }
     }
     return true;
   },
@@ -561,7 +827,7 @@ export const founder: CareerDef = {
      * see a hire eat the runway rather than discovering it on Monday.
      */
     const team = teamOutput(v);
-    const build = (alloc.build ?? 0) * (2.4 + s.r.skill * 0.03) + team.build;
+    const build = (alloc.build ?? 0) * 0.25 * (2.4 + s.r.skill * 0.03) + team.build;
     const sell = (alloc.sell ?? 0) * (9 + s.r.skill * 0.14 + v.product * 0.1);
     const spend = (alloc.market ?? 0) * 900;
 
@@ -594,6 +860,16 @@ export const founder: CareerDef = {
         note: `${Math.round(organicUsers(v))} arrive on their own, ${Math.round(v.users * churnRate(v))} leave.`,
       },
     ];
+
+    if (techDebtOf(v) >= 50) {
+      const econ = unitEconomicsOf(v);
+      out.push({
+        label: "Technical debt",
+        value: `${Math.round(techDebtOf(v))} of 100`,
+        tone: "bad" as const,
+        note: `Churn and server costs are carrying it. A customer is worth ${money(Math.round(econ.lifetimeValue))} over their stay — stability weeks bring it back.`,
+      });
+    }
 
     if (v.pitchRound) {
       const round = ROUND_BY_ID.get(v.pitchRound);

@@ -2,8 +2,50 @@ import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const SAVE_KEY = "career-tycoon:save:v11";
-const LEGACY_SAVE_KEY = "career-tycoon:save:v8";
+/*
+ * SIGNED IN, ALWAYS.
+ *
+ * The app has a front door now: no account, no game. Every test in this file
+ * is about what is behind that door, so one profile is seeded for all of them
+ * rather than making sixty-six navigations each sign themselves in.
+ *
+ * It is installed with `addInitScript` deliberately — unlike a save fixture,
+ * which must be written once (see `preload` below), the profile SHOULD come
+ * back after a `localStorage.clear()` and a reload. A test clearing storage
+ * is asking for a fresh game, not for the sign-in page.
+ *
+ * The front door itself is tested in `account.spec.ts`, which seeds nothing.
+ */
+const TEST_PLAYER_ID = "e2etester";
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(
+    ([playersKey, activeKey, id]) => {
+      window.localStorage.setItem(
+        playersKey,
+        JSON.stringify([
+          {
+            id,
+            name: "Tester",
+            createdAt: 0,
+            lastSeenAt: 0,
+          },
+        ]),
+      );
+      window.localStorage.setItem(activeKey, id);
+    },
+    [
+      "career-tycoon:players:v1",
+      "career-tycoon:activePlayer:v1",
+      TEST_PLAYER_ID,
+    ] as const,
+  );
+});
+
+/* Saves are scoped to whoever is signed in, so the fixtures go under the
+   seeded profile rather than under the bare key. */
+const SAVE_KEY = `career-tycoon:p.${TEST_PLAYER_ID}:save:v11`;
+const LEGACY_SAVE_KEY = `career-tycoon:p.${TEST_PLAYER_ID}:save:v8`;
 
 /**
  * Preload a deterministic save. The fixtures are produced by the real engine
@@ -183,13 +225,13 @@ async function startRun(page: Page) {
   // Then the start city. The default is Lyon, which is where every run
   // started before the choice existed.
   await page.getByRole("button", { name: /^Begin in Lyon$/ }).click();
-  await expect(page.getByRole("button", { name: /^network$/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^world$/i })).toBeVisible();
 }
 
 const mapGroup = (page: Page) => page.getByRole("group", { name: /World map/ });
 
 async function openNetwork(page: Page) {
-  await page.getByRole("button", { name: /^network$/i }).click();
+  await page.getByRole("button", { name: /^world$/i }).click();
   await expect(mapGroup(page)).toBeVisible();
 }
 
@@ -512,6 +554,61 @@ test.describe("network map", () => {
     await expect(routes).toHaveCount(1);
   });
 
+  test("two markets side by side, three is the limit, and it comes apart again", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startRun(page);
+    await openNetwork(page);
+
+    /* One market is not a comparison, so there is nothing to show yet. */
+    const drawer = page.locator('section[aria-labelledby="compare-title"]');
+    await page.getByRole("button", { name: /^compare Madrid$/i }).click();
+    await expect(drawer).toHaveCount(0);
+
+    /* Two is. Both cities and the axes appear side by side. */
+    await page.getByRole("button", { name: /^compare Tokyo$/i }).click();
+    await expect(drawer).toBeVisible();
+    /* Two traps in one locator, both learned here. The drawer renders the
+       phone cards and the desktop table together and shows one per
+       breakpoint, so ask for the visible copy. And ask for it EXACTLY:
+       getByText is case-insensitive substring matching, and "comPARISon" —
+       as in the Clear-comparison button this drawer always carries —
+       contains "paris". */
+    const shown = (text: string) =>
+      drawer.getByText(text, { exact: true }).filter({ visible: true }).first();
+    await expect(shown("Madrid")).toBeVisible();
+    await expect(shown("Tokyo")).toBeVisible();
+    await expect(drawer.getByText(/^Fees$/i).filter({ visible: true }).first()).toBeVisible();
+    await expect(
+      drawer.getByText(/^Room to grow$/i).filter({ visible: true }).first(),
+    ).toBeVisible();
+
+    /* Three fills it, and every other row's toggle says so by refusing. */
+    await page.getByRole("button", { name: /^compare Paris$/i }).click();
+    await expect(shown("Paris")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^compare Lagos$/i }),
+    ).toBeDisabled();
+
+    /* Removing one reopens the door. */
+    await page
+      .getByRole("button", { name: /remove Paris from the comparison/i })
+      .first()
+      .click();
+    await expect(drawer.getByText("Paris", { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /^compare Lagos$/i }),
+    ).toBeEnabled();
+
+    /* And clearing takes the whole thing down. */
+    await page.getByRole("button", { name: /clear comparison/i }).click();
+    await expect(drawer).toHaveCount(0);
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
   test("no page overflow at any tested width", { tag: "@sets-own-viewport" }, async ({ page }) => {
     await startRun(page);
     await openNetwork(page);
@@ -568,7 +665,7 @@ test.describe("practice artwork", () => {
     });
 
     await startRun(page);
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^work$/i }).click();
 
     const image = page.locator('img[src*="practice-progression"]');
     await expect(image).toBeVisible();
@@ -600,7 +697,7 @@ test.describe("practice artwork", () => {
     });
 
     await startRun(page);
-    await page.getByRole("button", { name: /^network$/i }).click();
+    await page.getByRole("button", { name: /^world$/i }).click();
     await expect(mapGroup(page)).toBeVisible();
 
     expect(requested, "2.5MB map PNG must not be fetched").toEqual([]);
@@ -616,7 +713,21 @@ test.describe("artwork", () => {
       if (/\/visuals\/.*\.png/.test(url)) pngs.push(url);
     });
 
-    await page.addInitScript(() => window.localStorage.clear());
+    /*
+     * A clean *game*, not a signed-out browser.
+     *
+     * This used to be `localStorage.clear()`, which also removed the profile
+     * the suite signs in with and left the test looking at the front door
+     * instead of the select screen. What it wants is no saved run; the
+     * account is not part of that.
+     */
+    await page.addInitScript(() => {
+      for (const k of Object.keys(window.localStorage)) {
+        if (/:(save|lastplan|taught|archive):/.test(k)) {
+          window.localStorage.removeItem(k);
+        }
+      }
+    });
     await page.goto("/");
 
     // next/image rewrites src to a URL-encoded optimiser path, so match on
@@ -669,7 +780,7 @@ test.describe("artwork", () => {
     });
 
     await startRun(page);
-    await page.getByRole("button", { name: /^network$/i }).click();
+    await page.getByRole("button", { name: /^world$/i }).click();
     await expect(mapGroup(page)).toBeVisible();
     await page.waitForTimeout(500);
 
@@ -1219,7 +1330,7 @@ test.describe("outbreak pressure", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Network/ })
+      .filter({ hasText: /World/ })
       .first()
       .click();
     await page.getByRole("tab", { name: /outbreaks/i }).click();
@@ -1317,7 +1428,7 @@ test.describe("buying things", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Practice/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
 
@@ -1342,7 +1453,7 @@ test.describe("buying things", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Practice/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
 
@@ -1441,10 +1552,10 @@ test.describe("an older save", () => {
     // The upgrade is written back once, under the current key.
     const keys = await page.evaluate(() => Object.keys(window.localStorage));
     expect(keys, "the save is stored at the current version").toContain(
-      "career-tycoon:save:v11",
+      SAVE_KEY,
     );
     expect(keys, "and the old key is cleaned up").not.toContain(
-      "career-tycoon:save:v8",
+      LEGACY_SAVE_KEY,
     );
 
     expect(problems).toEqual([]);
@@ -1560,7 +1671,7 @@ test.describe("the living world", () => {
     await preload(page, "midrun");
     await page.goto("/");
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await goto(page, /Network/, /rivals/i);
+    await goto(page, /World/, /rivals/i);
 
     /* Scoped to the panel. The shell header button is named "Physician Dr ·
        MD Back to career select", which a loose /Dr / matcher happily picks up
@@ -1589,7 +1700,7 @@ test.describe("the living world", () => {
     await preload(page, "midrun");
     await page.goto("/");
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await goto(page, /Practice/, /^team$/i);
+    await goto(page, /Work/, /^team$/i);
 
     // Derived, and it shows its working rather than a bare number.
     await expect(page.getByRole("meter", { name: /culture/i })).toBeVisible();
@@ -1605,7 +1716,7 @@ test.describe("the living world", () => {
     await preload(page, "midrun");
     await page.goto("/");
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await goto(page, /Practice/, /^money$/i);
+    await goto(page, /Work/, /^money$/i);
 
     await expect(page.getByText(/You own/i).first()).toBeVisible();
     // All four external routes are present, offered or explained.
@@ -1634,7 +1745,7 @@ test.describe("the living world", () => {
     await preload(page, "midrun");
     await page.goto("/");
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await goto(page, /Practice/, /^work$/i);
+    await goto(page, /Work/, /^assignments$/i);
 
     await expect(
       page.getByRole("heading", { name: /On the table/i }),
@@ -1652,10 +1763,10 @@ test.describe("the living world", () => {
     await page.getByRole("button", { name: /continue your run/i }).click();
 
     for (const [section, tab] of [
-      [/Practice/, /^work$/i],
-      [/Practice/, /^team$/i],
-      [/Practice/, /^money$/i],
-      [/Network/, /rivals/i],
+      [/Work/, /^assignments$/i],
+      [/Work/, /^team$/i],
+      [/Work/, /^money$/i],
+      [/World/, /rivals/i],
     ] as const) {
       await goto(page, section, tab);
       // The tab that was activated reports itself as selected, which is what
@@ -1680,9 +1791,9 @@ test.describe("the living world", () => {
     for (const width of [375, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       for (const [section, tab] of [
-        [/Practice/, /^team$/i],
-        [/Practice/, /^money$/i],
-        [/Network/, /rivals/i],
+        [/Work/, /^team$/i],
+        [/Work/, /^money$/i],
+        [/World/, /rivals/i],
       ] as const) {
         await goto(page, section, tab);
         await expectNoPageOverflow(page);
@@ -1728,7 +1839,7 @@ test.describe("knowing where you are", () => {
      * status is derived rather than boilerplate: if both said the same
      * sentence the header would be decoration.
      */
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     const build = page.getByRole("main").getByRole("status").first();
     await expect(build).toBeVisible();
     const buildText = (await build.innerText()).trim();
@@ -1762,7 +1873,7 @@ test.describe("knowing where you are", () => {
     await preload(page, "midrun");
     await page.goto("/");
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     const help = page
       .getByRole("main")
@@ -1790,7 +1901,7 @@ test.describe("knowing where you are", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Practice/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
     await page.getByRole("tab", { name: /^build$/i }).click();
@@ -1819,7 +1930,7 @@ test.describe("knowing where you are", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Practice/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
     await page.getByRole("tab", { name: /^build$/i }).click();
@@ -1882,8 +1993,8 @@ test.describe("knowing where you are", () => {
 
     const banned = /ends the run|run ends|game over|of 156|before week 156/i;
     for (const [section, tab] of [
-      [/Practice/, /^build$/i],
-      [/Practice/, /^staff$/i],
+      [/Work/, /^build$/i],
+      [/Work/, /^staff$/i],
       [/Career/, /^career$/i],
       [/Life/, undefined],
     ] as const) {
@@ -1903,9 +2014,9 @@ test.describe("knowing where you are", () => {
     await page.getByRole("button", { name: /continue your run/i }).click();
 
     for (const [section, tab] of [
-      [/Practice/, /^build$/i],
+      [/Work/, /^build$/i],
       [/Career/, /^standing$/i],
-      [/Network/, /^cities$/i],
+      [/World/, /^cities$/i],
     ] as const) {
       await nav(page, section, tab);
       await expectNoPageOverflow(page);
@@ -1959,7 +2070,7 @@ test.describe("visuals that explain the simulation", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^caseload$/i);
+    await nav(page, /Work/, /^caseload$/i);
 
     const flow = page.getByRole("region", {
       name: /where your patients went/i,
@@ -1992,7 +2103,7 @@ test.describe("visuals that explain the simulation", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^caseload$/i);
+    await nav(page, /Work/, /^caseload$/i);
 
     const cap = page.getByRole("region", { name: /what you can get through/i });
     await expect(cap).toBeVisible();
@@ -2014,7 +2125,7 @@ test.describe("visuals that explain the simulation", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^caseload$/i);
+    await nav(page, /Work/, /^caseload$/i);
 
     const card = page
       .getByRole("region", { name: /last week/i })
@@ -2033,7 +2144,7 @@ test.describe("visuals that explain the simulation", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^team$/i);
+    await nav(page, /Work/, /^team$/i);
 
     const grid = page.getByRole("region", { name: /departmental cover/i });
     await expect(grid).toBeVisible();
@@ -2052,7 +2163,7 @@ test.describe("visuals that explain the simulation", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^money$/i);
+    await nav(page, /Work/, /^money$/i);
 
     const chart = page.getByRole("region", { name: /a week of money/i });
     await expect(chart).toBeVisible();
@@ -2126,7 +2237,7 @@ test.describe("visuals that explain the simulation", () => {
     page.on("request", (r) => requested.push(r.url()));
 
     await resume(page);
-    await nav(page, /Practice/, /^caseload$/i);
+    await nav(page, /Work/, /^caseload$/i);
 
     const images = requested.filter((u) => /\.(png|webp|jpe?g)/i.test(u));
     expect(
@@ -2151,9 +2262,9 @@ test.describe("visuals that explain the simulation", () => {
     await resume(page);
 
     for (const [section, tab] of [
-      [/Practice/, /^caseload$/i],
-      [/Practice/, /^team$/i],
-      [/Practice/, /^money$/i],
+      [/Work/, /^caseload$/i],
+      [/Work/, /^team$/i],
+      [/Work/, /^money$/i],
       [/Career/, /^career$/i],
       [/Life/, undefined],
     ] as const) {
@@ -2183,7 +2294,7 @@ test.describe("visuals that explain the simulation", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     /* One stroke weight for the whole family — the identity is enforced in
        code, and this proves it survived to the DOM. */
@@ -2290,7 +2401,7 @@ test.describe("player journeys", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     /* Every purchase states both prices before it is made — the one-off on
        the card, the full breakdown a click away. */
@@ -2307,7 +2418,7 @@ test.describe("player journeys", () => {
 
     /* And the capacity screen says which of the two limits is binding, so
        "will this help" has an answer before the money is spent. */
-    await nav(page, /Practice/, /^caseload$/i);
+    await nav(page, /Work/, /^caseload$/i);
     await expect(page.getByText(/your main limit/i)).toBeVisible();
     await expect(page.getByText(/^this is the limit$/i)).toHaveCount(1);
 
@@ -2340,7 +2451,7 @@ test.describe("player journeys", () => {
   test("markets can be compared before a city is entered", async ({ page }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Network/, /^cities$/i);
+    await nav(page, /World/, /^cities$/i);
 
     /* Plain language on the comparison, not "max panel". */
     const body = await page.getByRole("main").innerText();
@@ -2504,12 +2615,12 @@ test.describe("empty and locked states", () => {
 
     /* Each of these is genuinely empty in week one. */
     for (const [section, tab] of [
-      [/Practice/, /^caseload$/i],
-      [/Practice/, /^staff$/i],
-      [/Practice/, /^team$/i],
-      [/Practice/, /^work$/i],
+      [/Work/, /^caseload$/i],
+      [/Work/, /^staff$/i],
+      [/Work/, /^team$/i],
+      [/Work/, /^assignments$/i],
       [/Career/, /^timeline$/i],
-      [/Network/, /^outbreaks$/i],
+      [/World/, /^outbreaks$/i],
     ] as const) {
       await nav(page, section, tab);
       const body = await page.getByRole("main").innerText();
@@ -2533,7 +2644,7 @@ test.describe("empty and locked states", () => {
   test("an unaffordable purchase names the gap in cash", async ({ page }) => {
     const problems = watchConsole(page);
     await startRun(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     await expect(page.getByText(/\$[\d,]+ short/i).first()).toBeVisible();
     expect(problems).toEqual([]);
   });
@@ -2543,7 +2654,7 @@ test.describe("empty and locked states", () => {
   }) => {
     const problems = watchConsole(page);
     await startRun(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     /* Week one has one department slot and it is used, so every other
        department is blocked — and must say so in a sentence. */
     await expect(
@@ -2652,7 +2763,7 @@ test.describe("purchasing", () => {
     });
 
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     await scrollThrough(page);
     await nav(page, /Life/);
     for (const t of [
@@ -2827,7 +2938,7 @@ test.describe("purchasing", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     const opener = page
       .getByRole("article", { name: "Community clinic" })
@@ -2855,7 +2966,7 @@ test.describe("purchasing", () => {
 
     for (const width of [1440, 1024, 768, 390]) {
       await page.setViewportSize({ width, height: 900 });
-      await nav(page, /Practice/, /^build$/i);
+      await nav(page, /Work/, /^build$/i);
       await expectNoPageOverflow(page);
       await nav(page, /Life/);
       await expectNoPageOverflow(page);
@@ -2902,7 +3013,7 @@ test.describe("purchasing", () => {
     });
 
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     await scrollThrough(page);
 
     expect(pngs, "masters stay in art-source").toEqual([]);
@@ -3070,7 +3181,7 @@ test.describe("department cards", () => {
     });
 
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     await scrollThrough(page);
 
     expect(fetched.size, "one interior per department").toBe(12);
@@ -3118,7 +3229,7 @@ test.describe("department cards", () => {
     });
 
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     await scrollThrough(page);
 
     expect(fetched.size, "one scene per machine").toBe(12);
@@ -3137,7 +3248,7 @@ test.describe("department cards", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     const card = page.getByRole("article", { name: "Cardiology" });
     await card.scrollIntoViewIfNeeded();
@@ -3160,7 +3271,7 @@ test.describe("department cards", () => {
   test("an open department reports its coverage in words", async ({ page }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     /* The mid-run fixture has general practice open. Whatever its cover, the
        card must state it as a word and as a severity pair, never as a colour
@@ -3181,7 +3292,7 @@ test.describe("department cards", () => {
        so every other field is genuinely refused — which is the engine's rule,
        not a decoration. */
     await startRun(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     const cardio = page.getByRole("article", { name: "Cardiology" });
     await cardio.scrollIntoViewIfNeeded();
@@ -3208,7 +3319,7 @@ test.describe("department cards", () => {
   }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     const card = page.getByRole("article", { name: "Dermatology" });
     await card.scrollIntoViewIfNeeded();
@@ -3229,7 +3340,7 @@ test.describe("department cards", () => {
   test("a department stays open after a reload", async ({ page }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     const card = page.getByRole("article", { name: "Dermatology" });
     await card.scrollIntoViewIfNeeded();
     await card.getByRole("button", { name: /^buy$/i }).click();
@@ -3241,7 +3352,7 @@ test.describe("department cards", () => {
 
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     const after = page.getByRole("article", { name: "Dermatology" });
     await after.scrollIntoViewIfNeeded();
     await expect(
@@ -3254,7 +3365,7 @@ test.describe("department cards", () => {
   test("opening one twice does not charge twice", async ({ page }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     const before = await page.getByRole("main").innerText();
     const cashBefore = Number(
@@ -3287,7 +3398,7 @@ test.describe("department cards", () => {
   test("equipment says when nobody can run it", async ({ page }) => {
     const problems = watchConsole(page);
     await startRun(page);
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
 
     /*
      * The requirement is stated before you own anything.
@@ -3311,7 +3422,7 @@ test.describe("department cards", () => {
     await preload(page, "midrun");
     await page.goto("/");
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await nav(page, /Practice/, /^build$/i);
+    await nav(page, /Work/, /^build$/i);
     const ecg = page.getByRole("article", { name: "Pathology lab" });
     await ecg.scrollIntoViewIfNeeded();
     await ecg.getByRole("button", { name: /^buy$/i }).click();
@@ -3337,7 +3448,7 @@ test.describe("department cards", () => {
 
     for (const width of [1440, 1024, 768, 390]) {
       await page.setViewportSize({ width, height: 900 });
-      await nav(page, /Practice/, /^build$/i);
+      await nav(page, /Work/, /^build$/i);
       await expectNoPageOverflow(page);
 
       const card = page.getByRole("article", { name: "Cardiology" });
@@ -3456,7 +3567,7 @@ test.describe("character portraits", () => {
   test("all five rivals are recognisable", async ({ page }) => {
     const problems = watchConsole(page);
     await resume(page);
-    await nav(page, /Network/, /^rivals$/i);
+    await nav(page, /World/, /^rivals$/i);
 
     /* Five rivals, five faces, and the strategy and standing they always
        carried. A portrait must not have displaced the numbers. */
@@ -3670,7 +3781,7 @@ test.describe("choosing where to start", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Map/ })
+      .filter({ hasText: /World/ })
       .first()
       .click();
     await expect(
@@ -3813,6 +3924,178 @@ test.describe("every career reads clearly", () => {
 
 
 
+
+
+test.describe("every career has a phone", () => {
+  /*
+   * Four careers were built without one and got theirs from a voice pack
+   * rather than a hand-written module. This walks all of them, because the
+   * failure a pack makes easy — a career wired to the wrong pack, or to none —
+   * is invisible until somebody opens that handset.
+   */
+  const PACKED = ["founder", "politician", "architect", "engineer"];
+
+  for (const career of PACKED) {
+    test(`the ${career} carries a phone of its own`, async ({ page }) => {
+      await page.goto("/");
+      await page.evaluate(() => window.localStorage.clear());
+      await page.reload();
+      const card = page
+        .getByRole("button", { name: new RegExp(String.raw`^open\s*${career}`, "i") })
+        .first();
+      await card.click();
+      await card.click();
+      await page.getByRole("button", { name: /^Begin in / }).first().click();
+
+      await page.getByRole("button", { name: /open phone/i }).click();
+      const phone = page.getByRole("dialog");
+      await expect(phone).toBeVisible();
+
+      /* Somebody has already been in touch, in this career's own voice. */
+      await phone.getByRole("button", { name: /^messages$/i }).first().click();
+      await expect(
+        phone.locator("li").first(),
+        "the opening message is waiting",
+      ).toBeVisible();
+
+      /* And there is something to say that the run has actually earned. */
+      await phone.getByRole("button", { name: /^pulse$/i }).first().click();
+      await phone.getByRole("button", { name: /compose/i }).first().click();
+      await expect(
+        phone.getByRole("button", { name: /publish|^the |^i am|^we are/i }).first(),
+        "the composer offers something",
+      ).toBeVisible();
+
+      const text = await phone.innerText();
+      expect(
+        text.match(/patient|caseload|larder|brigade|chambers/i)?.[0],
+        "no other career's vocabulary reaches this phone",
+      ).toBeUndefined();
+      expect(text).not.toContain("NaN");
+      expect(text).not.toContain("undefined");
+    });
+  }
+});
+
+test.describe("the way in", () => {
+  test("a newcomer is told where to start, and who they are", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+
+    /* Seven careers is a lot to meet at once; the screen answers the obvious
+       question rather than leaving it. */
+    await expect(
+      page.getByText(/New here\?/i),
+      "the screen suggests somewhere to start",
+    ).toBeVisible();
+    await expect(page.getByText(/Start with the Chef/i)).toBeVisible();
+
+    /* And says who is playing, with a way out — the whole point of accounts
+       is more than one person on a machine. */
+    await expect(page.getByText(/Signed in as/i)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Not you\?/i }),
+      "and offers a way to switch",
+    ).toBeVisible();
+  });
+
+  test("signing out returns to the front door", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    await page.getByRole("button", { name: /Not you\?/i }).click();
+    await expect(
+      page.getByRole("heading", { name: /Who is playing|Create your account/i }),
+      "signing out lands back on the account screen",
+    ).toBeVisible();
+  });
+});
+
+test.describe("every career can see where it is", () => {
+  /*
+   * The map is engine-level: any career with `startCities` gets it through
+   * the generic section set. This walks all seven rather than the two that
+   * had bespoke screens, because the failure this catches — a career added
+   * without a horizon line, or with a city the projection cannot draw — is
+   * exactly the kind that only shows up on the one nobody opened.
+   */
+  const CAREERS = [
+    "physician",
+    "chef",
+    "solicitor",
+    "founder",
+    "politician",
+    "architect",
+    "engineer",
+  ];
+
+  for (const career of CAREERS) {
+    test(`the ${career} map draws the world and says where you are`, async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await page.evaluate(() => window.localStorage.clear());
+      await page.reload();
+
+      const card = page
+        .getByRole("button", { name: new RegExp(String.raw`^open\s*${career}`, "i") })
+        .first();
+      await card.click();
+      await card.click();
+      await page.getByRole("button", { name: /^Begin in / }).first().click();
+
+      /* The Physician's is a network of markets it can actually enter, and
+         its destination is named for that; every other career shares the
+         generic map. Both are "where you are". */
+      await page
+        .getByRole("button", { name: /^World$/i })
+        .first()
+        .click();
+
+      /*
+       * Matched by accessible name rather than by role. The generic map is a
+       * static `role="img"`; the Physician's is an arrow-key navigable region,
+       * which is the correct role for something you can actually move around
+       * in. The claim being made is that the world is drawn *and described*,
+       * and that is true of both.
+       */
+      await expect(
+        page.getByLabel(/World map|Map of the world/i).first(),
+        "the world is drawn, and described for anybody not looking at it",
+      ).toBeVisible();
+
+      const text = await page.locator("main").innerText();
+      expect(text).not.toContain("NaN");
+      expect(text).not.toContain("undefined");
+    });
+  }
+
+  test("every career that cannot move says so", async ({ page }) => {
+    /* A world map with one marker on it invites the question "can I move
+       there?". Every career whose answer is no has to answer it out loud. */
+    for (const career of ["chef", "founder", "politician", "architect", "engineer"]) {
+      await page.goto("/");
+      await page.evaluate(() => window.localStorage.clear());
+      await page.reload();
+      const card = page
+        .getByRole("button", { name: new RegExp(String.raw`^open\s*${career}`, "i") })
+        .first();
+      await card.click();
+      await card.click();
+      await page.getByRole("button", { name: /^Begin in / }).first().click();
+      await page.getByRole("button", { name: /^World$/i }).first().click();
+
+      await expect(
+        page.getByText(/not built yet/i).first(),
+        `${career} says what its map cannot show`,
+      ).toBeVisible();
+    }
+  });
+});
+
 test.describe("the engineer", () => {
   const startEngineer = async (page: Page) => {
     await page.goto("/");
@@ -3825,15 +4108,35 @@ test.describe("the engineer", () => {
     await expect(
       page.getByRole("navigation", { name: "Primary" }).last(),
     ).toBeVisible();
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
   };
+
+  /** The Engineer has three destinations: Week, Work, World. */
+  const go = async (page: Page, where: RegExp) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: where })
+      .first()
+      .click();
+  };
+
+  const tab = async (page: Page, where: RegExp) => {
+    await page.getByRole("tab", { name: where }).first().click();
+  };
+
+  /** The certifier's terms, carried onto the screen where work is chosen. */
+  const strip = (page: Page) => page.locator('dl[aria-label="The bench"]');
 
   test("the fault count is shown as a range, never as a number", async ({
     page,
   }) => {
     const problems = watchConsole(page);
     await startEngineer(page);
+    await tab(page, /^What you could build$/);
     await page.getByRole("button", { name: /^Start it$/ }).first().click();
+    await tab(page, /^The bench$/);
 
     /* The career's whole contract: an estimate and a confidence, not a count. */
     await expect(
@@ -3863,6 +4166,7 @@ test.describe("the engineer", () => {
 
   test("craft gates what you are allowed to attempt", async ({ page }) => {
     await startEngineer(page);
+    await tab(page, /^What you could build$/);
     await expect(
       page.getByText(/Needs craft \d+; yours is \d+/).first(),
       "a product beyond you says so, with both numbers",
@@ -3871,16 +4175,137 @@ test.describe("the engineer", () => {
 
   test("an engineer run survives a reload", async ({ page }) => {
     await startEngineer(page);
+    await tab(page, /^What you could build$/);
     await page.getByRole("button", { name: /^Start it$/ }).first().click();
+    await tab(page, /^The bench$/);
     await expect(page.getByText(/mounting bracket/i).first()).toBeVisible();
 
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
     await expect(
       page.getByText(/Faults in it, estimated/i).first(),
       "the product on the bench survives a reload",
     ).toBeVisible();
+  });
+
+  /*
+   * ------------------------------------------------- the organised version
+   *
+   * Two screens rather than four, because this career has two subjects. What
+   * travels between them is the certifier: an estimate is a band, and a band
+   * is only good or bad news against the line it is drawn against.
+   */
+  test("the workshop is the bench and what could go on it", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startEngineer(page);
+
+    for (const [name, purpose] of [
+      [/^The bench$/, /What you are building/i],
+      [/^What you could build$/, /What is open to you/i],
+    ] as const) {
+      await tab(page, name);
+      await expect(
+        page.getByText(purpose).first(),
+        "each screen states its own purpose",
+      ).toBeVisible();
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test("the certifier's terms follow you to where work is chosen", async ({
+    page,
+  }) => {
+    await startEngineer(page);
+
+    await tab(page, /^The bench$/);
+    await expect(
+      strip(page),
+      "the bench states them in full, so the strip would be a duplicate",
+    ).toHaveCount(0);
+
+    await tab(page, /^What you could build$/);
+    await expect(strip(page)).toBeVisible();
+    await expect(
+      strip(page),
+      "what this market accepts is the thing a new product is chosen against",
+    ).toContainText(/faults/i);
+  });
+
+  /* The one rule this career cannot break: the true count is never shown. */
+  test("neither screen ever prints the real fault count", async ({ page }) => {
+    await startEngineer(page);
+    await tab(page, /^What you could build$/);
+    await page.getByRole("button", { name: /^Start it$/ }).first().click();
+
+    for (const name of [/^The bench$/, /^What you could build$/]) {
+      await tab(page, name);
+      const text = await page.locator("main").innerText();
+      expect(
+        /faults? in it:\s*\d+|latent/i.test(text),
+        "the hidden number must never reach a screen",
+      ).toBe(false);
+      expect(text).not.toContain("NaN");
+      expect(text).not.toContain("undefined");
+    }
+  });
+
+  test("a product carries its decisions, and the lab hires its disciplines", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startEngineer(page);
+
+    /* Something on the bench to decide about. */
+    await tab(page, /^What you could build$/);
+    await page.getByRole("button", { name: /^Start it$/ }).first().click();
+    await tab(page, /^The bench$/);
+
+    /* Requirements: negotiated once, in words. */
+    await page.getByRole("button", { name: /^Hardened$/ }).first().click();
+    await expect(
+      page.getByText(/^Spec:/).first(),
+      "the negotiated envelope is stated on the card",
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Lean spec$/ }),
+      "and the negotiation does not repeat",
+    ).toHaveCount(0);
+
+    /* Architecture: the other once-only decision. */
+    await page.getByRole("button", { name: /^Modular$/ }).first().click();
+    await expect(page.getByText(/^Architecture:/).first()).toBeVisible();
+
+    /* The lab and the disciplines are on the bench screen, with prices. */
+    await expect(
+      page.getByText(/^The lab, and the disciplines$/).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Buy — / }).first(),
+      "a rig has a price on it",
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Hire — / }).first(),
+      "and so does a discipline",
+    ).toBeVisible();
+
+    /* The prototype states its price, and buying it says what it bought.
+       On a bracket the bill is small enough for a fresh workshop — which
+       is the point of starting on brackets. */
+    await page
+      .getByRole("button", { name: /^Build a prototype — / })
+      .first()
+      .click();
+    await expect(
+      page.getByText(/^Prototyped$/).first(),
+      "the bought prototype is on the card",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
   });
 });
 
@@ -3898,7 +4323,32 @@ test.describe("the architect", () => {
     await expect(
       page.getByRole("navigation", { name: "Primary" }).last(),
     ).toBeVisible();
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
+  };
+
+  /** The Architect has three destinations: Week, Work, World. */
+  const go = async (page: Page, where: RegExp) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: where })
+      .first()
+      .click();
+  };
+
+  const tab = async (page: Page, where: RegExp) => {
+    await page.getByRole("tab", { name: where }).first().click();
+  };
+
+  /** What is unearned and what has been redrawn, carried everywhere else. */
+  const strip = (page: Page) => page.locator('dl[aria-label="On the boards"]');
+
+  /** Accept the opening offer and go back to the boards to look at it. */
+  const takeTheOffer = async (page: Page) => {
+    await tab(page, /^Offered$/);
+    await page.getByRole("button", { name: /^Take it on$/ }).first().click();
+    await tab(page, /^On the boards$/);
   };
 
   test("a commission shows its stage, its fee and its risk", async ({
@@ -3909,7 +4359,7 @@ test.describe("the architect", () => {
 
     /* The practice opens with one job offered, and taking it puts it on the
        boards — the career is unplayable without that first board. */
-    await page.getByRole("button", { name: /^Take it on$/ }).first().click();
+    await takeTheOffer(page);
 
     await expect(
       page.getByText(/banked/i).first(),
@@ -3938,7 +4388,7 @@ test.describe("the architect", () => {
 
   test("seeing the client is a real defence", async ({ page }) => {
     await startArchitect(page);
-    await page.getByRole("button", { name: /^Take it on$/ }).first().click();
+    await takeTheOffer(page);
 
     /* An associate exists to make that call for you, and the risk on the
        card has to move when one is hired. */
@@ -3951,10 +4401,12 @@ test.describe("the architect", () => {
     };
 
     const before = await riskOf();
+    await tab(page, /^The studio$/);
     await page
       .getByRole("button", { name: /^Take them on$/ })
       .last()
       .click();
+    await tab(page, /^On the boards$/);
     const after = await riskOf();
     expect(
       after,
@@ -3964,16 +4416,125 @@ test.describe("the architect", () => {
 
   test("an architect run survives a reload", async ({ page }) => {
     await startArchitect(page);
-    await page.getByRole("button", { name: /^Take it on$/ }).first().click();
+    await takeTheOffer(page);
     await expect(page.getByText(/A house extension/).first()).toBeVisible();
 
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
     await expect(
       page.getByText(/A house extension/).first(),
       "the commission survives a reload",
     ).toBeVisible();
+  });
+
+  /*
+   * ------------------------------------------------- the organised version
+   *
+   * Four screens under one destination. The career is paid in stages and its
+   * risk is being made to draw one twice, so what is unearned and what has
+   * been redrawn ride on every screen that is not the boards themselves.
+   */
+  test("the practice is four screens, not one scroll", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startArchitect(page);
+
+    for (const [name, purpose] of [
+      [/^On the boards$/, /What you are drawing/i],
+      [/^Offered$/, /What you are being asked for/i],
+      [/^Competitions$/, /Months of unpaid drawing/i],
+      [/^The studio$/, /Who draws for you/i],
+    ] as const) {
+      await tab(page, name);
+      await expect(
+        page.getByText(purpose).first(),
+        "each screen states its own purpose",
+      ).toBeVisible();
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test("what is unearned is on every screen except the boards", async ({
+    page,
+  }) => {
+    await startArchitect(page);
+
+    await tab(page, /^On the boards$/);
+    await expect(
+      strip(page),
+      "the boards state it in full, so the strip would be a duplicate",
+    ).toHaveCount(0);
+
+    for (const name of [/^Offered$/, /^Competitions$/, /^The studio$/]) {
+      await tab(page, name);
+      await expect(strip(page)).toBeVisible();
+      await expect(strip(page)).toContainText(/Redrawn/i);
+    }
+  });
+
+  test("competitions are reachable and say what they cost", async ({
+    page,
+  }) => {
+    await startArchitect(page);
+    await tab(page, /^Competitions$/);
+    await expect(
+      page.getByText(/Months of unpaid work/i).first(),
+      "the screen is honest about what it is",
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Enter$/ }).first(),
+      "and an entry can actually be made",
+    ).toBeVisible();
+  });
+
+  test("a commission carries its decisions: brief, palette, planning, cost plan", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startArchitect(page);
+
+    /* Take the offered job so there is a card to decide on. */
+    await tab(page, /^Offered$/);
+    await page.getByRole("button", { name: /^Take it on$/ }).first().click();
+    await tab(page, /^On the boards$/);
+
+    /* The brief meeting: three choices, agreed once. */
+    await page.getByRole("button", { name: /^Signature$/ }).first().click();
+    await expect(
+      page.getByText(/Brief:/).first(),
+      "the agreed brief is stated on the card",
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Economy$/ }),
+      "and the meeting does not repeat",
+    ).toHaveCount(0);
+
+    /* The palette, with the carbon consequence spelled out in Amsterdam. */
+    await page.getByRole("button", { name: /^Mass timber$/ }).first().click();
+    await expect(
+      page.getByText(/reads well here/i).first(),
+      "a low-carbon palette in a carbon-pricing market says so",
+    ).toBeVisible();
+
+    /* The cost plan reads the choices it was given. */
+    await expect(
+      page.getByText(/^Cost plan:/).first(),
+      "the cost plan is stated once anything is chosen",
+    ).toBeVisible();
+
+    /* Planning can be lodged, for a stated fee, and says it is in. */
+    await page
+      .getByRole("button", { name: /^Lodge planning — / })
+      .first()
+      .click();
+    await expect(
+      page.getByText(/At committee/i).first(),
+      "a lodged application says where it is",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
   });
 });
 
@@ -3991,8 +4552,28 @@ test.describe("the politician", () => {
     await expect(
       page.getByRole("navigation", { name: "Primary" }).last(),
     ).toBeVisible();
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
   };
+
+  /** The Politician has three destinations: Week, Work, World. */
+  const go = async (page: Page, where: RegExp) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: where })
+      .first()
+      .click();
+  };
+
+  /** Within The seat: the count, the electorate, where you stand, the ladder. */
+  const tab = async (page: Page, where: RegExp) => {
+    await page.getByRole("tab", { name: where }).first().click();
+  };
+
+  /** The count, carried onto the screens that are not themselves the count. */
+  const strip = (page: Page) =>
+    page.locator('dl[aria-label="The count"], p[aria-label="The count"]');
 
   test("the seat says where support is heading, not just where it is", async ({
     page,
@@ -4000,10 +4581,14 @@ test.describe("the politician", () => {
     const problems = watchConsole(page);
     await startPolitician(page);
 
+    /* The count states the constraint... */
     await expect(
       page.getByText(/the only moment any of this is banked/i).first(),
       "the career states its own constraint on the screen",
     ).toBeVisible();
+
+    /* ...and the electorate, one screen along, explains the drift. */
+    await tab(page, /^The electorate$/);
     await expect(
       page.getByText(/drifts toward where your positions leave it/i).first(),
       "and explains the drift rather than hiding it",
@@ -4030,6 +4615,7 @@ test.describe("the politician", () => {
     page,
   }) => {
     await startPolitician(page);
+    await tab(page, /^Where you stand$/);
 
     /* Every stance shows who it loses as well as who it wins. */
     const build = page.getByRole("button", { name: /Build the houses/ }).first();
@@ -4054,15 +4640,135 @@ test.describe("the politician", () => {
 
   test("a politician run survives a reload", async ({ page }) => {
     await startPolitician(page);
+    await tab(page, /^Where you stand$/);
     await page.getByRole("button", { name: /Fund it properly/ }).first().click();
 
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
+    await tab(page, /^Where you stand$/);
     await expect(
       page.getByRole("button", { name: /Fund it properly/ }).first(),
       "the position survives a reload",
     ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  /*
+   * ------------------------------------------------- the organised version
+   *
+   * This career was one generic "Business" page carrying the poll, the
+   * electorate, the positions and the ladder on a single scroll. The count is
+   * what every one of those is measured against, so it rides on all of them.
+   */
+  test("the seat is four screens, not one scroll", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startPolitician(page);
+
+    for (const [name, purpose] of [
+      [/^The count$/, /What you would take if the vote were today/i],
+      [/^The electorate$/, /Who is in this seat/i],
+      [/^Where you stand$/, /questions you have answered in public/i],
+      [/^The ladder$/, /The office above this one/i],
+    ] as const) {
+      await tab(page, name);
+      await expect(
+        page.getByText(purpose).first(),
+        "each screen states its own purpose",
+      ).toBeVisible();
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test("the count is on every screen except its own", async ({ page }) => {
+    await startPolitician(page);
+
+    await tab(page, /^The count$/);
+    await expect(
+      strip(page),
+      "the count screen states it in full, so the strip would be a duplicate",
+    ).toHaveCount(0);
+
+    for (const name of [
+      /^The electorate$/,
+      /^Where you stand$/,
+      /^The ladder$/,
+    ]) {
+      await tab(page, name);
+      await expect(strip(page).first()).toBeVisible();
+      await expect(strip(page).first()).toContainText(/bar|name forward/i);
+    }
+  });
+
+  test("targeting a bloc is reachable and reports itself", async ({ page }) => {
+    await startPolitician(page);
+    await tab(page, /^The electorate$/);
+
+    const target = page
+      .getByRole("button", { name: /^Target this bloc$/ })
+      .first();
+    await expect(target, "a bloc can be worked").toBeVisible();
+    await target.click();
+    await expect(
+      page.getByRole("button", { name: /^Targeting this bloc$/ }).first(),
+      "and says so once chosen",
+    ).toBeVisible();
+  });
+
+  test("no other career's vocabulary reaches any of the four", async ({
+    page,
+  }) => {
+    await startPolitician(page);
+
+    for (const name of [
+      /^The count$/,
+      /^The electorate$/,
+      /^The postbag$/,
+      /^Where you stand$/,
+      /^The ladder$/,
+    ]) {
+      await tab(page, name);
+      const text = await page.locator("main").innerText();
+      expect(
+        text.match(
+          /patient|caseload|triage|outbreak|physician|larder|brigade|runway|chambers/i,
+        )?.[0],
+        "the Politician is showing another career's word",
+      ).toBeUndefined();
+      expect(text).not.toContain("NaN");
+      expect(text).not.toContain("undefined");
+    }
+  });
+
+  test("the postbag holds the ground game", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startPolitician(page);
+    await tab(page, /^The postbag$/);
+
+    /* The desk: names with deadlines, or an honest empty state. */
+    await expect(
+      page.getByText(/worked oldest first/i).first(),
+      "the desk says how it is worked",
+    ).toBeVisible();
+
+    /* The ground game states what volunteers are worth, even at zero. */
+    await expect(page.getByText(/^Volunteers$/).first()).toBeVisible();
+    await expect(
+      page.getByText(/knock the doors you cannot/i).first(),
+    ).toBeVisible();
+
+    /* The fund states its compliance rule where the money is, and a
+       focus group cannot be bought from an empty fund. */
+    await expect(
+      page.getByText(/never the rent, which is the law/i).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Focus group/ }),
+      "an empty fund cannot buy a reading of the room",
+    ).toBeDisabled();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
   });
 });
 
@@ -4082,18 +4788,39 @@ test.describe("the founder", () => {
     ).toBeVisible();
   };
 
+  /** The Founder has three destinations: Week, Work, World. */
+  const go = async (page: Page, where: RegExp) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: where })
+      .first()
+      .click();
+  };
+
+  /** Within Company: runway, team, raising. */
+  const tab = async (page: Page, where: RegExp) => {
+    await page.getByRole("tab", { name: where }).first().click();
+  };
+
+  /** The runway summary carried onto the screens that are not about it. */
+  const strip = (page: Page) => page.locator('dl[aria-label="Runway"]');
+
   test("the career is played in weeks, not pounds", async ({ page }) => {
     const problems = watchConsole(page);
     await startFounder(page);
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
 
     /* The headline is a countdown. */
+    await tab(page, /^Runway$/);
     await expect(
       page.getByText(/^11 weeks$/).first(),
       "the opening runway is the eleven weeks the tagline promises",
     ).toBeVisible();
 
-    /* And every hire is priced in the same currency. */
+    /* And every hire is priced in the same currency, one screen along. */
+    await tab(page, /^Team$/);
     await expect(
       page.getByText(/weeks of runway/i).first(),
       "a hire is priced in weeks, not just money",
@@ -4112,9 +4839,12 @@ test.describe("the founder", () => {
 
   test("hiring shortens the runway that pays for it", async ({ page }) => {
     await startFounder(page);
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
+    await tab(page, /^Team$/);
 
-    const runway = page.locator("section", { hasText: "Runway" }).first();
+    /* Read off the strip rather than a section heading: the whole point of
+       carrying it here is that the cost of a hire can be seen while hiring. */
+    const runway = strip(page);
     const before = Number(
       ((await runway.innerText()).match(/(\d+)\s*weeks/) ?? ["", "0"])[1],
     );
@@ -4136,7 +4866,8 @@ test.describe("the founder", () => {
 
   test("a founder run survives a reload", async ({ page }) => {
     await startFounder(page);
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
+    await tab(page, /^Team$/);
     await page
       .getByRole("button", { name: /^Take them on$/ })
       .first()
@@ -4145,11 +4876,151 @@ test.describe("the founder", () => {
 
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await page.getByRole("button", { name: /Business/i }).first().click();
+    await go(page, /Work/i);
+    await tab(page, /^Team$/);
     await expect(
       page.getByText(/on the payroll/i).first(),
       "the team survives a reload",
     ).toBeVisible();
+  });
+
+  /*
+   * ------------------------------------------------- the organised version
+   *
+   * This career had no section set at all: one generic "Business" page
+   * carrying runway, growth, team and raising on a single scroll, and a note
+   * in the component defending it — the run has one question in it, and tabs
+   * would hide the arithmetic that makes each option a decision.
+   *
+   * The arithmetic turned out to be per-option and travelled with the option.
+   * What needed carrying was the clock, so these assert both halves: three
+   * real screens, and the clock on every one of them that is not itself the
+   * clock.
+   */
+  test("the company is three screens, not one scroll", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startFounder(page);
+    await go(page, /Work/i);
+
+    for (const [name, purpose] of [
+      [/^Runway$/, /How many weeks are left/i],
+      [/^Team$/, /Who is on the payroll/i],
+      [/^Raising$/, /What the company is worth/i],
+    ] as const) {
+      await tab(page, name);
+      await expect(
+        page.getByText(purpose).first(),
+        "each screen states its own purpose",
+      ).toBeVisible();
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test("the clock is on every screen except its own", async ({ page }) => {
+    await startFounder(page);
+    await go(page, /Work/i);
+
+    await tab(page, /^Runway$/);
+    await expect(
+      strip(page),
+      "the Runway screen states it in full, so the strip would be a duplicate",
+    ).toHaveCount(0);
+
+    await tab(page, /^Team$/);
+    await expect(strip(page)).toBeVisible();
+    await expect(strip(page)).toContainText(/Burn/i);
+
+    await tab(page, /^Raising$/);
+    await expect(strip(page)).toBeVisible();
+  });
+
+  test("raising says what it takes and never gives back", async ({ page }) => {
+    const problems = watchConsole(page);
+    await startFounder(page);
+    await go(page, /Work/i);
+    await tab(page, /^Raising$/);
+
+    await expect(
+      page.getByText(/costs a piece of that share, permanently/i),
+    ).toBeVisible();
+    await expect(page.getByText(/for about \d+%/i).first()).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+
+  /* The rule every career is held to, applied across all three screens
+     rather than the one the original test happened to land on. */
+  test("no other career's vocabulary reaches any of the three", async ({
+    page,
+  }) => {
+    await startFounder(page);
+    await go(page, /Work/i);
+
+    for (const name of [/^Runway$/, /^The product$/, /^Team$/, /^Raising$/]) {
+      await tab(page, name);
+      const text = await page.locator("main").innerText();
+      expect(
+        text.match(
+          /patient|caseload|triage|outbreak|physician|larder|brigade|chambers|hearing/i,
+        )?.[0],
+        "the Founder is showing another career's word",
+      ).toBeUndefined();
+      expect(text).not.toContain("NaN");
+      expect(text).not.toContain("undefined");
+    }
+  });
+
+  test("the product screen holds the roadmap, the funnel and the tests", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await startFounder(page);
+    await go(page, /Work/i);
+    await tab(page, /^The product$/);
+
+    /* Discovery states itself, honestly, from zero. */
+    await expect(
+      page.getByRole("meter", { name: /customer insight/i }),
+      "insight is a meter, not a mystery",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/You are guessing/i).first(),
+      "and zero insight says so in words",
+    ).toBeVisible();
+
+    /* The roadmap holds a stance: steady by default, ship on demand. */
+    const steady = page.getByRole("button", { name: /^Steady/ }).first();
+    await expect(steady).toHaveAttribute("aria-pressed", "true");
+    const ship = page.getByRole("button", { name: /^Ship fast/ }).first();
+    await ship.click();
+    await expect(
+      ship,
+      "choosing a pace marks it chosen",
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(steady).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      page.getByRole("meter", { name: /technical debt/i }),
+      "the bill is a meter beside the choice that runs it up",
+    ).toBeVisible();
+
+    /* The funnel reads top to bottom, and the economics are stated. */
+    await expect(page.getByText(/^Looked$/i).first()).toBeVisible();
+    await expect(page.getByText(/worth .* over their stay/i).first()).toBeVisible();
+
+    /* An experiment can be bought, and immediately says it is running. */
+    const run = page
+      .getByRole("button", { name: /^Run — / })
+      .first();
+    await expect(run).toBeEnabled();
+    await run.click();
+    await expect(
+      page.getByText(/reading out/i).first(),
+      "the bought test says it is in flight",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
   });
 });
 
@@ -4196,7 +5067,7 @@ test.describe("the chef", () => {
   }) => {
     const problems = watchConsole(page);
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
 
     const screens: [RegExp, RegExp][] = [
       [/The room/, /Premises and equipment/i],
@@ -4249,7 +5120,7 @@ test.describe("the chef", () => {
 
     /* 1. The book. Switching it is the choice that decides how much of next
        week is knowable before any food is bought. */
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /The pass/);
     const reservations = page
       .getByRole("button", { name: /Reservations only/ })
@@ -4310,7 +5181,7 @@ test.describe("the chef", () => {
 
     /* 4. Plan the week. The forecast has to appear before committing — it is
        what the ordering decision is made against. */
-    await go(page, /Overview/);
+    await go(page, /Week/);
     /* `.first()` because the forecast appears twice by design — once as the
        week's headline and once in the commit strip. Either would do; the
        claim is that it is on screen before anything is committed. */
@@ -4339,7 +5210,7 @@ test.describe("the chef", () => {
     await page.keyboard.press("Escape");
 
     /* Open a dinner service and commit the week. */
-    await go(page, /Overview/);
+    await go(page, /Week/);
     const plus = page.locator("button").filter({ hasText: /^\+$/ });
     await plus.nth(1).click();
     await plus.nth(1).click();
@@ -4351,7 +5222,7 @@ test.describe("the chef", () => {
 
     /* The report is the other half of the forecast: what actually happened,
        and — the part a player cannot infer — which constraint bound. */
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /The pass/);
     await expect(page.getByText(/Last service/i).first()).toBeVisible();
     await expect(page.getByText(/Limited by:/i).first()).toBeVisible();
@@ -4456,7 +5327,7 @@ test.describe("the chef", () => {
   test("a dish can be put on, cooked, and read back", async ({ page }) => {
     const problems = watchConsole(page);
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
 
     /* 1. The pantry starts empty and says so rather than showing a blank. */
     await tab(page, /Larder/);
@@ -4527,7 +5398,7 @@ test.describe("the chef", () => {
     page,
   }) => {
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
 
     /* A dish on the menu with nothing behind it is the mistake this whole
        system exists to make visible, and it must be visible *before* the week
@@ -4544,7 +5415,7 @@ test.describe("the chef", () => {
       "the shortfall is named on the screen where it is fixed",
     ).toBeVisible();
 
-    await go(page, /Overview/);
+    await go(page, /Week/);
     await expect(
       page.getByText(/On the menu/i).first(),
       "and again on the week's own briefing, before anything is committed",
@@ -4561,7 +5432,7 @@ test.describe("the chef", () => {
   test("a service is run, recorded and explained", async ({ page }) => {
     const problems = watchConsole(page);
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
 
     /* 1. A menu, and the ingredients behind it. */
     await tab(page, /Menu/);
@@ -4593,7 +5464,7 @@ test.describe("the chef", () => {
     await expect(push).toHaveAttribute("aria-pressed", "true");
 
     /* 3. Run the week. */
-    await go(page, /Overview/);
+    await go(page, /Week/);
     const plus = page.locator("button").filter({ hasText: /^\+$/ });
     await plus.nth(1).click();
     await plus.nth(1).click();
@@ -4604,7 +5475,7 @@ test.describe("the chef", () => {
     await dismissReview(page);
 
     /* 4. The night, recorded. */
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /The pass/);
     await expect(
       page.getByText(/served,.*walked out/i).first(),
@@ -4623,7 +5494,7 @@ test.describe("the chef", () => {
     page,
   }) => {
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /Brigade/);
 
     /* Every station, with what it can move and who is on it. */
@@ -4688,7 +5559,7 @@ test.describe("the chef", () => {
     ).toBeVisible();
 
     await page.keyboard.press("Escape");
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /Brigade/);
     await expect(
       page.getByText(chosen).first(),
@@ -4700,7 +5571,7 @@ test.describe("the chef", () => {
 
   test("a chef run survives a reload", async ({ page }) => {
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /The pass/);
     await page.getByRole("button", { name: /Deposit on booking/ }).first().click();
     await tab(page, /Larder/);
@@ -4714,7 +5585,7 @@ test.describe("the chef", () => {
 
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
 
     await tab(page, /The pass/);
     await expect(
@@ -4741,7 +5612,7 @@ test.describe("the chef", () => {
   }) => {
     const problems = watchConsole(page);
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /Word of mouth/);
 
     await expect(
@@ -4785,7 +5656,7 @@ test.describe("the chef", () => {
 
     /* Buy food, open a service, and commit — the same three things a player
        does on their first week. */
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /Larder/);
     await page.getByRole("button", { name: /call your suppliers/i }).click();
     await page
@@ -4795,14 +5666,14 @@ test.describe("the chef", () => {
       .click();
     await page.keyboard.press("Escape");
 
-    await go(page, /Overview/);
+    await go(page, /Week/);
     const plus = page.locator("button").filter({ hasText: /^\+$/ });
     await plus.nth(1).click();
     await plus.nth(1).click();
     await page.getByRole("button", { name: /^Commit week/ }).first().click();
     await dismissReview(page);
 
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /Word of mouth/);
 
     /* Every standing move carries the sentence the simulation wrote when it
@@ -4826,7 +5697,7 @@ test.describe("the chef", () => {
   }) => {
     const problems = watchConsole(page);
     await startChef(page);
-    await go(page, /Map/);
+    await go(page, /World/);
     await tab(page, /The scene/);
 
     await expect(
@@ -4876,7 +5747,7 @@ test.describe("the chef", () => {
      */
     await page.evaluate(() => {
       const key = Object.keys(window.localStorage).find((k) =>
-        k.startsWith("career-tycoon:save:"),
+        k.startsWith("career-tycoon:") && k.includes(":save:"),
       );
       if (!key) throw new Error("no run in storage");
       const run = JSON.parse(window.localStorage.getItem(key) as string);
@@ -4896,7 +5767,7 @@ test.describe("the chef", () => {
     });
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /Word of mouth/);
 
     await expect(
@@ -4986,7 +5857,7 @@ test.describe("the chef", () => {
   }) => {
     const problems = watchConsole(page);
     await startChef(page);
-    await go(page, /^You$/);
+    await go(page, /^Career$/);
     await tab(page, /The craft/);
 
     await expect(
@@ -5037,7 +5908,7 @@ test.describe("the chef", () => {
     page,
   }) => {
     await startChef(page);
-    await go(page, /^You$/);
+    await go(page, /^Career$/);
     await tab(page, /The craft/);
     await page
       .locator("li", { hasText: /Stocks and reductions/ })
@@ -5045,7 +5916,7 @@ test.describe("the chef", () => {
       .click();
 
     /* The planner offers the block, and states what it will do. */
-    await go(page, /Overview/);
+    await go(page, /Week/);
     await expect(
       page.getByText(/points towards stocks and reductions/i).first(),
       "the block says where it is going before it is spent",
@@ -5057,7 +5928,7 @@ test.describe("the chef", () => {
     await page.getByRole("button", { name: /^Commit week/ }).first().click();
     await dismissReview(page);
 
-    await go(page, /^You$/);
+    await go(page, /^Career$/);
     await tab(page, /The craft/);
     await expect(
       page.getByText(/22 of 35/).first(),
@@ -5070,7 +5941,7 @@ test.describe("the chef", () => {
   }) => {
     const problems = watchConsole(page);
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /Larder/);
 
     await expect(page.getByText(/^The cellar$/)).toBeVisible();
@@ -5108,7 +5979,7 @@ test.describe("the chef", () => {
     page,
   }) => {
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
     await tab(page, /Word of mouth/);
 
     await expect(page.getByText(/^The guide$/)).toBeVisible();
@@ -5141,7 +6012,7 @@ test.describe("the chef", () => {
   }) => {
     const problems = watchConsole(page);
     await startChef(page);
-    await go(page, /^You$/);
+    await go(page, /^Career$/);
     await tab(page, /Beyond the kitchen/);
 
     await expect(
@@ -5174,7 +6045,7 @@ test.describe("the chef", () => {
 
   test("the chef screens work on a phone and by keyboard", async ({ page }) => {
     await startChef(page);
-    await go(page, /Kitchen/);
+    await go(page, /Work/);
 
     /* Every Chef screen, not only the first: the split moved controls onto
        four screens that had never been laid out on their own. */
@@ -5216,7 +6087,7 @@ test.describe("the chef", () => {
     expect(["BUTTON", "A"], "tab reaches a control").toContain(focused);
 
     /* And the Map destination, which now carries two screens of its own. */
-    await go(page, /Map/);
+    await go(page, /World/);
     for (const label of [/^Map$/, /The scene/]) {
       await tab(page, label);
       await expectNoPageOverflow(page);
@@ -5337,7 +6208,7 @@ test.describe("the solicitor", () => {
   }) => {
     const problems = watchConsole(page);
     await startSolicitor(page);
-    await go(page, /Chambers/);
+    await go(page, /Work/);
 
     const screens: [RegExp, RegExp][] = [
       [/^Instructions$/, /what this market will ever send you/i],
@@ -5380,7 +6251,7 @@ test.describe("the solicitor", () => {
 
     /* 1. Nothing is on the table in week one, and the screen says so rather
        than showing an empty list. */
-    await go(page, /Chambers/);
+    await go(page, /Work/);
     await tab(page, /^Instructions$/);
     await expect(
       page.getByRole("heading", { name: /Practising in London/ }),
@@ -5397,10 +6268,10 @@ test.describe("the solicitor", () => {
        resolved week, so this is the loop a player actually runs. */
     let accepted = false;
     for (let week = 0; week < 6 && !accepted; week++) {
-      await go(page, /Overview/);
+      await go(page, /Week/);
       await playWeek(page, "Pitch for work");
       await closeWeek(page);
-      await go(page, /Chambers/);
+      await go(page, /Work/);
       await tab(page, /^Instructions$/);
       const accept = page
         .getByRole("button", { name: /Accept the instruction/ })
@@ -5432,13 +6303,13 @@ test.describe("the solicitor", () => {
     ).toBeVisible();
 
     /* 4. Do the work. Casework is the block that moves hours into files. */
-    await go(page, /Overview/);
+    await go(page, /Week/);
     await playWeek(page, "Casework");
     await closeWeek(page);
 
     /* 5. Settle it, and the money is there. Settling is the one thing in this
        career that pays on the day it is decided. */
-    await go(page, /Chambers/);
+    await go(page, /Work/);
     const before = await readFirmCash(page);
     await tab(page, /^Casework$/);
     await page.getByRole("button", { name: /^Settle for /i }).first().click();
@@ -5463,13 +6334,13 @@ test.describe("the solicitor", () => {
 
     /* The fixture is a practice mid-run: work on the books, money owed to it,
        and a matter listed for the week about to be committed. */
-    await go(page, /Chambers/);
+    await go(page, /Work/);
     await tab(page, /^Casework$/);
     await expect(
       page.getByText(/On the books in London/i).first(),
     ).toBeVisible();
 
-    await go(page, /Overview/);
+    await go(page, /Week/);
     await playWeek(page, "Casework");
 
     /* The review is the week read back, and a court decided something in it. */
@@ -5482,7 +6353,7 @@ test.describe("the solicitor", () => {
     await closeWeek(page);
 
     /* And the record carries it, with the odds it was decided at. */
-    await go(page, /Chambers/);
+    await go(page, /Work/);
     await tab(page, /^The firm$/);
     await expect(
       page.getByText(/Won at \d+%|Lost at \d+%|Settled/).first(),
@@ -5498,7 +6369,7 @@ test.describe("the solicitor", () => {
     const problems = watchConsole(page);
     await resume(page, "solicitor-listed");
 
-    await go(page, /Chambers/);
+    await go(page, /Work/);
     await tab(page, /^The books$/);
 
     /* The figures the career is operated against, and the sentence that
@@ -5596,7 +6467,7 @@ test.describe("the solicitor", () => {
     await expect(phone).toBeHidden();
 
     /* And the person taken on is on the Firm screen, where the report lives. */
-    await go(page, /Chambers/);
+    await go(page, /Work/);
     await tab(page, /^The firm$/);
     await expect(page.getByText(/Who is billing hours/i).first()).toBeVisible();
 
@@ -5611,7 +6482,7 @@ test.describe("the solicitor", () => {
 
     /* The doorway: the Casework screen names what the list is for and opens
        the handset on it, rather than carrying the transaction itself. */
-    await go(page, /Chambers/);
+    await go(page, /Work/);
     await tab(page, /^Casework$/);
     await page
       .getByRole("button", { name: /call the listings office/i })
@@ -5650,7 +6521,7 @@ test.describe("the solicitor", () => {
     page,
   }) => {
     await startSolicitor(page);
-    await go(page, /Chambers/);
+    await go(page, /Work/);
 
     for (const label of [
       /^Instructions$/,
@@ -5675,7 +6546,7 @@ test.describe("the solicitor", () => {
     expect(["BUTTON", "A"], "tab reaches a control").toContain(focused);
 
     /* And the Map, which the career shares with everyone else. */
-    await go(page, /Map/);
+    await go(page, /World/);
     await expectNoPageOverflow(page);
   });
 });
@@ -5705,6 +6576,34 @@ test.describe("guidance in every career", () => {
       begin: /^Begin in London$/,
       lesson: /A week is six blocks, and none of them pay/i,
       word: /Instruction|Work in progress|Costs order/i,
+    },
+    {
+      card: /^open\s*founder/i,
+      name: "Founder",
+      begin: /^Begin in New York$/,
+      lesson: /A week is six blocks, and the runway shortens either way/i,
+      word: /Runway|Default alive|Dilution/i,
+    },
+    {
+      card: /^open\s*politician/i,
+      name: "Politician",
+      begin: /^Begin in London$/,
+      lesson: /A week is six blocks, and support drains through all of them/i,
+      word: /Bloc|Drift|Reversal|Party standing/i,
+    },
+    {
+      card: /^open\s*architect/i,
+      name: "Architect",
+      begin: /^Begin in Amsterdam$/,
+      lesson: /A week is six blocks, and a building takes years of them/i,
+      word: /Commission|Banked|Sent back|Portfolio/i,
+    },
+    {
+      card: /^open\s*engineer/i,
+      name: "Engineer",
+      begin: /^Begin in Berlin$/,
+      lesson: /A week is six blocks, and you never see what is in the work/i,
+      word: /The estimate|Confidence|Tolerance|Surfaced/i,
     },
   ];
 
@@ -5797,9 +6696,9 @@ test.describe("guidance in every career", () => {
         .getByRole("navigation", { name: "Primary" })
         .last()
         .getByRole("button")
-        .filter({ hasText: /Kitchen/ })
+        .filter({ hasText: /Work/ })
         .first()
-        .getByText(/\d+ (critical|warning)s? in Kitchen/i)
+        .getByText(/\d+ (critical|warning)s? in Work/i)
         .first(),
       "the kitchen is badged, and says what is wrong",
     ).toBeAttached();
@@ -5815,9 +6714,9 @@ test.describe("guidance in every career", () => {
         .getByRole("navigation", { name: "Primary" })
         .last()
         .getByRole("button")
-        .filter({ hasText: /Chambers/ })
+        .filter({ hasText: /Work/ })
         .first()
-        .getByText(/\d+ (critical|warning)s? in Chambers/i)
+        .getByText(/\d+ (critical|warning)s? in Work/i)
         .first(),
       "chambers is badged, and says what is wrong",
     ).toBeAttached();
@@ -5881,8 +6780,12 @@ test.describe("a solicitor's crisis", () => {
       "no medical vocabulary on a solicitor's crisis",
     ).toBeUndefined();
 
-    /* And it states the deadline rather than implying one. */
-    await expect(page.getByText(/week|stage/i).first()).toBeVisible();
+    /* And it states the deadline rather than implying one. Scoped to main:
+       the navigation itself contains a destination called "Week" now, and a
+       hidden desktop rail's label is not a deadline. */
+    await expect(
+      page.getByRole("main").getByText(/week|stage/i).first(),
+    ).toBeVisible();
 
     await expectNoPageOverflow(page);
     expect(problems).toEqual([]);
@@ -5988,7 +6891,7 @@ test.describe("the solicitor's people", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Chambers/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
     await page.getByRole("tab", { name: /^The firm$/ }).first().click();
@@ -6053,7 +6956,7 @@ test.describe("the solicitor's people", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Chambers/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
     await page.getByRole("tab", { name: /^The firm$/ }).first().click();
@@ -6079,7 +6982,7 @@ test.describe("the solicitor's practice areas", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Chambers/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
     await page.getByRole("tab", { name: /^Instructions$/ }).first().click();
@@ -6157,7 +7060,7 @@ test.describe("the solicitor's practice areas", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Chambers/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
     await page.getByRole("tab", { name: /^Casework$/ }).first().click();
@@ -6215,7 +7118,7 @@ test.describe("the solicitor's chambers", () => {
       .getByRole("navigation", { name: "Primary" })
       .last()
       .getByRole("button")
-      .filter({ hasText: /Chambers/ })
+      .filter({ hasText: /Work/ })
       .first()
       .click();
     await page.getByRole("tab", { name: /^The firm$/ }).first().click();
@@ -6293,6 +7196,107 @@ test.describe("the solicitor's chambers", () => {
     await openFirm(page);
     await expect(
       page.getByText(/These rooms are full/i).first(),
+    ).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
+});
+
+
+/**
+ * MONEY THAT ARRIVES ON A DAY YOU CAN NAME
+ *
+ * A retainer is the premise's opposite number, and the engine suite proves it
+ * is a trade rather than a button. This proves a player meets the offer,
+ * understands what it costs before taking it, and can see it running.
+ */
+test.describe("the solicitor's retainers", () => {
+  const resume = async (page: Page, fixture: string) => {
+    await preload(page, fixture);
+    await page.goto("/");
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).last(),
+    ).toBeVisible();
+  };
+
+  const tab = async (page: Page, where: RegExp) => {
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .last()
+      .getByRole("button")
+      .filter({ hasText: /Work/ })
+      .first()
+      .click();
+    await page.getByRole("tab", { name: where }).first().click();
+  };
+
+  test("an offer states what it pays and what it costs, before it is taken", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await resume(page, "solicitor-retainer");
+    await tab(page, /^Instructions$/);
+
+    await expect(
+      page.getByRole("heading", { name: /wants you on a retainer/i }),
+    ).toBeVisible();
+
+    /* All three costs on the card, before the button. */
+    await expect(page.getByText(/a week/).first()).toBeVisible();
+    await expect(
+      page.getByText(/Costs/).first(),
+      "the hours it reserves",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Fewer instructions will come in the door/i).first(),
+      "and the cost that is easy to miss",
+    ).toBeVisible();
+
+    await expectNoPageOverflow(page);
+    expect(problems).toEqual([]);
+  });
+
+  test("taking one puts it on the books, and it can be given notice", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await resume(page, "solicitor-retainer");
+
+    /* Nothing standing to begin with, and the books say so plainly. */
+    await tab(page, /^The books$/);
+    await expect(
+      page.getByText(/Money that arrives on a day you can name/i).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/waiting on somebody else/i).first(),
+    ).toBeVisible();
+
+    /* Take it. */
+    await tab(page, /^Instructions$/);
+    await page.getByRole("button", { name: /take the retainer/i }).first().click();
+
+    /* And it is running, with what it pays and what it reserves. */
+    await tab(page, /^The books$/);
+    await expect(
+      page.getByText(/Every week/i).first(),
+      "the books carry what it pays",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Hours reserved/i).first(),
+      "and what it takes",
+    ).toBeVisible();
+    await expect(
+      page.getByText(/weeks left/i).first(),
+      "and that it does not run for ever",
+    ).toBeVisible();
+
+    /* And it can be ended, with the cost of ending it stated. */
+    await expect(
+      page.getByRole("button", { name: /give notice/i }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/walked away from a client/i).first(),
     ).toBeVisible();
 
     expect(problems).toEqual([]);

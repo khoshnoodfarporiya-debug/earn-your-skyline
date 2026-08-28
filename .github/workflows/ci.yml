@@ -1,0 +1,57 @@
+# Every gate a change must clear, in the order they fail cheapest.
+#
+# The balance job is separate and non-blocking: the suite's contracts are a
+# measurement, and one of them (the ambitious Chef) is red on purpose while
+# that career is being rebalanced. A red measurement is information; it is not
+# allowed to mask a type error or a broken build, so it cannot fail the run.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Engine suite
+        run: npm run check
+      - name: Build
+        run: npm run build
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser regression suite
+        run: npx playwright test
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+
+  balance:
+    runs-on: ubuntu-latest
+    # Informational: prints the six-market table and the contract verdicts.
+    # See the header comment for why a red contract here does not fail CI.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Balance contracts (12 seeds per city)
+        run: npx tsx scripts/cities.ts 12

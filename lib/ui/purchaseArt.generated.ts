@@ -6,6 +6,10 @@
  * before the image arrives.
  */
 export const ART_SIZES: Record<string, { width: number; height: number }> = {
+  "careers/architect-boards": { width: 720, height: 480 },
+  "careers/architect-competitions": { width: 720, height: 480 },
+  "careers/architect-offers": { width: 720, height: 480 },
+  "careers/architect-studio": { width: 720, height: 480 },
   "careers/career-architect": { width: 1448, height: 1086 },
   "careers/career-engineer": { width: 1448, height: 1086 },
   "careers/career-founder": { width: 1448, height: 1086 },
@@ -26,6 +30,15 @@ export const ART_SIZES: Record<string, { width: number; height: number }> = {
   "careers/chef-service-private-event": { width: 720, height: 480 },
   "careers/chef-service-tasting": { width: 720, height: 480 },
   "careers/chef-supplier-delivery": { width: 720, height: 480 },
+  "careers/engineer-bench": { width: 720, height: 480 },
+  "careers/engineer-newbuild": { width: 720, height: 480 },
+  "careers/founder-raising": { width: 720, height: 480 },
+  "careers/founder-runway": { width: 720, height: 480 },
+  "careers/founder-team": { width: 720, height: 480 },
+  "careers/politician-electorate": { width: 720, height: 480 },
+  "careers/politician-office": { width: 720, height: 480 },
+  "careers/politician-polling": { width: 720, height: 480 },
+  "careers/politician-positions": { width: 720, height: 480 },
   "careers/solicitor-borrowed-desk": { width: 720, height: 480 },
   "careers/solicitor-case-files": { width: 720, height: 480 },
   "careers/solicitor-case-preparation": { width: 720, height: 480 },

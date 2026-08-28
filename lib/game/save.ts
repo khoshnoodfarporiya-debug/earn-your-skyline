@@ -82,7 +82,7 @@ export const SAVE_KEYS: readonly string[] = KEYS;
 export function saveRun(state: RunState) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(state));
+    window.localStorage.setItem(scoped(KEY), JSON.stringify(state));
   } catch {
     // Storage disabled or full — the run continues in memory either way.
   }
@@ -92,7 +92,7 @@ export function loadRun(): RunState | null {
   if (typeof window === "undefined") return null;
   try {
     for (const key of KEYS) {
-      const raw = window.localStorage.getItem(key);
+      const raw = window.localStorage.getItem(scoped(key));
       if (!raw) continue;
       const parsed = JSON.parse(raw) as unknown;
       if (!isObj(parsed)) continue;
@@ -106,8 +106,8 @@ export function loadRun(): RunState | null {
            failure between the two leaves the player with their old save
            rather than with nothing. */
         try {
-          window.localStorage.setItem(KEY, JSON.stringify(migrated));
-          window.localStorage.removeItem(key);
+          window.localStorage.setItem(scoped(KEY), JSON.stringify(migrated));
+          window.localStorage.removeItem(scoped(key));
         } catch {
           /* Out of quota. The run still loads; it will migrate again next
              time, which is wasteful and harmless. */
@@ -361,7 +361,7 @@ const TAUGHT_KEY = "career-tycoon:taught:v1";
 export function loadTaught(): string[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(TAUGHT_KEY);
+    const raw = window.localStorage.getItem(scoped(TAUGHT_KEY));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     /* Anything that is not a list of strings is a corrupt value, and a
@@ -376,7 +376,7 @@ export function loadTaught(): string[] {
 export function saveTaught(ids: readonly string[]) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(TAUGHT_KEY, JSON.stringify([...ids]));
+    window.localStorage.setItem(scoped(TAUGHT_KEY), JSON.stringify([...ids]));
   } catch {
     // Storage disabled or full. Lessons simply reappear next session.
   }
@@ -387,7 +387,7 @@ const PLAN_KEY = "career-tycoon:lastplan:v1";
 export function saveLastPlan(careerId: string, alloc: Record<string, number>) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(PLAN_KEY, JSON.stringify({ careerId, alloc }));
+    window.localStorage.setItem(scoped(PLAN_KEY), JSON.stringify({ careerId, alloc }));
   } catch {
     // Storage disabled or full. The button simply does not appear.
   }
@@ -396,7 +396,7 @@ export function saveLastPlan(careerId: string, alloc: Record<string, number>) {
 export function loadLastPlan(careerId: string): Record<string, number> | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(PLAN_KEY);
+    const raw = window.localStorage.getItem(scoped(PLAN_KEY));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (!isObj(parsed)) return null;
@@ -445,6 +445,15 @@ export function validateRun(s: Record<string, unknown>): boolean {
   if (!isInt(s.seed)) return false;
 
   if (!numberMap(s.r)) return false;
+  /*
+   * `numberMap` only says "whatever is here is finite" — it accepts an empty
+   * bag, and a save with `cash` deleted sailed through it. The career already
+   * declares exactly which resources it runs on, so require every one of
+   * them, by the career's own catalogue rather than a hardcoded list. The
+   * underscore-prefixed scratch fields stay optional: migrations default
+   * them, and older saves legitimately lack them.
+   */
+  if (!numbers(s.r, career.resources.map((res) => res.id))) return false;
   if (!numberMap(s.owned)) return false;
   if (!numberMap(s.eventHistory)) return false;
 
@@ -747,7 +756,7 @@ export function validateRun(s: Record<string, unknown>): boolean {
 export function clearRun() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(KEY);
+    window.localStorage.removeItem(scoped(KEY));
   } catch {
     /* nothing to do */
   }
@@ -764,10 +773,83 @@ export function clearRun() {
  */
 const ARCHIVE_KEY = "career-tycoon:archive:v1";
 
+/**
+ * WHOSE SAVE THIS IS
+ *
+ * Every key above is a *base*. `scoped` puts the signed-in player's id into
+ * it, so two people sharing a browser get two entirely separate games rather
+ * than overwriting each other on the same key.
+ *
+ * With no player set the base key is returned unchanged, which is deliberate
+ * and load-bearing: it is exactly the key every existing save is already
+ * under. `adoptLegacySave` moves that run into the first account created, so
+ * nobody who was mid-run loses it the day the sign-in page appears.
+ *
+ * This is also the seam the storage swap goes through later. A Neon-backed
+ * store replaces the *reads and writes*; the key shape and the scoping rule
+ * do not have to change at all.
+ */
+let SCOPE = "";
+
+export function setSaveScope(playerId: string | null): void {
+  SCOPE = playerId ? `p.${playerId}:` : "";
+}
+
+export const saveScope = (): string => SCOPE;
+
+const scoped = (key: string): string =>
+  SCOPE ? key.replace("career-tycoon:", `career-tycoon:${SCOPE}`) : key;
+
+/**
+ * Move an unscoped save into a player's scope, once.
+ *
+ * Called when an account is created and there is a run sitting under the old
+ * key. It copies rather than moves until the write has succeeded, for the
+ * same reason the version migration above does.
+ */
+export function adoptLegacySave(playerId: string): void {
+  if (typeof window === "undefined") return;
+  const bases = [...KEYS, TAUGHT_KEY, PLAN_KEY, ARCHIVE_KEY];
+  const previous = SCOPE;
+  try {
+    for (const base of bases) {
+      const raw = window.localStorage.getItem(base);
+      if (raw === null) continue;
+      SCOPE = `p.${playerId}:`;
+      const target = scoped(base);
+      SCOPE = previous;
+      if (window.localStorage.getItem(target) !== null) continue;
+      window.localStorage.setItem(target, raw);
+      window.localStorage.removeItem(base);
+    }
+  } catch {
+    /* Storage full or disabled. The legacy save stays where it is, which is
+       still readable by an unscoped session. */
+    SCOPE = previous;
+  }
+}
+
+
 export function loadArchive(): ArchivedCareer[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(ARCHIVE_KEY);
+    let raw = window.localStorage.getItem(scoped(ARCHIVE_KEY));
+    /*
+     * RESCUE PATH — the write below was unscoped for a while (the scoping
+     * pass replaced single-line `setItem` calls and this one is multiline),
+     * so a signed-in player's archive could land under the bare key and then
+     * be invisible to the scoped read. If the scoped slot is empty and the
+     * bare one is not, adopt it into this scope — copy first, remove only
+     * after the write succeeded, same discipline as the version migration.
+     */
+    if (raw === null && SCOPE) {
+      const stranded = window.localStorage.getItem(ARCHIVE_KEY);
+      if (stranded !== null) {
+        window.localStorage.setItem(scoped(ARCHIVE_KEY), stranded);
+        window.localStorage.removeItem(ARCHIVE_KEY);
+        raw = stranded;
+      }
+    }
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -783,7 +865,10 @@ export function saveArchive(list: ArchivedCareer[]): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
-      ARCHIVE_KEY,
+      /* Scoped, like the read above. These two MUST use the same key — the
+         mismatch is exactly the bug the rescue path in `loadArchive` cleans
+         up after. */
+      scoped(ARCHIVE_KEY),
       // Newest first, bounded, so a long-lived install cannot grow forever.
       JSON.stringify(list.slice(0, MAX_ARCHIVE)),
     );
