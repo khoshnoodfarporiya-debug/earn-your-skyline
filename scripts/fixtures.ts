@@ -20,6 +20,7 @@ import {
 } from "../lib/game/engine";
 import { lawyer, practice } from "../lib/game/careers/lawyer";
 import { stageOf, startCrisis } from "../lib/game/crisis";
+import { retainerOffersOf } from "../lib/game/careers/casework";
 import { EVENT_VISUALS } from "../lib/ui/visuals";
 import { postContext } from "../lib/game/medical/phone";
 import { POSTS } from "../lib/game/medical/posts";
@@ -247,4 +248,39 @@ const cmd = (s: RunState, c: string, a: string) => runCommand(doctor, s, c, a);
   if (s.outcome) throw new Error("crisis fixture must not carry an outcome");
   console.log(`  (${stage.choices.length} choices on "${stage.title}")`);
   write("solicitor-crisis", s);
+}
+
+/* ------------------------------------------- a practice offered a retainer
+ *
+ * Played forward by a plain bot until somebody asks to put it on a standing
+ * arrangement. Retainer offers only come from clients you have actually acted
+ * for and only once your standing warrants one, so this is a real run rather
+ * than a constructed state — and the browser suite needs the decision itself,
+ * which is on the Instructions screen.
+ */
+{
+  let found: RunState | null = null;
+  outer: for (let seed = 1; seed <= 120 && !found; seed++) {
+    let s = startRun(lawyer, seed);
+    for (let w = 0; w < 80; w++) {
+      for (const offer of [...practice(s).offers]) {
+        if (practice(s).cases.length >= 3) break;
+        s = runCommand(lawyer, s, "takeCase", offer.id);
+      }
+      if (retainerOffersOf(practice(s)).length > 0) {
+        console.log(
+          `  (seed ${seed}, week ${s.week}: ${retainerOffersOf(practice(s))[0].kind} offered by ${retainerOffersOf(practice(s))[0].client})`,
+        );
+        found = s;
+        break outer;
+      }
+      const out = advanceWeek(lawyer, s, { casework: 2, pitch: 1, rest: 2 });
+      s = out.state;
+      if (out.event) s = resolveEventChoice(lawyer, s, out.event.def, 0);
+      if (s.outcome) break;
+    }
+  }
+  if (!found) throw new Error("no practice was ever offered a retainer");
+  found.r.cash = 60_000;
+  write("solicitor-retainer", found);
 }

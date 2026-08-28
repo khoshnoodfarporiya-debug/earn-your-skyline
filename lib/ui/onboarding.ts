@@ -14,6 +14,30 @@ import {
   lawyerLearned,
   lawyerRelevant,
 } from "./lawyerHelp";
+import {
+  FOUNDER_LESSONS,
+  FOUNDER_LESSON_IDS,
+  founderLearned,
+  founderRelevant,
+} from "./founderHelp";
+import {
+  POLITICIAN_LESSONS,
+  POLITICIAN_LESSON_IDS,
+  politicianLearned,
+  politicianRelevant,
+} from "./politicianHelp";
+import {
+  ARCHITECT_LESSONS,
+  ARCHITECT_LESSON_IDS,
+  architectLearned,
+  architectRelevant,
+} from "./architectHelp";
+import {
+  ENGINEER_LESSONS,
+  ENGINEER_LESSON_IDS,
+  engineerLearned,
+  engineerRelevant,
+} from "./engineerHelp";
 
 /**
  * TEACHING THROUGH THE FIRST WEEKS
@@ -77,7 +101,27 @@ export type LessonId =
   | "law-instructions"
   | "law-casework"
   | "law-books"
-  | "law-firm";
+  | "law-firm"
+  /* The Founder's. */
+  | "founder-first-week"
+  | "founder-runway"
+  | "founder-team"
+  | "founder-raising"
+  /* The Politician's. */
+  | "pol-first-week"
+  | "pol-count"
+  | "pol-positions"
+  | "pol-ladder"
+  /* The Architect's. */
+  | "arch-first-week"
+  | "arch-stages"
+  | "arch-clients"
+  | "arch-competitions"
+  /* The Engineer's. */
+  | "eng-first-week"
+  | "eng-estimate"
+  | "eng-certification"
+  | "eng-field";
 
 export interface LessonPoint {
   /** The term as the interface labels it. */
@@ -306,6 +350,10 @@ export const LESSONS: Record<string, Lesson> = {
   ...MEDICAL_LESSONS,
   ...CHEF_LESSONS,
   ...LAWYER_LESSONS,
+  ...FOUNDER_LESSONS,
+  ...POLITICIAN_LESSONS,
+  ...ARCHITECT_LESSONS,
+  ...ENGINEER_LESSONS,
 };
 
 const MEDICAL_ORDER: LessonId[] = [
@@ -327,6 +375,13 @@ const MEDICAL_ORDER: LessonId[] = [
 export function lessonOrderFor(careerId: string): LessonId[] {
   if (careerId === "chef") return [...CHEF_LESSON_IDS] as LessonId[];
   if (careerId === "lawyer") return [...LAWYER_LESSON_IDS] as LessonId[];
+  if (careerId === "founder") return [...FOUNDER_LESSON_IDS] as LessonId[];
+  if (careerId === "politician")
+    return [...POLITICIAN_LESSON_IDS] as LessonId[];
+  if (careerId === "architect")
+    return [...ARCHITECT_LESSON_IDS] as LessonId[];
+  if (careerId === "engineer")
+    return [...ENGINEER_LESSON_IDS] as LessonId[];
   if (careerId === "doctor") return MEDICAL_ORDER;
   return [];
 }
@@ -348,6 +403,10 @@ export function learned(
 ): boolean {
   if (state.careerId === "chef") return chefLearned(id, state);
   if (state.careerId === "lawyer") return lawyerLearned(id, state);
+  if (state.careerId === "founder") return founderLearned(id, state);
+  if (state.careerId === "politician") return politicianLearned(id, state);
+  if (state.careerId === "architect") return architectLearned(id, state);
+  if (state.careerId === "engineer") return engineerLearned(id, state);
   if (state.careerId !== "doctor") return true;
   const m = med(state);
   switch (id) {
@@ -388,6 +447,13 @@ export function relevant(
 ): boolean {
   if (state.careerId === "chef") return chefRelevant(id, state, ctx);
   if (state.careerId === "lawyer") return lawyerRelevant(id, state, ctx);
+  if (state.careerId === "founder") return founderRelevant(id, state, ctx);
+  if (state.careerId === "politician")
+    return politicianRelevant(id, state, ctx);
+  if (state.careerId === "architect")
+    return architectRelevant(id, state, ctx);
+  if (state.careerId === "engineer")
+    return engineerRelevant(id, state, ctx);
   if (state.careerId !== "doctor") return false;
   const m = med(state);
   switch (id) {

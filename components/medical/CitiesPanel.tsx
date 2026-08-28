@@ -7,6 +7,7 @@ import { med } from "@/lib/game/careers/doctor";
 import { networkNodes } from "@/lib/ui/visuals";
 import { NetworkMap } from "../visuals/NetworkMap";
 import { CityDetail } from "../visuals/CityDetail";
+import { CompareDrawer } from "./CompareDrawer";
 import { MarketList } from "./MarketList";
 
 /**
@@ -32,6 +33,17 @@ export function CitiesPanel({
 }) {
   const m = med(state);
   const [selected, setSelected] = useState<CityId>(m.homeCity);
+  /* Up to three markets held side by side. Session-local on purpose: a
+     comparison is a moment of deciding, not a setting. */
+  const [compare, setCompare] = useState<CityId[]>([]);
+  const toggleCompare = (id: CityId) =>
+    setCompare((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : prev.length >= 3
+          ? prev
+          : [...prev, id],
+    );
 
   /*
    * If the selected market disappears from the catalogue — only possible via
@@ -77,11 +89,21 @@ export function CitiesPanel({
         </div>
       </div>
 
+      <CompareDrawer
+        m={m}
+        reputation={state.r.reputation}
+        ids={compare}
+        onRemove={(id) => setCompare((prev) => prev.filter((x) => x !== id))}
+        onClear={() => setCompare([])}
+      />
+
       <MarketList
         m={m}
         reputation={state.r.reputation}
         selected={selected}
         onSelect={setSelected}
+        compare={compare}
+        onToggleCompare={toggleCompare}
       />
     </div>
   );

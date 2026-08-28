@@ -63,6 +63,21 @@ export interface CaseKind {
   prestige: number;
 }
 
+/*
+ * FEES, RE-MEASURED 27 AUG 2026.
+ *
+ * These were cut ~55% when a contract dispute paid $1,571/hour and the goal
+ * fell in every run. Since then the practice gained costs orders, counsel
+ * fees and crises — real downside that did not exist when the cut was sized.
+ * The balance trace showed where that stack landed: a London firm at
+ * reputation 96 earned $143k against $134k of costs over 120 weeks, could
+ * never reach the cash needed to hire, and drowned in five of six markets
+ * (median 27-69 weeks overdrawn at 8 seeds).
+ *
+ * +35% across the scale is roughly half the original cut given back. The
+ * hourly-rate exploit stays dead — hours per case were also cut then and are
+ * unchanged now.
+ */
 export const CASE_KINDS: CaseKind[] = [
   {
     id: "conveyance",
@@ -70,7 +85,7 @@ export const CASE_KINDS: CaseKind[] = [
     blurb:
       "Searches, a chain that keeps breaking, and a client who rings every day. Dull, quick, and it pays.",
     hours: 14,
-    fee: 4_200,
+    fee: 5_700,
     baseOdds: 0.9,
     window: 8,
     prestige: 1,
@@ -81,7 +96,7 @@ export const CASE_KINDS: CaseKind[] = [
     blurb:
       "A will, three siblings and a house nobody can agree on. It will take longer than anyone has said.",
     hours: 26,
-    fee: 9_500,
+    fee: 12_800,
     baseOdds: 0.82,
     window: 14,
     prestige: 2,
@@ -92,7 +107,7 @@ export const CASE_KINDS: CaseKind[] = [
     blurb:
       "She was managed out and everybody knows it. Proving what everybody knows is the job.",
     hours: 44,
-    fee: 17_500,
+    fee: 23_600,
     baseOdds: 0.58,
     window: 18,
     prestige: 5,
@@ -103,7 +118,7 @@ export const CASE_KINDS: CaseKind[] = [
     blurb:
       "Liability is admitted; the number is not. Paid on the outcome, which means paid on how hard you push.",
     hours: 62,
-    fee: 33_000,
+    fee: 44_500,
     baseOdds: 0.52,
     window: 22,
     prestige: 7,
@@ -114,7 +129,7 @@ export const CASE_KINDS: CaseKind[] = [
     blurb:
       "Two companies, one badly drafted clause, and counsel on the other side who does this every day.",
     hours: 105,
-    fee: 74_000,
+    fee: 100_000,
     baseOdds: 0.45,
     window: 30,
     prestige: 13,
@@ -125,7 +140,7 @@ export const CASE_KINDS: CaseKind[] = [
     blurb:
       "Two hundred claimants against somebody who can afford to make it last for years. It will define the firm either way.",
     hours: 190,
-    fee: 205_000,
+    fee: 277_000,
     baseOdds: 0.36,
     window: 44,
     prestige: 26,
@@ -665,6 +680,10 @@ export interface PracticeState {
 
   /** Judgments in your favour that have not turned into money yet. */
   bills?: Bill[];
+  /** Standing arrangements: weekly money against weekly hours. */
+  retainers?: Retainer[];
+  /** Arrangements on the table. */
+  retainerOffers?: RetainerOffer[];
   /** Clients you have been instructed by. What a conflict is measured against. */
   actedFor?: string[];
   /**
@@ -1124,6 +1143,144 @@ export function settlementFor(
   return Math.round(feeIn(p, k) * odds * 0.72 * waited * public_);
 }
 
+/* -------------------------------------------------------------- retainers
+ *
+ * THE ONE THING IN THIS CAREER THAT PAYS EVERY WEEK
+ *
+ * Everything else here is a lump, months away, and uncertain — that is the
+ * premise, and a retainer is the premise's opposite number rather than an
+ * escape from it. A client pays you a fixed sum every week whether or not
+ * they need anything, and in exchange you reserve hours for them every week
+ * whether or not they call.
+ *
+ * Which makes it a genuine trade rather than free money:
+ *
+ *   you get   income that arrives on time, does not care what a court says,
+ *             and can be planned against — the only such money in the career
+ *   you pay   hours off the top of every week, before a single one reaches a
+ *             live matter, and they are gone whether or not the client rings
+ *
+ * And one cost that is easy to miss and is the sharpest of the three: a
+ * client on a retainer stops sending you *instructions*. Their work is
+ * covered. So retaining somebody removes them from the pool the market draws
+ * from, and a practice on three retainers is a practice hearing from fewer
+ * people.
+ *
+ * Priced below what an hour in a live matter is worth in expectation, because
+ * what is being bought is certainty, and certainty in this career is worth
+ * paying for. A firm that is comfortable should be taking matters; a firm
+ * that cannot see past Friday should be taking retainers. That is the whole
+ * decision.
+ */
+export interface RetainerKind {
+  id: string;
+  label: string;
+  blurb: string;
+  /** London money a week. Multiplied by the market's fee index. */
+  fee: number;
+  /** Hours reserved every week, whether or not they call. */
+  hours: number;
+  /** Weeks the arrangement runs before it ends. */
+  weeks: number;
+  /** Standing before anybody offers one of these. */
+  needs: number;
+}
+
+export const RETAINERS: RetainerKind[] = [
+  {
+    id: "advice",
+    label: "An advice line",
+    blurb:
+      "A few hours a week on the end of a telephone for somebody who would rather ask than find out. Rarely interesting and it pays on the first of the month.",
+    fee: 650,
+    hours: 5,
+    weeks: 26,
+    needs: 18,
+  },
+  {
+    id: "general",
+    label: "General retainer",
+    blurb:
+      "Everything that comes up, up to a point. They stop shopping around and you stop being able to bill them for the good months.",
+    fee: 1_300,
+    hours: 10,
+    weeks: 34,
+    needs: 38,
+  },
+  {
+    id: "panel",
+    label: "A place on the panel",
+    blurb:
+      "Named solicitors for a company large enough to have a legal department of its own. Steady, unglamorous, and it will carry a practice through a bad year.",
+    fee: 2_300,
+    hours: 18,
+    weeks: 44,
+    needs: 58,
+  },
+];
+
+/**
+ * How many standing arrangements a practice can hold at once.
+ *
+ * There has to be a ceiling and the simulation is why. Without one, a bot
+ * that accepted every offer ended a 120-week run on fourteen thousand a week
+ * of retainers and finished on 120% of goal against 90% for a bot that took
+ * none — better worth *and* a third of the overdrawn weeks, which is not a
+ * trade, it is a strictly better button.
+ *
+ * The reason is that a growing firm is hours-rich and work-poor: the pipeline
+ * cannot always supply enough matters to fill the week, so retained hours
+ * were being paid out of hours that would otherwise have idled. Free money
+ * wearing the costume of a decision.
+ *
+ * Three is a practice with a character rather than a subscription business.
+ */
+export const MAX_RETAINERS = 3;
+
+export const RETAINER_BY_ID = new Map(RETAINERS.map((r) => [r.id, r]));
+
+/** A standing arrangement the firm has accepted. */
+export interface Retainer {
+  id: string;
+  kind: string;
+  client: string;
+  fromWeek: number;
+  /** Weeks still to run. Nothing here lasts for ever. */
+  weeks: number;
+}
+
+/** One on the table, not yet accepted. */
+export interface RetainerOffer {
+  id: string;
+  kind: string;
+  client: string;
+  expiresWeek: number;
+}
+
+export const retainersOf = (p: PracticeState): Retainer[] => p.retainers ?? [];
+export const retainerOffersOf = (p: PracticeState): RetainerOffer[] =>
+  p.retainerOffers ?? [];
+
+/** What arrives every week whatever the courts are doing. */
+export const retainerIncome = (p: PracticeState): number =>
+  Math.round(
+    retainersOf(p).reduce(
+      (n, r) => n + (RETAINER_BY_ID.get(r.kind)?.fee ?? 0),
+      0,
+    ) * legalCityOf(p).fee,
+  );
+
+/** Hours taken off the top of the week before any matter sees one. */
+export const retainerHours = (p: PracticeState): number =>
+  retainersOf(p).reduce(
+    (n, r) => n + (RETAINER_BY_ID.get(r.kind)?.hours ?? 0),
+    0,
+  );
+
+/** Clients whose work is already covered, so they send no instructions. */
+export const retainedClients = (p: PracticeState): Set<string> =>
+  new Set(retainersOf(p).map((r) => r.client));
+
 const CLIENTS = [
   "Halloran & Co", "the Aldridge estate", "Ms Baptiste", "Northgate Freight",
   "Mr Ferreira", "the Okonjo family", "Vance Holdings", "Ms Lindqvist",
@@ -1165,6 +1322,26 @@ export function newOffers(
 ): CaseOffer[] {
   const out: CaseOffer[] = [];
   const city = legalCityOf(p);
+  /* Somebody who pays you every week does not also send you instructions —
+     their work is what the retainer covers. Retaining people therefore
+     narrows the pool the market draws from, which is the third and least
+     obvious cost of the arrangement. */
+  const held = retainedClients(p);
+  const free = CLIENTS.filter((c) => !held.has(c));
+  if (free.length === 0) return out;
+  /*
+   * And a firm on retainer is a firm with less time to go and find work.
+   *
+   * The hours cost alone was not a cost at all. A growing practice is
+   * hours-rich and work-poor — the pipeline cannot always fill the week — so
+   * retained hours came out of hours that would otherwise have idled, and a
+   * bot taking every arrangement beat one taking none on *both* worth and
+   * weeks overdrawn. That is a strictly better button rather than a trade.
+   *
+   * This is the cost that scales with the firm, because what it takes is the
+   * thing the firm actually lives on: new instructions arriving.
+   */
+  const retainerDrag = Math.max(0.55, 1 - retainersOf(p).length * 0.15);
   const echo = Math.max(0, p.echo ?? 0);
   const tries = 1 + pitching + echo;
   for (let i = 0; i < tries; i++) {
@@ -1172,7 +1349,8 @@ export function newOffers(
       !rng.chance(
         (0.35 + pitching * 0.16 + echo * 0.1 + reputation / 260) *
           city.flow *
-          chambersDraw(p),
+          chambersDraw(p) *
+          retainerDrag,
       )
     ) {
       continue;
@@ -1220,7 +1398,7 @@ export function newOffers(
     out.push({
       id: `of-${p.nextId++}`,
       kind: kind.id,
-      client: rng.pick(CLIENTS),
+      client: rng.pick(free),
       expiresWeek: week + 3,
       payer: payerFor(kind, rng),
       ...(opponent ? { conflict: true, opponent } : {}),
@@ -1239,6 +1417,8 @@ export function initialPractice(): PracticeState {
     lastVerdicts: [],
     nextId: 1,
     bills: [],
+    retainers: [],
+    retainerOffers: [],
     actedFor: [],
     echo: 0,
     pressure: 0,

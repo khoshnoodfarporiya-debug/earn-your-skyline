@@ -90,11 +90,20 @@ export function MessagesApp({
                   </div>
                 )}
 
-                {msg.choices && msg.answered !== undefined && (
-                  <p className="mt-2 border-l-2 border-clinical/60 pl-2.5 text-[13.5px] italic leading-snug text-ink-soft">
-                    {msg.choices[msg.answered].reply}
-                  </p>
-                )}
+                {/*
+                  Guarded even though the save validator now bounds
+                  `answered`: this component renders whatever storage handed
+                  it, and a validator and a component disagreeing about whose
+                  job safety is ends with both wrong. A missing choice renders
+                  nothing rather than crashing the thread.
+                */}
+                {msg.choices &&
+                  msg.answered !== undefined &&
+                  msg.choices[msg.answered] && (
+                    <p className="mt-2 border-l-2 border-clinical/60 pl-2.5 text-[13.5px] italic leading-snug text-ink-soft">
+                      {msg.choices[msg.answered].reply}
+                    </p>
+                  )}
               </div>
             </div>
           </li>

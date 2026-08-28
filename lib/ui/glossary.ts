@@ -24,6 +24,10 @@
 
 import { CHEF_TERMS } from "./chefHelp";
 import { LEGAL_TERMS } from "./lawyerHelp";
+import { STARTUP_TERMS } from "./founderHelp";
+import { CAMPAIGN_TERMS } from "./politicianHelp";
+import { STUDIO_TERMS } from "./architectHelp";
+import { WORKSHOP_TERMS } from "./engineerHelp";
 
 export interface Term {
   id: string;
@@ -155,6 +159,10 @@ export function glossaryFor(careerId: string): Term[] {
   if (careerId === "doctor") return GLOSSARY;
   if (careerId === "chef") return CHEF_TERMS;
   if (careerId === "lawyer") return LEGAL_TERMS;
+  if (careerId === "founder") return STARTUP_TERMS;
+  if (careerId === "politician") return CAMPAIGN_TERMS;
+  if (careerId === "architect") return STUDIO_TERMS;
+  if (careerId === "engineer") return WORKSHOP_TERMS;
   return [];
 }
 

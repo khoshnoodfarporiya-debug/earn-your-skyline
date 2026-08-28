@@ -6,14 +6,18 @@ Simulator, built against the opposite principle: there, every player is a
 generic owner optimising the same cash loop. Here, what constrains you depends
 on who you are.
 
-Three careers are playable, and they are not the same game with different
+Seven careers are playable, and they are not the same game with different
 nouns — each is built around a different binding constraint:
 
 | Career | What constrains you | State |
 | --- | --- | --- |
 | **Physician** | Capability — you cannot treat what you have no department for | The most complete career, and the baseline the others are built against |
 | **Chef** | Spoilage — stock decays and is served oldest-first | Playable: recipes, a menu, an ingredient pantry, and a service pipeline worked by a brigade of positions |
-| **Solicitor** | The case pipeline — nothing pays until it settles, and it might not | Playable, with a smaller UI and feature set (see Status) |
+| **Solicitor** | The case pipeline — nothing pays until it settles, and it might not | Playable: casework, chambers, staff, counsel, retainers and bill factoring |
+| **Founder** | Runway — everything is priced in weeks of survival, and raising more time costs ownership | Playable: product, users, pricing, a team, funding rounds and a market that saturates |
+| **Politician** | The electoral cycle — support decays continuously and is only banked on polling day | Playable: a ward, a party, issues, canvassing and elections |
+| **Architect** | The long commission — payment is staged against milestones you do not control | Playable: competitions, commissions, a studio and a reputation built in years |
+| **Engineer** | Defect risk — everything shipped carries latent faults that surface weeks later | Playable: prototypes, certification, contracts and the liability curve |
 
 A run has **no forced ending**. Failure produces setbacks with recovery routes,
 never a game-over screen, and retirement is something you choose.
@@ -847,7 +851,7 @@ npm run cities               # every start city of the Chef and the Solicitor
 npm run balance -- 250       # the authoritative pass; 250 seeds, 95% intervals
 npm run trace builder 1074   # week-by-week table for one run
 npm run fixtures             # regenerate the deterministic browser fixtures
-npm run e2e                  # Playwright: 64 tests across mobile 375 and desktop 1440
+npm run e2e                  # Playwright: 404 tests across mobile 375 and desktop 1440
 npm run build
 npm audit --omit=dev --audit-level=moderate
 ```
@@ -1623,11 +1627,29 @@ of *that* a **craft of fourteen techniques, a wine cellar, a guide that awards
 and withdraws stars, and the four things every chef is eventually offered**
 ([The craft, and the top of the trade](#the-craft-and-the-top-of-the-trade)).
 
-**Solicitor — playable, smaller.** The case pipeline is real: instructions
-arrive, hours accumulate against a deadline, preparation moves the odds
-without ever reaching certainty, and every live case carries a settlement you
-can take instead. Still two screens plus a base map — it is where the Chef
-started.
+**Solicitor — playable, and no longer small.** The case pipeline is real:
+instructions arrive, hours accumulate against a deadline, preparation moves
+the odds without ever reaching certainty, and every live case carries a
+settlement you can take instead. Around it now sit chambers and staff,
+instructed counsel, retainers, bill factoring, practice areas, crises and a
+phone — four screens plus the handset's apps, up from the two screens it
+started with.
+
+**Founder, Politician, Architect, Engineer — playable, with their depth
+slices in.** Each runs its own model (a venture, a campaign, a studio, a
+workshop), its own events, its own phone and its own briefing — and each now
+carries the systems its profession is actually about: the Founder's customer
+discovery, roadmap-with-technical-debt, acquisition funnel and experiments;
+the Politician's named constituent casework, volunteers, campaign fund and
+polling uncertainty; the Architect's client briefs, planning consent, cost
+plans and materials with embodied-carbon consequences; the Engineer's
+requirements negotiation, architecture decisions, prototypes, lab rigs and
+four-discipline bench. Every system is optional in the save (older runs load
+untouched and play identically — the engine suite proves it to nine decimal
+places), and each career holds TWO balance contracts in `npm run cities`: a
+plain bot that ignores the new systems, and an engaged one, printed side by
+side so a trap or a free lunch shows on sight. They remain the careers with
+the least human playtesting.
 
 ### Honest gaps
 
@@ -1639,16 +1661,18 @@ started.
   they are listed by id in `AWAITING_ART` and briefed in
   [`docs/artwork-shot-list.md`](docs/artwork-shot-list.md), and their cards
   render a typographic fallback until the masters land.
-- **The Solicitor has no browser-test coverage** yet. Both new careers are
-  covered by engine tests in `npm run check`, and the Chef has a Playwright
-  journey through its five screens; the Solicitor does not, so "playable"
-  there means verified by hand and by unit test, not by CI.
-- **The Solicitor participates in none of the shared systems**: no phone,
-  news, rivals, people, timeline, ambitions or expansion. The Chef now has a
-  phone, its own news, its own reviews and its own city rivals, but still no
-  engine-level `people`, `timeline` or `ambitions`. Their maps show every city the
-  trade is done in, mark the one you chose, and say plainly that you cannot
-  move — rather than implying a network that does not exist.
+- **Browser coverage is no longer the gap it was**: every career has its own
+  Playwright block (the Solicitor alone has over twenty tests across its
+  casework, retainers, counsel, people and crises). What remains thin is
+  human playtesting — the suites prove the screens work, not that the pacing
+  is fun.
+- **The shared systems are unevenly adopted.** The Solicitor now has people,
+  crises and a handset with its own apps, and the Chef has a phone, its own
+  news, reviews and city rivals — but neither has engine-level `timeline` or
+  `ambitions`, and no career outside the Physician can expand between cities.
+  Their maps show every city the trade is done in, mark the one you chose,
+  and say plainly that you cannot move — rather than implying a network that
+  does not exist.
 - **Time-block cash costs are still global.** Developing a menu is $150 and
   pitching for work is $250 wherever you are, because those are properties of
   the action rather than of the run. They are small enough not to distort a

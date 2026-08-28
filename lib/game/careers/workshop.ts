@@ -1,4 +1,6 @@
 import type { StartCity } from "../types";
+import type { PhoneState } from "../medical/types";
+import type { RunState } from "../types";
 
 /**
  * THE WORKSHOP
@@ -245,9 +247,243 @@ export interface Product {
   /** How much of the market it has reached. Grows while shipped. */
   reach: number;
   recalls: number;
+  /*
+   * PHASE 5, ALL OPTIONAL: a product from an older save carries none of
+   * these and designs, tests, ships and fails exactly as it always did.
+   */
+  /** The requirements envelope, negotiated once while designing. */
+  spec?: SpecLevel;
+  /** How the thing is put together. Decided once, while designing. */
+  architecture?: ArchitectureId;
+  /** Whether a prototype round has been built. Once per product. */
+  prototyped?: boolean;
 }
 
+export type SpecLevel = "lean" | "standard" | "hardened";
+
+/**
+ * REQUIREMENTS ARE A NEGOTIATION, NOT A GIVEN
+ *
+ * What the product must survive is agreed before it exists: cut the
+ * requirements and it designs faster and sells cheaper — and everything the
+ * spec no longer covers is a fault waiting at a customer. Harden them and
+ * the design drags, the price rises, and far less is in there to surface.
+ * Standard is the default and exactly the product this career always built.
+ */
+export const SPECS: Record<
+  SpecLevel,
+  { label: string; blurb: string; design: number; revenue: number; seed: number }
+> = {
+  lean: {
+    label: "Lean spec",
+    blurb: "Only what the launch needs. Faster, cheaper, and it finds out at customers.",
+    design: 0.8,
+    revenue: 0.9,
+    seed: 1.45,
+  },
+  standard: {
+    label: "Standard",
+    blurb: "The envelope the market expects. Nothing traded either way.",
+    design: 1,
+    revenue: 1,
+    seed: 1,
+  },
+  hardened: {
+    label: "Hardened",
+    blurb: "Margins on the margins. Slower to draw, dearer to buy, quieter in the field.",
+    design: 1.25,
+    revenue: 1.1,
+    seed: 0.68,
+  },
+};
+
+export type ArchitectureId = "integrated" | "modular";
+
+/**
+ * THE ARCHITECTURE DECISION, MADE ONCE AND LIVED WITH
+ *
+ * Integrated is elegant and compact — it designs faster and commands a
+ * premium, and when it fails the whole unit comes back. Modular takes
+ * longer to draw and every fault is a swappable module: cheaper in the
+ * field, faster on the test rig. Undecided is identity: the old product.
+ */
+export const ARCHITECTURES: Record<
+  ArchitectureId,
+  {
+    label: string;
+    blurb: string;
+    design: number;
+    revenue: number;
+    fault: number;
+    testYield: number;
+  }
+> = {
+  integrated: {
+    label: "Integrated",
+    blurb: "One elegant unit. Premium price, and the whole thing comes back when it fails.",
+    design: 0.9,
+    revenue: 1.08,
+    fault: 1.3,
+    testYield: 1,
+  },
+  modular: {
+    label: "Modular",
+    blurb: "Swappable everything. Slower to draw, cheap to fix, quick on the rig.",
+    design: 1.15,
+    revenue: 1,
+    fault: 0.6,
+    testYield: 1.25,
+  },
+};
+
+export const specOf = (p: Product) => SPECS[p.spec ?? "standard"];
+export const archOf = (p: Product) =>
+  p.architecture
+    ? ARCHITECTURES[p.architecture]
+    : { design: 1, revenue: 1, fault: 1, testYield: 1 };
+
+/* ------------------------------------------------------------ the lab */
+
+export interface RigDef {
+  id: string;
+  label: string;
+  blurb: string;
+  cost: number;
+}
+
+/**
+ * Laboratory equipment: bought once, owned forever, and every product on
+ * the bench benefits. The thermal chamber makes each test week remove
+ * more; the shaker table makes each one *tell* you more.
+ */
+export const RIGS: RigDef[] = [
+  {
+    id: "thermal",
+    label: "Thermal chamber",
+    blurb: "Bake it, freeze it, find what lets go. Testing removes a fifth more.",
+    cost: 9_000,
+  },
+  {
+    id: "shaker",
+    label: "Shaker table",
+    blurb: "A week on the table is a year on the road. Confidence comes faster.",
+    cost: 14_000,
+  },
+];
+
+export const RIG_BY_ID = new Map(RIGS.map((r) => [r.id, r]));
+
+export const rigsOf = (w: WorkshopState): string[] => w.rigs ?? [];
+export const hasRig = (w: WorkshopState, id: string): boolean =>
+  rigsOf(w).includes(id);
+
+export const rigCost = (w: WorkshopState, rig: RigDef): number =>
+  Math.round(rig.cost * workshopCityOf(w).revenueIndex);
+
+/* ------------------------------------------------------- the disciplines */
+
+export interface BenchRole {
+  id: string;
+  label: string;
+  blurb: string;
+  /** Weekly, before the city's index. */
+  salary: number;
+  /** Weeks of design added to the focused product, weekly. */
+  design: number;
+  /** Weeks of testing added to the focused product, weekly. */
+  test: number;
+  /** Extra market reach for every shipped product, weekly. */
+  reach: number;
+}
+
+/**
+ * The four disciplines a real product needs. Each hire does one thing to
+ * the week, passively — the bench is still yours to point.
+ */
+export const BENCH_ROLES: BenchRole[] = [
+  {
+    id: "mechanical",
+    label: "Mechanical engineer",
+    blurb: "Housings, mounts, and everything that moves or must not.",
+    salary: 980,
+    design: 0.5,
+    test: 0,
+    reach: 0,
+  },
+  {
+    id: "electrical",
+    label: "Electrical engineer",
+    blurb: "Boards, power and the faults that only show under load.",
+    salary: 950,
+    design: 0,
+    test: 0.4,
+    reach: 0,
+  },
+  {
+    id: "software",
+    label: "Software engineer",
+    blurb: "Firmware. Half the design, half the testing, all of the updates.",
+    salary: 990,
+    design: 0.25,
+    test: 0.2,
+    reach: 0,
+  },
+  {
+    id: "manufacturing",
+    label: "Manufacturing engineer",
+    blurb: "Yield, tooling and shipping in volume. Reach grows on its own.",
+    salary: 920,
+    design: 0,
+    test: 0,
+    reach: 0.025,
+  },
+];
+
+export const BENCH_ROLE_BY_ID = new Map(BENCH_ROLES.map((r) => [r.id, r]));
+
+export interface BenchHire {
+  id: string;
+  name: string;
+  role: string;
+  salary: number;
+  since: number;
+}
+
+export const benchOf = (w: WorkshopState): BenchHire[] => w.team ?? [];
+
+export const benchWages = (w: WorkshopState): number =>
+  benchOf(w).reduce((n, h) => n + h.salary, 0);
+
+export const benchSalary = (w: WorkshopState, role: BenchRole): number =>
+  Math.round(role.salary * workshopCityOf(w).revenueIndex);
+
+export const benchOutput = (
+  w: WorkshopState,
+): { design: number; test: number; reach: number } =>
+  benchOf(w).reduce(
+    (acc, h) => {
+      const role = BENCH_ROLE_BY_ID.get(h.role);
+      if (!role) return acc;
+      return {
+        design: acc.design + role.design,
+        test: acc.test + role.test,
+        reach: acc.reach + role.reach,
+      };
+    },
+    { design: 0, test: 0, reach: 0 },
+  );
+
+/** What a prototype round costs: a fraction of certification, since it is
+    the same rigour pointed earlier. */
+export const prototypeCost = (w: WorkshopState, kind: ProductKind): number =>
+  Math.round(kind.certCost * 0.35 * workshopCityOf(w).revenueIndex);
+
 export interface WorkshopState {
+  /**
+   * The handset. Optional so a save from before this career had one
+   * still loads; it is created on first touch.
+   */
+  phone?: PhoneState;
   city: string;
   products: Product[];
   /** Which product the bench is pointed at. */
@@ -256,6 +492,10 @@ export interface WorkshopState {
   /** Every fault that has ever reached a customer. The career's real score. */
   faultsInField: number;
   recalls: number;
+  /** The lab: rigs bought once and owned forever. Optional — see above. */
+  rigs?: string[];
+  /** The disciplines on the payroll. Optional — see above. */
+  team?: BenchHire[];
 }
 
 export function initialWorkshop(): WorkshopState {
@@ -276,9 +516,14 @@ export const kindOf = (p: Product): ProductKind | undefined =>
 /** Weeks of design this product needs before it can be tested. */
 export const designNeeded = (kind: ProductKind): number => kind.designWeeks;
 
+/** The same, for one product: the kind's weeks through the spec and the
+    architecture. Identity for a product that never chose. */
+export const designNeededFor = (p: Product, kind: ProductKind): number =>
+  Math.max(1, Math.round(kind.designWeeks * specOf(p).design * archOf(p).design));
+
 export const designProgress = (p: Product): number => {
   const kind = kindOf(p);
-  return kind ? Math.min(1, p.design / designNeeded(kind)) : 0;
+  return kind ? Math.min(1, p.design / designNeededFor(p, kind)) : 0;
 };
 
 /**
@@ -316,6 +561,11 @@ export function testYield(p: Product): number {
   return Math.max(0.35, p.latent * 0.28) * (kind.complexity > 2 ? 0.85 : 1);
 }
 
+/** The same, on this workshop's bench: a modular product strips faster,
+    and a thermal chamber strips a fifth more. Identity when neither. */
+export const testYieldFor = (w: WorkshopState, p: Product): number =>
+  testYield(p) * archOf(p).testYield * (hasRig(w, "thermal") ? 1.2 : 1);
+
 /** Whether the certifier would pass it, given what is actually in there. */
 export const wouldCertify = (
   w: WorkshopState,
@@ -329,8 +579,14 @@ export const certWeeksFor = (w: WorkshopState): number =>
 export function revenueOf(w: WorkshopState, p: Product): number {
   const kind = kindOf(p);
   if (!kind || p.stage !== "shipped") return 0;
+  /* The spec's price band and the architecture's premium — both exactly
+     one for a product that never chose. */
   return Math.round(
-    kind.revenue * workshopCityOf(w).revenueIndex * Math.min(1, p.reach),
+    kind.revenue *
+      workshopCityOf(w).revenueIndex *
+      Math.min(1, p.reach) *
+      specOf(p).revenue *
+      archOf(p).revenue,
   );
 }
 
@@ -353,8 +609,10 @@ export function surfaceChance(p: Product): number {
 export function faultCost(w: WorkshopState, p: Product): number {
   const kind = kindOf(p);
   if (!kind) return 0;
+  /* A modular failure is a module in the post; an integrated one is the
+     whole unit back on the bench. */
   return Math.round(
-    kind.faultCost * workshopCityOf(w).scrutiny * (0.5 + p.reach),
+    kind.faultCost * workshopCityOf(w).scrutiny * (0.5 + p.reach) * archOf(p).fault,
   );
 }
 
@@ -370,7 +628,11 @@ export function recallCost(w: WorkshopState, p: Product): number {
   const kind = kindOf(p);
   if (!kind) return 0;
   return Math.round(
-    kind.faultCost * 2.4 * (0.6 + p.reach) * workshopCityOf(w).scrutiny,
+    kind.faultCost *
+      2.4 *
+      (0.6 + p.reach) *
+      workshopCityOf(w).scrutiny *
+      archOf(p).fault,
   );
 }
 
@@ -413,3 +675,14 @@ const PRODUCT_NAMES = [
 ];
 
 export const productName = (n: number) => PRODUCT_NAMES[n % PRODUCT_NAMES.length];
+
+/**
+ * This career's slice of the run.
+ *
+ * It lives here rather than beside the CareerDef because it is about
+ * the *state shape*, and because anything that needs it — the event
+ * catalogue, the voice pack — would otherwise have to import the
+ * career module and form an import cycle with it.
+ */
+export const workshop = (s: RunState): WorkshopState =>
+  s.data.workshop as WorkshopState;

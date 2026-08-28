@@ -47,6 +47,11 @@ const BANNERED = new Set<ScreenId>([
   "growth",
 ]);
 import { Overview } from "./overview/Overview";
+import { WeeklyPlanRail } from "./plan/WeeklyPlanRail";
+import {
+  WeeklyPlanSheet,
+  WeeklyPlanTrigger,
+} from "./plan/WeeklyPlanSheet";
 import { WeekReview } from "./WeekReview";
 import { Outcome } from "./Outcome";
 import { BuildPanel } from "./medical/BuildPanel";
@@ -66,6 +71,10 @@ import { RivalsPanel } from "./medical/RivalsPanel";
 import { CrisisPanel } from "./medical/CrisisPanel";
 import { SetbackPanel } from "./medical/SetbackPanel";
 import { OperationPanel } from "./careers/OperationPanel";
+import { FounderScreens } from "./careers/FounderScreens";
+import { PoliticianScreens } from "./careers/PoliticianScreens";
+import { ArchitectScreens } from "./careers/ArchitectScreens";
+import { EngineerScreens } from "./careers/EngineerScreens";
 import { ChefScreens } from "./careers/ChefScreens";
 import { LawyerScreens } from "./careers/LawyerScreens";
 import { HomeMap } from "./careers/HomeMap";
@@ -167,6 +176,10 @@ export function Game({
     setPhoneOpen(true);
   };
   const [glossaryOpen, setGlossaryOpen] = useState(false);
+  /* The weekly plan sheet — the phone-sized door to the same allocation the
+     Week screen edits. Openable from every screen but the Week itself. */
+  const [planOpen, setPlanOpen] = useState(false);
+  const planButtonRef = useRef<HTMLButtonElement>(null);
   /*
    * Which lessons the player has closed.
    *
@@ -287,7 +300,7 @@ export function Game({
   }
 
   const m = state.careerId === "doctor" ? med(state) : null;
-  const activeSection = sectionOf(screen).id;
+  const activeSection = sectionOf(screen, state.careerId).id;
   /* The phone is career-aware now: any career that carries one gets the
      button, the badge and the handset. One without one gets nothing, which
      is absence rather than breakage. */
@@ -304,7 +317,7 @@ export function Game({
     >
   > = {};
   for (const alert of alerts) {
-    const target = sectionOf(alert.destination).id;
+    const target = sectionOf(alert.destination, state.careerId).id;
     const existing = badges[target];
     if (!existing) {
       badges[target] = { severity: alert.severity, count: 1 };
@@ -325,6 +338,10 @@ export function Game({
      * it about 700px wide — small enough that the cities crowded.
      */
     <div
+      /* The career accent: globals.css keys --accent off this attribute, and
+         the `clinical` token reads it, so everything active, owned or
+         pressable takes this career's colour from here down. */
+      data-career={state.careerId}
       className={`mx-auto px-3 pt-3 sm:px-6 sm:pt-6 md:pb-10 ${
         screen === "cities" ? "max-w-[1680px]" : "max-w-6xl"
       } ${screen === "overview" ? "pb-36" : "pb-24"}`}
@@ -412,7 +429,20 @@ export function Game({
         />
       )}
 
-      <main ref={mainRef} tabIndex={-1} className="outline-none">
+      {/*
+        * Phase 4: the plan rides beside the decision on desktop. Every screen
+        * except two gets the two-column grid — the Week already IS the plan,
+        * and the map wants the whole stage (its right rail becomes city
+        * intelligence when the World shell lands).
+        */}
+      <div
+        className={
+          screen !== "overview" && screen !== "cities"
+            ? "lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6"
+            : undefined
+        }
+      >
+      <main ref={mainRef} tabIndex={-1} className="min-w-0 outline-none">
         {/*
          * A crisis outranks the screen you happen to be on.
          *
@@ -484,6 +514,13 @@ export function Game({
         {screen === "operation" && (
           <OperationPanel state={state} onCommand={dispatch} />
         )}
+        {/* The Founder's three, on the same terms as the two careers below:
+            venture state rather than medical state, and outside the header's
+            button. */}
+        <FounderScreens screen={screen} state={state} onCommand={dispatch} />
+        <PoliticianScreens screen={screen} state={state} onCommand={dispatch} />
+        <ArchitectScreens screen={screen} state={state} onCommand={dispatch} />
+        <EngineerScreens screen={screen} state={state} onCommand={dispatch} />
         {/* The Chef's five screens, for the same two reasons: they read
             kitchen state, not medical state, and they must not be nested
             inside the header's button. */}
@@ -514,7 +551,7 @@ export function Game({
             {screen === "staff" && (
               <SectionBanner
                 section="staff"
-                kicker="Practice"
+                kicker="Work"
                 title="Your people"
                 status={`${m.staff.length} on the payroll · ${money(weeklyCosts(state))}/wk in fixed costs`}
               />
@@ -522,7 +559,7 @@ export function Game({
             {screen === "caseload" && (
               <SectionBanner
                 section="caseload"
-                kicker="Practice"
+                kicker="Work"
                 title="The caseload"
                 status={`${m.lastCases.reduce((n, c) => n + c.arrived, 0)} cases arrived last week`}
               />
@@ -546,7 +583,7 @@ export function Game({
             {screen === "growth" && (
               <SectionBanner
                 section="growth"
-                kicker="Network"
+                kicker="World"
                 title="Growth"
                 status={`${m.campaigns.length} campaign${m.campaigns.length === 1 ? "" : "s"} running`}
               />
@@ -644,6 +681,47 @@ export function Game({
           </>
         )}
       </main>
+
+      {screen !== "overview" && screen !== "cities" && (
+        <WeeklyPlanRail
+          career={career}
+          state={state}
+          alloc={alloc}
+          budget={budget}
+          spent={spent}
+          alerts={alerts}
+          onAllocate={setAlloc}
+          onCommit={commit}
+          onNavigate={setScreen}
+        />
+      )}
+      </div>
+
+      {/* Mobile: the week plan one tap away on every screen but the Week,
+          which already ends in the sticky commit bar. */}
+      {screen !== "overview" && (
+        <WeeklyPlanTrigger
+          state={state}
+          spent={spent}
+          budget={budget}
+          buttonRef={planButtonRef}
+          onOpen={() => setPlanOpen(true)}
+        />
+      )}
+      {planOpen && (
+        <WeeklyPlanSheet
+          career={career}
+          state={state}
+          alloc={alloc}
+          budget={budget}
+          spent={spent}
+          lastWeek={lastWeek}
+          onAllocate={setAlloc}
+          onCommit={commit}
+          onClose={() => setPlanOpen(false)}
+          returnFocusTo={planButtonRef}
+        />
+      )}
 
       {/* Mobile: the same five destinations, within thumb reach. */}
       <div className="lg:hidden">

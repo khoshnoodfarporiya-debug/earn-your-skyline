@@ -327,7 +327,7 @@ const STATUS_TEXT: Record<Status, string> = {
 };
 
 const STATUS_SPINE: Record<Status, string> = {
-  held: "#2DD4BF",
+  held: "rgb(var(--accent))",
   available: "#43C78B",
   locked: "#F59E55",
   later: "transparent",

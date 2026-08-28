@@ -57,7 +57,7 @@ function siteUrl(): URL {
 
 const TITLE = "Earn Your Skyline";
 const DESCRIPTION =
-  "Start as a physician with $165,000 of debt and one exam room. Cases arrive whether or not you can treat them.";
+  "Seven careers, one rule: the work arrives whether or not you can afford to do it. Build a practice, a kitchen, a chambers, a startup, a campaign, a studio or a workshop from debt to skyline.";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(),

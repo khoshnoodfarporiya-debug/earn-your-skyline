@@ -7,18 +7,73 @@ import { startRun } from "@/lib/game/engine";
 import { clearRun, loadRun, saveRun } from "@/lib/game/save";
 import { CareerSelect } from "@/components/CareerSelect";
 import { Game } from "@/components/Game";
+import { AccountGate } from "@/components/AccountGate";
+import {
+  localAccountStore,
+  readActive,
+  signIn,
+  signOut,
+  type Player,
+} from "@/lib/game/account";
 
 export default function Page() {
   const [run, setRun] = useState<RunState | null>(null);
   const [savedRun, setSavedRun] = useState<RunState | null>(null);
   const [ready, setReady] = useState(false);
+  /* Who is playing. Null means the front door. */
+  const [playerId, setPlayerId] = useState<string | null>(null);
+  /* The name, so the game can greet whoever is playing. */
+  const [playerName, setPlayerName] = useState<string>("");
 
-  // localStorage is only available client-side, so the first paint is the
-  // career select either way; this just decides whether to offer "continue".
+  /*
+   * ORDER MATTERS HERE.
+   *
+   * The save scope has to be pointed at the signed-in player *before*
+   * anything reads a run, or the first load hands them somebody else's game.
+   * So this effect signs in first and only then looks for a save.
+   */
   useEffect(() => {
-    setSavedRun(loadRun());
-    setReady(true);
+    const active = readActive();
+    if (!active) {
+      setReady(true);
+      return;
+    }
+    /*
+     * The stored id is a claim, not a fact: the profile behind it can be gone
+     * while the pointer survives (a cleared players list, a hand-edited
+     * store). Trusting it blindly opened a scoped game with a blank identity
+     * and no matching profile — so the profile is confirmed to exist BEFORE
+     * anything signs in or reads a save, and a stale pointer is cleaned up
+     * and sent back to the front door instead.
+     */
+    let alive = true;
+    void localAccountStore.list().then((all) => {
+      if (!alive) return;
+      const player = all.find((x) => x.id === active);
+      if (player) {
+        /* Sign in first, then read: the scope must point at this player
+           before anything loads a run, or it loads somebody else's. */
+        signIn(active);
+        setPlayerId(active);
+        setPlayerName(player.name);
+        setSavedRun(loadRun());
+      } else {
+        signOut();
+      }
+      setReady(true);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
+
+  const onSignedIn = (player: Player) => {
+    setPlayerId(player.id);
+    setPlayerName(player.name);
+    /* `signIn` has already set the scope, so this reads the right save —
+       including a run adopted from before accounts existed. */
+    setSavedRun(loadRun());
+  };
 
   const update = (next: RunState) => {
     setRun(next);
@@ -61,6 +116,9 @@ export default function Page() {
 
   if (!ready) return <div className="min-h-screen" />;
 
+  /* The front door. Nothing behind it renders until somebody is signed in. */
+  if (!playerId) return <AccountGate onSignedIn={onSignedIn} />;
+
   // `!career` rather than `orphaned` so the type narrows here too.
   if (!run || !career) {
     return (
@@ -69,6 +127,14 @@ export default function Page() {
         hasSave={!orphaned && !!savedRun && !savedRun.outcome}
         onContinue={() => savedRun && setRun(savedRun)}
         onPick={begin}
+        playerName={playerName}
+        onSignOut={() => {
+          signOut();
+          setPlayerId(null);
+          setPlayerName("");
+          setSavedRun(null);
+          setRun(null);
+        }}
       />
     );
   }

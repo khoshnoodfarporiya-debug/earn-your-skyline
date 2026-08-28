@@ -12,6 +12,10 @@ import { money } from "../game/format";
 import type { ScreenId } from "./navigation";
 import { chefAlerts } from "./chefHelp";
 import { lawyerAlerts } from "./lawyerHelp";
+import { founderAlerts } from "./founderHelp";
+import { politicianAlerts } from "./politicianHelp";
+import { architectAlerts } from "./architectHelp";
+import { engineerAlerts } from "./engineerHelp";
 
 /**
  * Urgent state, derived rather than stored.
@@ -55,6 +59,13 @@ const bySeverity = (alerts: Alert[]): Alert[] =>
 export function deriveAlerts(state: RunState): Alert[] {
   if (state.careerId === "chef") return bySeverity(chefAlerts(state));
   if (state.careerId === "lawyer") return bySeverity(lawyerAlerts(state));
+  if (state.careerId === "founder") return bySeverity(founderAlerts(state));
+  if (state.careerId === "politician")
+    return bySeverity(politicianAlerts(state));
+  if (state.careerId === "architect")
+    return bySeverity(architectAlerts(state));
+  if (state.careerId === "engineer")
+    return bySeverity(engineerAlerts(state));
   if (state.careerId !== "doctor") return [];
   const m = med(state);
   const out: Alert[] = [];

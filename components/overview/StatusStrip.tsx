@@ -2,7 +2,7 @@
 
 import type { RunState } from "@/lib/game/types";
 import { money } from "@/lib/game/format";
-import { weeklyCosts } from "@/lib/game/careers/doctor";
+import { cashTone, weeklyBurnFor } from "@/lib/ui/constraint";
 
 /**
  * The four numbers a player should never have to hunt for: what week it is,
@@ -20,8 +20,10 @@ export function StatusStrip({
   spent: number;
   budget: number;
 }) {
-  const isDoctor = state.careerId === "doctor";
-  const burn = isDoctor ? weeklyCosts(state) : 0;
+  /* Career-dispatched since Phase 4: the Chef's rent and wages, the
+     Solicitor's chambers and salaries, the Physician's costs — each from its
+     own model. Null means the career states its constraint its own way. */
+  const burn = weeklyBurnFor(state) ?? 0;
   const remaining = budget - spent;
 
   const cells = [
@@ -36,17 +38,16 @@ export function StatusStrip({
     {
       label: "Cash",
       value: money(state.r.cash),
-      /* `weeklyCosts` is the Physician's sum and only theirs, so "no fixed
-         costs" is a claim this component can only make about a doctor. A Chef
-         pays rent from week one; saying otherwise under their cash figure
-         would be plainly false. */
-      sub: burn > 0 ? `${money(burn)}/wk out` : isDoctor ? "no fixed costs" : "",
-      tone:
-        state.r.cash < 0
-          ? "alarm"
-          : burn > 0 && state.r.cash < burn * 2
-            ? "caution"
-            : "plain",
+      /* "No fixed costs" is only claimable when the career's own model says
+         the burn is genuinely zero — a Physician before the first lease. A
+         career that states its constraint elsewhere shows cash alone. */
+      sub:
+        burn > 0
+          ? `${money(burn)}/wk out`
+          : weeklyBurnFor(state) === 0
+            ? "no fixed costs"
+            : "",
+      tone: cashTone(state),
     },
     {
       label: "Debt",

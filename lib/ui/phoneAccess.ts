@@ -3,6 +3,7 @@ import type { PhoneState } from "../game/medical/types";
 import { med } from "../game/careers/doctor";
 import { kitchen } from "../game/careers/chef";
 import { practice } from "../game/careers/lawyer";
+import { packFor, packedPhoneOf } from "../game/phone/packs";
 
 /**
  * ONE DOOR TO EVERY CAREER'S PHONE
@@ -19,6 +20,9 @@ export function phoneOf(state: RunState): PhoneState | null {
   if (state.careerId === "doctor") return med(state).phone;
   if (state.careerId === "chef") return kitchen(state).phone ?? null;
   if (state.careerId === "lawyer") return practice(state).phone ?? null;
+  /* The four careers whose phones are built from a voice pack rather than
+     hand-written. Same shape, same door. */
+  if (packFor(state.careerId)) return packedPhoneOf(state) ?? null;
   return null;
 }
 
@@ -41,6 +45,9 @@ export const unreadTotalIn = (p: PhoneState): number =>
  */
 export function scrutinyLine(careerId: string, scrutiny: number): string {
   const n = Math.round(scrutiny);
+  if (packFor(careerId)) {
+    return `${n} — you are being watched, and a bad week now travels further than it used to.`;
+  }
   if (careerId === "chef") {
     return `${n} — you are being watched. A bad night now travels further than it used to.`;
   }
@@ -52,6 +59,9 @@ export function scrutinyLine(careerId: string, scrutiny: number): string {
 
 /** The composer's empty-state advice, per career. */
 export function composerEmptyLine(careerId: string): string {
+  if (packFor(careerId)) {
+    return "Nothing worth saying yet. Do something the world would notice and there will be.";
+  }
   if (careerId === "chef") {
     return "Nothing worth saying yet. Run a good service, get to know a supplier, or take somebody on and there will be.";
   }

@@ -52,7 +52,14 @@ import {
   billsOwed,
   LEGAL_PREMISES,
   PREMISES_BY_ID,
+  MAX_RETAINERS,
+  RETAINERS,
+  RETAINER_BY_ID,
   chambersRent,
+  retainerHours,
+  retainerIncome,
+  retainerOffersOf,
+  retainersOf,
   chambersOf,
   chambersPrice,
   seatsFree,
@@ -239,12 +246,54 @@ import {
  * with free hiring now reaches about 90% — which is the correct direction for
  * a system whose whole purpose is that growth has to be paid for.
  *
+ * ---------------------------------------------------------- and retainers
+ *
+ * The premise's opposite number: money that arrives on a day you can name,
+ * paid for in hours reserved off the top of every week and in that client no
+ * longer instructing you. A bot that accepts every arrangement offered
+ * against the same bot that ignores them, 24 runs in each of six markets:
+ *
+ *                     ignores          takes
+ *   worth             90% of goal      85%
+ *   weeks overdrawn   9.7              5.8
+ *
+ * Which is the shape this had to have: retainers cost a little wealth and buy
+ * real safety. A practice that is comfortable should be taking matters; one
+ * that cannot see past Friday should be taking retainers. The regional split
+ * says the same thing from the other side — Amsterdam and New York, where
+ * matters pay best, are punished for retaining; Lagos, where they pay worst,
+ * is rewarded.
+ *
+ * It took three passes and the first two were the same mistake twice. At
+ * £900/£2,000/£4,000 a week with no ceiling, a bot taking everything finished
+ * on 120% against 90% and with a third of the overdrawn weeks — better on
+ * *both* axes, which is not a trade but a strictly better button. Capping at
+ * three and cutting the rate to about £130 an hour halved it and left it
+ * still dominant.
+ *
+ * The reason neither worked is worth keeping: **a growing firm is hours-rich
+ * and work-poor.** The pipeline cannot always fill the week, so "hours
+ * reserved" was being paid out of hours that would otherwise have idled — no
+ * cost at all, at exactly the scale where the income mattered most. The fix
+ * had to be denominated in the thing the firm actually lives on, so holding
+ * retainers now cuts the rate at which new instructions arrive
+ * (`retainerDrag`), which is a cost that grows as the firm does.
+ *
  * See `casework.ts` for the model and `lawyerPhone.ts` for the handset.
  */
 
 const GOAL = 2_500_000;
-const START_DEBT = 46_000;
-const START_CASH = 9_000;
+/*
+ * RE-CAPITALISED 27 AUG 2026, FROM MEASUREMENT.
+ *
+ * Nine thousand of float was nine weeks of London's fixed costs, and the
+ * first fee in this career lands months out by design — the balance
+ * histogram showed every market underwater in weeks 1-20 before a single
+ * growth decision was taken. The loan buys the float, so the debt rises by
+ * the same amount: the practice starts with more room, not more money.
+ */
+const START_DEBT = 51_000;
+const START_CASH = 14_000;
 
 /**
  * How long a record the firm keeps.
@@ -881,6 +930,59 @@ export const lawyer: CareerDef = {
         );
         break;
       }
+      /*
+       * TAKING ONE ON
+       *
+       * The only money in this career that arrives on a day you can name. It
+       * costs hours off the top of every week and it stops that client
+       * sending you instructions — see `RETAINERS`.
+       */
+      case "takeRetainer": {
+        const offer = retainerOffersOf(p).find((o) => o.id === arg);
+        if (!offer) return;
+        const kind = RETAINER_BY_ID.get(offer.kind);
+        if (!kind) return;
+        /* A practice can only hold so many. See MAX_RETAINERS for what the
+           simulation said about what happens without a ceiling. */
+        if (retainersOf(p).length >= MAX_RETAINERS) return;
+        p.retainerOffers = retainerOffersOf(p).filter((o) => o.id !== arg);
+        p.retainers = [
+          ...retainersOf(p),
+          {
+            id: `r-${p.nextId++}`,
+            kind: kind.id,
+            client: offer.client,
+            fromWeek: s.week,
+            weeks: kind.weeks,
+          },
+        ];
+        pushLog(
+          s,
+          `${offer.client} have put you on ${kind.label.toLowerCase()} — ${money(localSum(s, kind.fee))} a week, and ${kind.hours} hours of yours a week.`,
+          "good",
+        );
+        break;
+      }
+
+      /*
+       * Giving notice. Costs standing rather than money: you are the one
+       * walking away, and the profession is small.
+       */
+      case "endRetainer": {
+        const held = retainersOf(p).find((x) => x.id === arg);
+        if (!held) return;
+        p.retainers = retainersOf(p).filter((x) => x.id !== arg);
+        s.r.reputation = Math.max(0, s.r.reputation - 3);
+        pushLog(s, `You have given ${held.client} notice.`, "bad");
+        touchPerson(
+          s,
+          "ellory",
+          { respect: -2 },
+          `You came off ${held.client}'s retainer.`,
+          "bad",
+        );
+        break;
+      }
       case "payLoan": {
         const pay = Math.min(10_000, s.r.debt, Math.max(0, s.r.cash));
         if (pay <= 0) return;
@@ -1081,7 +1183,10 @@ export const lawyer: CareerDef = {
      * and it means a player who over-commits watches the far cases starve
      * rather than everything degrading equally.
      */
-    let hours = (s.r._hours ?? 0) + staffHours(p);
+    /* Retained hours come off the top, before a single one reaches a live
+       matter, and they are gone whether or not the client rang this week. */
+    const reserved = retainerHours(p);
+    let hours = Math.max(0, (s.r._hours ?? 0) + staffHours(p) - reserved);
     const byDeadline = [...p.cases].sort((a, b) => a.dueWeek - b.dueWeek);
     for (const c of byDeadline) {
       if (hours <= 0) break;
@@ -1369,6 +1474,78 @@ export const lawyer: CareerDef = {
     );
     p.offers = p.offers.slice(0, 6);
 
+    /*
+     * And somebody occasionally asks to put you on a retainer.
+     *
+     * Only from a client you have actually acted for — nobody hands a
+     * standing arrangement to a stranger — and only what your standing
+     * warrants. Its own stream, so an arrangement being offered can never
+     * disturb the court's dice.
+     */
+    p.retainerOffers = retainerOffersOf(p).filter(
+      (o) => o.expiresWeek > s.week,
+    );
+    {
+      const retainRng = makeRng((s.seed ^ (s.week * 0x4d3f8b17)) >>> 0);
+      const held = new Set(retainersOf(p).map((x) => x.client));
+      const offered = new Set(retainerOffersOf(p).map((x) => x.client));
+      const candidates = (p.actedFor ?? []).filter(
+        (c) => !held.has(c) && !offered.has(c),
+      );
+      const reachable = RETAINERS.filter((k) => k.needs <= s.r.reputation);
+      if (
+        candidates.length > 0 &&
+        reachable.length > 0 &&
+        retainersOf(p).length < MAX_RETAINERS &&
+        retainerOffersOf(p).length < 2 &&
+        retainRng.chance(0.07)
+      ) {
+        const kind = reachable[reachable.length - 1];
+        p.retainerOffers = [
+          ...retainerOffersOf(p),
+          {
+            id: `ro-${p.nextId++}`,
+            kind: kind.id,
+            client: retainRng.pick(candidates),
+            expiresWeek: s.week + 3,
+          },
+        ];
+      }
+    }
+
+    /*
+     * 5. The money that does not care either.
+     *
+     * Booked before the costs below rather than after, because that is the
+     * order it matters in: this is the only line in the career that is there
+     * whatever the week did.
+     */
+    const retained = retainerIncome(p);
+    if (retained > 0) {
+      out.push({
+        label:
+          retainersOf(p).length === 1
+            ? "Retainer"
+            : `${retainersOf(p).length} retainers`,
+        amount: retained,
+        kind: "income",
+        note: `${reserved} hours a week reserved for them.`,
+      });
+    }
+
+    /* Arrangements run down, and none of them lasts for ever. */
+    for (const held of [...retainersOf(p)]) {
+      held.weeks -= 1;
+      if (held.weeks <= 0) {
+        p.retainers = retainersOf(p).filter((x) => x !== held);
+        pushLog(
+          s,
+          `${held.client}'s retainer has come to its end. Their hours are yours again.`,
+          "neutral",
+        );
+      }
+    }
+
     /* 5. The costs that do not care whether anything settled this week. */
     const r = chambersRent(p);
     out.push({ label: "Chambers", amount: -r, kind: "expense" });
@@ -1384,7 +1561,7 @@ export const lawyer: CareerDef = {
     /* What falls due every week whatever happens — the denominator for how
        much cover the office account actually has. */
     const weekly = r + w;
-    s.r.cash += collected - costsPaid - r - w;
+    s.r.cash += collected + retained - costsPaid - r - w;
     s.r._lastRevenue = collected;
     s.r._burnoutPeak = Math.max(s.r._burnoutPeak ?? 0, s.r.burnout);
     s.r.burnout = Math.max(0, s.r.burnout - 2);
@@ -1645,6 +1822,25 @@ export const lawyer: CareerDef = {
       }
     }
     if (p.actedFor !== undefined && !Array.isArray(p.actedFor)) return false;
+    if (p.retainers !== undefined) {
+      if (!Array.isArray(p.retainers)) return false;
+      if (
+        p.retainers.some(
+          (x) =>
+            !RETAINER_BY_ID.has(x.kind) ||
+            typeof x.weeks !== "number" ||
+            !Number.isFinite(x.weeks),
+        )
+      ) {
+        return false;
+      }
+    }
+    if (p.retainerOffers !== undefined) {
+      if (!Array.isArray(p.retainerOffers)) return false;
+      if (p.retainerOffers.some((x) => !RETAINER_BY_ID.has(x.kind))) {
+        return false;
+      }
+    }
     if (p.premises !== undefined && !PREMISES_BY_ID.has(p.premises)) {
       return false;
     }
@@ -1724,7 +1920,9 @@ export const lawyer: CareerDef = {
   briefing: (s, alloc) => {
     const p = practice(s);
     const mine = (alloc.casework ?? 0) * (12 + s.r.skill * 0.12);
-    const total = Math.round(mine + staffHours(p));
+    const total = Math.round(
+      Math.max(0, mine + staffHours(p) - retainerHours(p)),
+    );
     const need = hoursOutstanding(p);
     const soonest = [...p.cases].sort((a, b) => a.dueWeek - b.dueWeek)[0];
     const weekly = chambersRent(p) + legalWages(p);
@@ -1736,7 +1934,12 @@ export const lawyer: CareerDef = {
         label: "Hours into the files",
         value: `${total}`,
         tone: total > 0 ? "good" : "neutral",
-        note: need > 0 ? `${Math.round(need)} still owed across the pipeline` : "Nothing on the books",
+        note:
+          retainerHours(p) > 0
+            ? `${retainerHours(p)} reserved for retainers first · ${need > 0 ? `${Math.round(need)} still owed` : "nothing on the books"}`
+            : need > 0
+              ? `${Math.round(need)} still owed across the pipeline`
+              : "Nothing on the books",
       },
       {
         label: "Next hearing",
@@ -1768,7 +1971,10 @@ export const lawyer: CareerDef = {
         label: "Costs this week",
         value: money(weekly),
         tone: s.r.cash < weekly * 3 ? "bad" : "neutral",
-        note: "Due whether or not anything settles.",
+        note:
+          retainerIncome(p) > 0
+            ? `Due whether or not anything settles — ${money(retainerIncome(p))} of it is covered by retainers.`
+            : "Due whether or not anything settles.",
       },
     ];
   },

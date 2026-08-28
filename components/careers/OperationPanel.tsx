@@ -14,10 +14,6 @@ import {
   workInProgress,
 } from "@/lib/game/careers/casework";
 import { practice } from "@/lib/game/careers/lawyer";
-import { FounderScreens } from "./FounderScreens";
-import { PoliticianScreens } from "./PoliticianScreens";
-import { ArchitectScreens } from "./ArchitectScreens";
-import { EngineerScreens } from "./EngineerScreens";
 
 /**
  * THE ONE SCREEN A CAREER WITH NO BESPOKE SCREENS HAS
@@ -55,16 +51,6 @@ export function OperationPanel({
 }) {
   if (state.careerId === "lawyer")
     return <PracticePanel state={state} onCommand={onCommand} />;
-  /* The Founder's one screen. Mounted here rather than given its own section
-     set because the career genuinely has one question in it. */
-  if (state.careerId === "founder")
-    return <FounderScreens state={state} onCommand={onCommand} />;
-  if (state.careerId === "politician")
-    return <PoliticianScreens state={state} onCommand={onCommand} />;
-  if (state.careerId === "architect")
-    return <ArchitectScreens state={state} onCommand={onCommand} />;
-  if (state.careerId === "engineer")
-    return <EngineerScreens state={state} onCommand={onCommand} />;
   return null;
 }
 

@@ -168,12 +168,63 @@ body {
   box-shadow: -6px 0 16px -8px var(--dept, transparent);
 }
 
+/*
+ * CAREER ACCENTS (Phase 4).
+ *
+ * One accent per career, carried as raw RGB components so Tailwind can
+ * compose opacity onto them (`border-clinical/60` keeps working). The
+ * `clinical` token in tailwind.config.ts reads these, so all four hundred
+ * call sites re-skin from here — the same trick the light-to-dark swap used.
+ *
+ * The rule the audit set and this file enforces: the accent is *identity* —
+ * the active destination, the primary action, the thing you own. Warning,
+ * failure and success colours are semantic and never vary by career.
+ *
+ * The default is the Physician's teal, which is also the shell's own colour
+ * everywhere no career is signed in (the front door, career select).
+ */
+:root {
+  --accent: 45 212 191;
+  --accent-hover: 94 234 212;
+  --accent-tint: 14 43 44;
+}
+[data-career="chef"] {
+  --accent: 249 115 22;
+  --accent-hover: 251 146 60;
+  --accent-tint: 43 26 14;
+}
+[data-career="lawyer"] {
+  --accent: 214 169 77;
+  --accent-hover: 227 190 108;
+  --accent-tint: 42 34 18;
+}
+[data-career="founder"] {
+  --accent: 139 92 246;
+  --accent-hover: 167 139 250;
+  --accent-tint: 30 23 48;
+}
+[data-career="politician"] {
+  --accent: 129 140 248;
+  --accent-hover: 165 180 252;
+  --accent-tint: 23 27 51;
+}
+[data-career="architect"] {
+  --accent: 76 141 255;
+  --accent-hover: 122 170 255;
+  --accent-tint: 16 32 58;
+}
+[data-career="engineer"] {
+  --accent: 163 230 53;
+  --accent-hover: 190 242 100;
+  --accent-tint: 32 43 16;
+}
+
 /* Credential badge — your post-nominals, lit. */
 .stamp {
-  border: 1px solid rgba(45, 212, 191, 0.4);
+  border: 1px solid rgb(var(--accent) / 0.4);
   border-radius: 999px;
-  color: #2dd4bf;
-  background: rgba(45, 212, 191, 0.09);
+  color: rgb(var(--accent));
+  background: rgb(var(--accent) / 0.09);
 }
 
 /*

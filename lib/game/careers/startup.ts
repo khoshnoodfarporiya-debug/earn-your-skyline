@@ -1,4 +1,6 @@
 import type { StartCity } from "../types";
+import type { PhoneState } from "../medical/types";
+import type { RunState } from "../types";
 
 /**
  * THE VENTURE
@@ -45,6 +47,16 @@ export interface StartupCity extends StartCity {
   /** Desks, weekly. Small next to payroll, and never zero. */
   rent: number;
   /**
+   * How many people in this market would ever pay for the product.
+   *
+   * The balance bots found what its absence meant: word of mouth is
+   * proportional to the users you already have, and with no ceiling that is
+   * an exponential — every city reached the goal, every seed, week after
+   * week of five-per-cent compounding. Growth now slows as the market fills,
+   * which is also simply true of markets.
+   */
+  market: number;
+  /**
    * What it costs you to exist here for a week.
    *
    * Without this the career had no constraint at all for the first act: a
@@ -78,12 +90,13 @@ export const STARTUP_CITIES: StartupCity[] = [
       "Engineers cost half again what they cost anywhere else",
       "Word travels fastest",
     ],
-    difficulty: "even",
+    difficulty: "hard",
     salaryIndex: 1.5,
     capital: 1.45,
     reach: 1.25,
     rent: 900,
     living: 4100,
+    market: 6000,
   },
   {
     id: "london",
@@ -102,6 +115,7 @@ export const STARTUP_CITIES: StartupCity[] = [
     reach: 1.05,
     rent: 650,
     living: 3200,
+    market: 4500,
   },
   {
     id: "berlin",
@@ -120,6 +134,7 @@ export const STARTUP_CITIES: StartupCity[] = [
     reach: 0.9,
     rent: 380,
     living: 2100,
+    market: 3000,
   },
   {
     id: "mumbai",
@@ -133,12 +148,13 @@ export const STARTUP_CITIES: StartupCity[] = [
       "Investors are hardest to reach from here",
       "An enormous market, and everyone is already selling to it",
     ],
-    difficulty: "hard",
+    difficulty: "even",
     salaryIndex: 0.6,
     capital: 0.62,
     reach: 1.0,
     rent: 240,
     living: 1150,
+    market: 8000,
   },
 ];
 
@@ -174,7 +190,7 @@ export const STARTUP_ROLES: StartupRole[] = [
     blurb: "Ships the thing. The only role that makes the product better.",
     salary: 2_600,
     hireCost: 3_000,
-    build: 4.5,
+    build: 1.1,
     sell: 0,
     market: 0,
   },
@@ -185,7 +201,7 @@ export const STARTUP_ROLES: StartupRole[] = [
       "Makes it make sense. Fewer people leave when they can work out what it does.",
     salary: 2_200,
     hireCost: 2_400,
-    build: 2.8,
+    build: 0.7,
     sell: 0,
     market: 0.8,
   },
@@ -218,7 +234,7 @@ export const STARTUP_ROLES: StartupRole[] = [
       "Answers the people you already have, which is why they stay. Cuts churn directly.",
     salary: 1_700,
     hireCost: 1_800,
-    build: 0.6,
+    build: 0.15,
     sell: 0,
     market: 0.6,
   },
@@ -312,6 +328,11 @@ export interface WeekResult {
 }
 
 export interface VentureState {
+  /**
+   * The handset. Optional so a save from before this career had one
+   * still loads; it is created on first touch.
+   */
+  phone?: PhoneState;
   city: string;
   /** Paying customers. The only number investors actually look at. */
   users: number;
@@ -331,7 +352,134 @@ export interface VentureState {
   pitchRound?: string;
   nextId: number;
   lastWeek?: WeekResult;
+  /*
+   * PHASE 5, ALL OPTIONAL: a save written before the product work still
+   * loads, and absence means "never engaged", which costs nothing.
+   */
+  /** 0-100. What you actually know about the people you are building for. */
+  insight?: number;
+  /** 0-100. The corners cut to ship faster, compounding against you. */
+  techDebt?: number;
+  /** The roadmap's current answer to "fast, or right?". Absent = steady. */
+  stance?: RoadmapStance;
+  /** Experiments finished, with the lift each one measured. */
+  experiments?: CompletedExperiment[];
+  /** The one experiment in flight, if any. */
+  experimentRun?: { id: string; started: number };
 }
+
+export type RoadmapStance = "ship" | "steady" | "stability";
+
+/**
+ * THE ROADMAP AS ONE DECISION, HELD RATHER THAN CLICKED
+ *
+ * "Fast, or right?" is the product conversation every real venture has
+ * weekly, and it is a *stance*, not a button: the cost of shipping fast is
+ * invisible the week you choose it and undeniable a quarter later. Ship
+ * multiplies everything built — yours and the team's — and quietly accrues
+ * technical debt; stability builds almost nothing and pays the debt down.
+ * Steady is the default and deliberately neutral, so a founder who never
+ * opens the roadmap plays exactly the venture this career always was.
+ */
+export const STANCES: Record<
+  RoadmapStance,
+  { label: string; blurb: string; buildMult: number; debtPerWeek: number }
+> = {
+  ship: {
+    label: "Ship fast",
+    blurb: "Everything builds a third faster, and the corners you cut stay cut.",
+    buildMult: 1.3,
+    debtPerWeek: 2.4,
+  },
+  steady: {
+    label: "Steady",
+    blurb: "Build at the pace the code can carry. Nothing accrues, nothing heals.",
+    buildMult: 1,
+    debtPerWeek: 0,
+  },
+  stability: {
+    label: "Stability",
+    blurb: "Refactor weeks. Little ships, and the debt comes down.",
+    buildMult: 0.45,
+    debtPerWeek: -3.5,
+  },
+};
+
+export const insightOf = (v: VentureState): number => v.insight ?? 0;
+export const techDebtOf = (v: VentureState): number => v.techDebt ?? 0;
+export const stanceOf = (v: VentureState): RoadmapStance => v.stance ?? "steady";
+export const experimentsOf = (v: VentureState): CompletedExperiment[] =>
+  v.experiments ?? [];
+
+/**
+ * What building is worth this week, per block, yours and the team's alike:
+ * the roadmap's pace times how well you know what to build. Insight is a
+ * bonus and never a tax — at zero it multiplies by exactly one, so a founder
+ * who never interviews builds precisely what they always built.
+ */
+export const buildLiftOf = (v: VentureState): number =>
+  STANCES[stanceOf(v)].buildMult * (1 + insightOf(v) * 0.003);
+
+export interface CompletedExperiment {
+  id: string;
+  week: number;
+  /** The measured relative lift on its funnel stage, e.g. 0.11 for +11%. */
+  lift: number;
+}
+
+export interface ExperimentDef {
+  id: string;
+  label: string;
+  blurb: string;
+  /** Which stage of the funnel the result multiplies. */
+  stage: "visitors" | "trials" | "paying";
+  /** In Lyon money; charged at this city's salary index. */
+  baseCost: number;
+  /** The lift a well-informed venture can expect, before variance. */
+  baseLift: number;
+}
+
+/**
+ * ACQUISITION EXPERIMENTS, RUN ONCE AND MEASURED
+ *
+ * Each is a real project with a real bill, two weeks of waiting, and a
+ * result that is *measured*, not promised: what you know about your
+ * customers (insight) is most of whether the test finds anything. The lift
+ * is permanent — a rebuilt onboarding stays rebuilt — which is why each can
+ * run only once: the second landing-page rewrite is a redesign, not an
+ * experiment.
+ */
+export const EXPERIMENTS: ExperimentDef[] = [
+  {
+    id: "landing",
+    label: "Landing page test",
+    blurb: "Say what the product does, in the words customers used.",
+    stage: "visitors",
+    baseCost: 2_500,
+    baseLift: 0.12,
+  },
+  {
+    id: "onboarding",
+    label: "Onboarding rework",
+    blurb: "Walk the first hour of the product like a stranger would.",
+    stage: "trials",
+    baseCost: 4_000,
+    baseLift: 0.14,
+  },
+  {
+    id: "referral",
+    label: "Referral programme",
+    blurb: "Give the people who stay a reason to say so.",
+    stage: "paying",
+    baseCost: 6_000,
+    baseLift: 0.1,
+  },
+];
+
+export const EXPERIMENT_BY_ID = new Map(EXPERIMENTS.map((e) => [e.id, e]));
+
+export const experimentCost = (v: VentureState, e: ExperimentDef): number =>
+  Math.round(e.baseCost * startupCityOf(v).salaryIndex);
 
 export function initialVenture(): VentureState {
   return {
@@ -420,22 +568,98 @@ export const churnRate = (v: VentureState): number => {
     (n, h) => n + (h.role === "support" ? 0.006 : 0),
     0,
   );
-  return Math.max(0.012, fromProduct - fromSupport);
+  /*
+   * Price pressure. Without this, raising the price was a strict upgrade:
+   * an 18% rise shed 10% of users once, the freed market headroom grew them
+   * back, and the balance bots ratcheted price 65% above base by week 100.
+   * A product priced above what this market considers normal now loses
+   * people every week it stays there — price becomes an equilibrium you
+   * choose, not a lever you crank.
+   */
+  const city = startupCityOf(v);
+  const base = Math.round(24 * (0.8 + city.salaryIndex * 0.25));
+  const fromPrice = Math.max(0, v.price / base - 1) * 0.025;
+  /* Cut corners surface as bugs, and bugs surface as cancellations. Zero
+     debt costs exactly nothing, which keeps an old save's economy intact. */
+  const fromDebt = (techDebtOf(v) / 100) * 0.02;
+  return Math.max(0.012, fromProduct - fromSupport + fromPrice + fromDebt);
 };
 
 /**
- * People who arrive because they heard, not because you asked.
+ * THE ACQUISITION FUNNEL
  *
- * Proportional to brand *and* to the users you already have — word of mouth
- * needs a mouth. A venture with no users and a huge brand still crawls, which
- * is correct and is why pure marketing cannot be the whole strategy.
+ * The same growth the career always had, finally shown as the pipeline it
+ * is: people who *looked*, people who *tried*, people who *paid*. The totals
+ * are calibrated so that a venture with no insight and no experiments gains
+ * exactly what the old one-line formula produced — the funnel is a lens on
+ * the existing economy, plus the two levers the product work adds:
+ *
+ *   - insight lifts the paying rate (you built what they asked for)
+ *   - each finished experiment permanently lifts its own stage
+ *
+ * Visitors remain proportional to brand *and* existing users — word of
+ * mouth needs a mouth — and to the room left in this market.
  */
-export const organicUsers = (v: VentureState): number => {
-  const reach = startupCityOf(v).reach;
-  const base = (v.brand / 100) * 9 * reach;
-  const wordOfMouth = v.users * (v.brand / 100) * 0.05 * reach;
-  return base + wordOfMouth;
-};
+const TRIAL_BASE = 0.52;
+const BUY_BASE = 0.24;
+
+export function funnelOf(v: VentureState): {
+  visitors: number;
+  trialRate: number;
+  buyRate: number;
+  trials: number;
+  gained: number;
+} {
+  const city = startupCityOf(v);
+  const headroom = Math.max(0, 1 - v.users / city.market);
+  const reached =
+    ((v.brand / 100) * 9 * city.reach +
+      v.users * (v.brand / 100) * 0.05 * city.reach) *
+    headroom;
+
+  let visitorLift = 1;
+  let trialLift = 1;
+  let buyLift = 1 + insightOf(v) * 0.0015;
+  for (const done of experimentsOf(v)) {
+    const def = EXPERIMENT_BY_ID.get(done.id);
+    if (!def) continue;
+    if (def.stage === "visitors") visitorLift *= 1 + done.lift;
+    if (def.stage === "trials") trialLift *= 1 + done.lift;
+    if (def.stage === "paying") buyLift *= 1 + done.lift;
+  }
+
+  const visitors = (reached / (TRIAL_BASE * BUY_BASE)) * visitorLift;
+  const trialRate = TRIAL_BASE * trialLift;
+  const buyRate = BUY_BASE * buyLift;
+  const trials = visitors * trialRate;
+  return { visitors, trialRate, buyRate, trials, gained: trials * buyRate };
+}
+
+/** People who arrive because they heard, not because you asked — the bottom
+    of the funnel, kept under its old name for every existing caller. */
+export const organicUsers = (v: VentureState): number => funnelOf(v).gained;
+
+/**
+ * What one customer is worth against what keeping them costs — the unit
+ * economics investors actually read. Margin is weekly price share minus the
+ * infrastructure a user consumes (dearer as debt accrues); lifetime is the
+ * reciprocal of churn.
+ */
+export function unitEconomicsOf(v: VentureState): {
+  weeklyMargin: number;
+  weeksRetained: number;
+  lifetimeValue: number;
+} {
+  const weeklyPrice = v.price / 4.33;
+  const infraPerUser = 0.35 * (1 + techDebtOf(v) / 250);
+  const weeklyMargin = weeklyPrice - infraPerUser;
+  const weeksRetained = 1 / churnRate(v);
+  return {
+    weeklyMargin,
+    weeksRetained,
+    lifetimeValue: weeklyMargin * weeksRetained,
+  };
+}
 
 /** Brand is a stock, and stocks leak. Nothing you did last month still works. */
 export const BRAND_DECAY = 0.06;
@@ -469,7 +693,16 @@ export const teamOutput = (
  */
 export const valuationOf = (v: VentureState): number => {
   const annual = revenueOf(v) * 52;
-  const multiple = 4 + (Math.min(100, v.product) / 100) * 4;
+  /*
+   * A modest multiple, deliberately: 1.5x to 3x annual revenue as the
+   * product matures. The old 4x-8x was VC paper, and against a goal shared
+   * with careers that count hard assets it made the bots reach in every
+   * city, every seed, by week 65 — the balance trace showed an $18M
+   * "valuation" on four thousand customers. The implied-by-round floor
+   * still gives a freshly funded company its post-money story; it just no
+   * longer compounds into a win by itself.
+   */
+  const multiple = 1.5 + (Math.min(100, v.product) / 100) * 1.5;
   const fromRevenue = annual * multiple;
   const lastRound = v.roundsClosed.length
     ? (ROUND_BY_ID.get(v.roundsClosed[v.roundsClosed.length - 1])?.amount ?? 0)
@@ -556,3 +789,14 @@ export const runwayLabel = (cash: number, v: VentureState): string => {
   if (weeks < 1) return "Under a week";
   return `${Math.floor(weeks)} week${Math.floor(weeks) === 1 ? "" : "s"}`;
 };
+
+/**
+ * This career's slice of the run.
+ *
+ * It lives here rather than beside the CareerDef because it is about
+ * the *state shape*, and because anything that needs it — the event
+ * catalogue, the voice pack — would otherwise have to import the
+ * career module and form an import cycle with it.
+ */
+export const venture = (s: RunState): VentureState =>
+  s.data.venture as VentureState;

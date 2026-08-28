@@ -35,7 +35,7 @@ import {
 import { nextStep } from "../lib/ui/guidance";
 import { glossaryFor } from "../lib/ui/glossary";
 import { deriveAlerts } from "../lib/ui/alerts";
-import { lessonFor, lessonStatus } from "../lib/ui/onboarding";
+import { lessonFor, lessonStatus, lessonOrderFor, LESSONS } from "../lib/ui/onboarding";
 import {
   defaultScreen,
   screenOf,
@@ -67,7 +67,15 @@ import {
   overallReputation,
 } from "../lib/game/reputation";
 import { CHAIN_EVENTS } from "../lib/game/medical/chains";
-import { SAVE_KEYS, migrateRun, validateRun } from "../lib/game/save";
+import {
+  SAVE_KEYS,
+  loadArchive,
+  migrateRun,
+  saveArchive,
+  setSaveScope,
+  validateRun,
+} from "../lib/game/save";
+import { validatePhone } from "../lib/game/phone/validate";
 import {
   MAX_SETBACKS,
   RECOVERY,
@@ -319,43 +327,77 @@ import {
 } from "../lib/game/careers/chef";
 import { engineer, workshop } from "../lib/game/careers/engineer";
 import {
+  ARCHITECTURES,
+  PRODUCT_BY_ID as ENGINE_KIND_BY_ID,
+  RIGS,
   WORKSHOP_CITY_BY_ID,
+  benchOf,
+  benchWages,
   buildableKinds,
   confidenceOf,
+  designNeededFor,
   estimateOf,
+  faultCost,
+  prototypeCost,
   revenueOf as productRevenue,
+  rigCost,
+  rigsOf,
   surfaceChance,
+  testYieldFor,
 } from "../lib/game/careers/workshop";
 import { architect, studio } from "../lib/game/careers/architect";
 import {
+  BRIEFS,
   KIND_BY_ID,
+  STAGES as DESIGN_STAGES,
+  budgetLoad,
   competitionOdds,
+  consentCost,
   feeFor,
   offerableKinds,
+  overBudget,
   revisionDepth,
   revisionRisk,
   stageOf as buildStage,
+  stageWeeks,
+  stageWeeksOf,
 } from "../lib/game/careers/studio";
 import { politician, campaign } from "../lib/game/careers/politician";
 import {
   BLOCS,
+  FOCUS_GROUP_COST,
   ISSUES,
   blocWeight,
+  constituentsOf,
+  gotvBonus,
   leanOf,
+  pollBandOf,
   projectedShare,
+  recordOf,
   selectionBlocker,
   survivesToPoll,
+  volunteerLift,
+  volunteersOf,
+  warchestOf,
 } from "../lib/game/careers/constituency";
 import { founder, venture } from "../lib/game/careers/founder";
 import {
+  EXPERIMENTS,
   ROUND_BY_ID,
   burnOf,
   churnRate as ventureChurn,
   defaultAlive,
+  experimentCost,
+  experimentsOf,
+  funnelOf,
+  insightOf,
   revenueOf,
   roundBlocker,
   runwayLabel,
   runwayOf,
+  startupCityOf,
+  stanceOf,
+  techDebtOf,
 } from "../lib/game/careers/startup";
 import {
   INGREDIENT_BY_ID,
@@ -482,7 +524,14 @@ import {
   COUNSEL,
   COUNSEL_ODDS,
   LEGAL_PREMISES,
+  MAX_RETAINERS,
   PREMISES_BY_ID,
+  RETAINERS,
+  RETAINER_BY_ID,
+  retainerHours,
+  retainerIncome,
+  retainerOffersOf,
+  retainersOf,
   chambersOf,
   chambersPrice,
   chambersSeats,
@@ -7180,10 +7229,19 @@ console.log("\nThe Founder\n" + "───────────────�
       run(grind, 140) < run(grind, 60) * 1.15,
       `${Math.round(run(grind, 60))} at week 60, ${Math.round(run(grind, 140))} at 140`,
     );
+    /*
+     * The original claim here was "compounding does not plateau", and the
+     * market-saturation change falsified it on purpose: word of mouth needs
+     * somebody left to tell, so growth now tapers as the market fills. The
+     * design claim that survives — and the one that matters — is that
+     * compounding still ends far above what grinding ever reaches, and is
+     * still growing at the horizon rather than flat.
+     */
     check(
-      "compounding does not",
-      run(compound, 140) > run(compound, 60) * 5,
-      `${Math.round(run(compound, 60))} at week 60, ${Math.round(run(compound, 140))} at 140`,
+      "compounding still ends far above the grind, and is still moving",
+      run(compound, 140) > run(grind, 140) * 3 &&
+        run(compound, 140) > run(compound, 60) * 2,
+      `grind ${Math.round(run(grind, 140))}, compound ${Math.round(run(compound, 60))} -> ${Math.round(run(compound, 140))}`,
     );
   }
 
@@ -7341,6 +7399,192 @@ console.log("\nThe Founder\n" + "───────────────�
       "no medical, kitchen or legal vocabulary reaches the Founder",
       !/patient|clinic|covers|larder|brigade|hearing|counsel|chambers/i.test(text),
     );
+  }
+
+  /*
+   * THE PRODUCT SLICE (Phase 5): discovery, the roadmap, the funnel and its
+   * experiments. The first claim is the one everything else leans on — that
+   * a founder who touches none of it plays exactly the venture that shipped
+   * before it existed.
+   */
+  {
+    /* -------------------------------------------- the compatibility proof */
+    {
+      let f = startF(31);
+      for (let i = 0; i < 8; i++)
+        f = advanceWeek(founder, f, { market: 2, sell: 2, build: 2 }).state;
+      const v = venture(f);
+      const city = startupCityOf(v);
+      /* The pre-funnel formula, recomputed here from first principles. */
+      const headroom = Math.max(0, 1 - v.users / city.market);
+      const old =
+        ((v.brand / 100) * 9 * city.reach +
+          v.users * (v.brand / 100) * 0.05 * city.reach) *
+        headroom;
+      check(
+        "an untouched venture gains exactly what the old formula paid",
+        Math.abs(funnelOf(v).gained - old) < 1e-9,
+        `funnel ${funnelOf(v).gained.toFixed(6)} vs formula ${old.toFixed(6)}`,
+      );
+      check(
+        "and carries no debt, no insight and a steady roadmap",
+        techDebtOf(v) === 0 &&
+          insightOf(v) === 0 &&
+          stanceOf(v) === "steady",
+      );
+    }
+
+    /* ------------------------------------------------------- the roadmap */
+    {
+      let f = runCommand(founder, startF(32), "setRoadmap", "ship");
+      check(
+        "the roadmap takes an answer",
+        stanceOf(venture(f)) === "ship",
+      );
+      const garbage = runCommand(founder, f, "setRoadmap", "yolo");
+      check(
+        "and refuses a pace it does not know",
+        stanceOf(venture(garbage)) === "ship",
+      );
+      for (let i = 0; i < 6; i++)
+        f = advanceWeek(founder, f, { build: 4 }).state;
+      const debtAfterShip = techDebtOf(venture(f));
+      check(
+        "shipping fast accrues technical debt",
+        debtAfterShip > 10,
+        `${debtAfterShip.toFixed(1)} after six weeks`,
+      );
+      check(
+        "which raises churn above the same venture clean",
+        ventureChurn(venture(f)) >
+          ventureChurn({ ...venture(f), techDebt: 0 }),
+      );
+      f = runCommand(founder, f, "setRoadmap", "stability");
+      for (let i = 0; i < 6; i++)
+        f = advanceWeek(founder, f, { build: 4 }).state;
+      check(
+        "and stability weeks pay it back down",
+        techDebtOf(venture(f)) < debtAfterShip,
+        `${debtAfterShip.toFixed(1)} -> ${techDebtOf(venture(f)).toFixed(1)}`,
+      );
+    }
+
+    /* ----------------------------------------------------------- discovery */
+    {
+      const before = startF(33);
+      const talked = advanceWeek(founder, before, { interview: 3 }).state;
+      check(
+        "talking to customers raises insight",
+        insightOf(venture(talked)) > 10,
+        `${insightOf(venture(talked)).toFixed(1)}`,
+      );
+      /* Build the same week from the same state, with and without insight:
+         the informed build must land more product. */
+      const clean = advanceWeek(founder, startF(33), { build: 4 }).state;
+      const informed = advanceWeek(founder, talked, { build: 4 }).state;
+      const cleanGain = venture(clean).product - venture(before).product;
+      const informedGain =
+        venture(informed).product - venture(talked).product;
+      check(
+        "and building with insight lands more product per block",
+        informedGain > cleanGain,
+        `${informedGain.toFixed(2)} vs ${cleanGain.toFixed(2)}`,
+      );
+      check(
+        "insight fades when you stop asking",
+        insightOf(venture(informed)) < insightOf(venture(talked)),
+      );
+    }
+
+    /* --------------------------------------------------------- experiments */
+    {
+      const def = EXPERIMENTS[0];
+      let f = startF(34);
+      const poor = { ...f, r: { ...f.r, cash: 10 } };
+      check(
+        "an experiment the account cannot cover is refused",
+        venture(runCommand(founder, poor, "runExperiment", def.id))
+          .experimentRun === undefined,
+      );
+      const cost = experimentCost(venture(f), def);
+      const cashBefore = f.r.cash;
+      f = runCommand(founder, f, "runExperiment", def.id);
+      check(
+        "an affordable one is charged exactly its bill",
+        cashBefore - f.r.cash === cost &&
+          venture(f).experimentRun?.id === def.id,
+      );
+      check(
+        "and a second test cannot start while it runs",
+        venture(
+          runCommand(founder, f, "runExperiment", EXPERIMENTS[1].id),
+        ).experimentRun?.id === def.id,
+      );
+      const gainedBefore = funnelOf({ ...venture(f), brand: 40, users: 50 })
+        .gained;
+      for (let i = 0; i < 3; i++)
+        f = advanceWeek(founder, f, { build: 2, rest: 1 }).state;
+      const doneList = experimentsOf(venture(f));
+      check(
+        "it reads out after two weeks with a measured lift",
+        venture(f).experimentRun === undefined &&
+          doneList.length === 1 &&
+          doneList[0].lift > 0,
+        JSON.stringify(doneList),
+      );
+      check(
+        "the lift is permanent on its stage of the funnel",
+        funnelOf({ ...venture(f), brand: 40, users: 50 }).gained >
+          gainedBefore,
+      );
+      check(
+        "and the same experiment cannot run twice",
+        venture(runCommand(founder, f, "runExperiment", def.id))
+          .experimentRun === undefined,
+      );
+    }
+
+    /* --------------------------------------------- saves that lie, again */
+    {
+      const good = startF(35);
+      const asOld = JSON.parse(JSON.stringify(good.data)) as {
+        venture: Record<string, unknown>;
+      };
+      delete asOld.venture.insight;
+      delete asOld.venture.techDebt;
+      delete asOld.venture.stance;
+      delete asOld.venture.experiments;
+      delete asOld.venture.experimentRun;
+      check(
+        "a save from before the product work still validates",
+        founder.validateData!(asOld) === true,
+      );
+      const wreck = (fn: (v: Record<string, unknown>) => void) => {
+        const copy = JSON.parse(JSON.stringify(good.data)) as {
+          venture: Record<string, unknown>;
+        };
+        fn(copy.venture);
+        return founder.validateData!(copy);
+      };
+      check(
+        "a roadmap pace the game never wrote is rejected",
+        !wreck((v) => {
+          v.stance = "yolo";
+        }),
+      );
+      check(
+        "an insight beyond its scale is rejected",
+        !wreck((v) => {
+          v.insight = 150;
+        }),
+      );
+      check(
+        "an experiment the catalogue does not know is rejected",
+        !wreck((v) => {
+          v.experiments = [{ id: "growth-hack", week: 4, lift: 0.5 }];
+        }),
+      );
+    }
   }
 }
 
@@ -7626,6 +7870,226 @@ console.log("\nThe Politician\n" + "──────────────�
       "no other career\u2019s language reaches the Politician",
       !/patient|clinic|covers|larder|brigade|runway|churn|chambers/i.test(text),
     );
+  }
+
+  /*
+   * THE GROUND GAME (Phase 5): the postbag, the volunteers, the fund and
+   * the band. First claim first: a campaign that touches none of it counts
+   * exactly the votes it always counted.
+   */
+  {
+    /* -------------------------------------------- the compatibility proof */
+    {
+      let f = startP(41);
+      for (let i = 0; i < 8; i++)
+        f = advanceWeek(politician, f, { canvass: 2, party: 2, media: 1, rest: 1 }).state;
+      const c = campaign(f);
+      check(
+        "an untouched campaign carries no record, no volunteers, no fund",
+        Object.keys(recordOf(c)).length === 0 &&
+          volunteersOf(c) === 0 &&
+          warchestOf(c) === 0,
+      );
+      check(
+        "the post still arrives, and ignoring it moves nothing",
+        (() => {
+          /* The lean must be exactly the seat's positions-only lean: the
+             desk fills and expires without a point changing hands. */
+          const withDesk = leanOf(c);
+          const bare = leanOf({ ...c, constituents: undefined, record: undefined });
+          return Object.keys(withDesk).every(
+            (b) => Math.abs(withDesk[b] - (bare[b] ?? 0)) < 1e-12,
+          );
+        })(),
+      );
+      check(
+        "and canvassing lifts exactly what it always lifted",
+        Math.abs(volunteerLift(c) - 1) < 1e-12 && gotvBonus(c) === 0,
+      );
+    }
+
+    /* ------------------------------------------------------- the postbag */
+    {
+      let f = startP(42);
+      /* Let the post arrive. */
+      for (let i = 0; i < 4; i++)
+        f = advanceWeek(politician, f, { party: 2, rest: 1 }).state;
+      const before = campaign(f);
+      const open = constituentsOf(before);
+      check(
+        "named constituents arrive with names, blocs and deadlines",
+        open.length > 0 &&
+          open.every(
+            (k) => k.name.length > 0 && k.deadline > k.arrived,
+          ),
+        `${open.length} on the desk`,
+      );
+      const first = open[0];
+      const worked = advanceWeek(politician, f, { casework: 1, rest: 2 }).state;
+      const c2 = campaign(worked);
+      check(
+        "a surgery block settles the oldest case",
+        !constituentsOf(c2).some((k) => k.id === first.id),
+      );
+      check(
+        "and the delivered case moves that bloc's lean, permanently",
+        (recordOf(c2)[first.bloc] ?? 0) > 0 &&
+          (leanOf(c2)[first.bloc] ?? 0) >
+            (leanOf({ ...c2, record: undefined })[first.bloc] ?? 0),
+      );
+      check(
+        "the record is capped — delivery cannot buy a bloc outright",
+        (() => {
+          const stuffed = {
+            ...c2,
+            record: { [first.bloc]: 500 },
+          };
+          const lean = leanOf(stuffed)[first.bloc] ?? 0;
+          const bare = leanOf({ ...c2, record: undefined })[first.bloc] ?? 0;
+          return lean - bare <= 12 + 1e-9;
+        })(),
+      );
+    }
+
+    /* ------------------------------------- volunteers, and what they carry */
+    {
+      let f = startP(43);
+      for (let i = 0; i < 5; i++)
+        f = advanceWeek(politician, f, { organise: 2, rest: 1 }).state;
+      const c = campaign(f);
+      check(
+        "organising builds a volunteer base",
+        volunteersOf(c) > 20,
+        `${volunteersOf(c).toFixed(1)}`,
+      );
+      check(
+        "which amplifies canvassing and knocks doors on the day",
+        volunteerLift(c) > 1.05 && gotvBonus(c) > 0,
+      );
+      const idle = advanceWeek(politician, f, { rest: 1 }).state;
+      check(
+        "and drifts away untended, like everything else here",
+        volunteersOf(campaign(idle)) < volunteersOf(c),
+      );
+    }
+
+    /* ------------------------------------------------ the fund's own rules */
+    {
+      let f = startP(44);
+      const cashBefore = f.r.cash;
+      f = advanceWeek(politician, f, { fundraise: 3, rest: 1 }).state;
+      const c = campaign(f);
+      check(
+        "fundraising fills the fund, not your pocket",
+        warchestOf(c) > 500 && f.r.cash < cashBefore,
+        `fund ${warchestOf(c)}, cash ${f.r.cash - cashBefore}`,
+      );
+      /* A funded week of canvassing must end richer than the same week
+         with the fund emptied: the fund reimburses the campaign's costs. */
+      const funded = advanceWeek(politician, f, { canvass: 3, rest: 1 }).state;
+      check(
+        "and it reimburses the week's campaigning",
+        (() => {
+          const paid = JSON.parse(JSON.stringify(f)) as typeof f;
+          (paid.data as { campaign: { warchest?: number } }).campaign.warchest = 0;
+          const unfunded = advanceWeek(politician, paid, { canvass: 3, rest: 1 }).state;
+          return funded.r.cash > unfunded.r.cash;
+        })(),
+      );
+      check(
+        "a focus group is paid from the fund and nowhere else",
+        (() => {
+          const cash = f.r.cash;
+          const g = runCommand(politician, f, "focusGroup", "");
+          return (
+            g.r.cash === cash &&
+            warchestOf(campaign(g)) === warchestOf(c) - FOCUS_GROUP_COST &&
+            (campaign(g).focusUntil ?? 0) > f.week
+          );
+        })(),
+      );
+      check(
+        "and an empty fund cannot buy one",
+        (() => {
+          const broke = JSON.parse(JSON.stringify(f)) as typeof f;
+          (broke.data as { campaign: { warchest?: number } }).campaign.warchest = 100;
+          const g = runCommand(politician, broke, "focusGroup", "");
+          return campaign(g).focusUntil === undefined;
+        })(),
+      );
+    }
+
+    /* ------------------------------------------------------------ the band */
+    {
+      const f = startP(45);
+      const c = campaign(f);
+      const far = pollBandOf(c, 1);
+      const near = pollBandOf(c, c.electionWeek);
+      check(
+        "the count tightens as polling day approaches",
+        far > near && near >= 1,
+        `±${far.toFixed(1)} far out, ±${near.toFixed(1)} on the day`,
+      );
+      check(
+        "and a fresh focus group tightens it further",
+        pollBandOf({ ...c, focusUntil: 10 }, 5) < pollBandOf(c, 5),
+      );
+      check(
+        "the briefing states the band, not false precision",
+        JSON.stringify(politician.briefing(f, {})).includes("±"),
+      );
+    }
+
+    /* --------------------------------------------- saves that lie, again */
+    {
+      const good = startP(46);
+      const asOld = JSON.parse(JSON.stringify(good.data)) as {
+        campaign: Record<string, unknown>;
+      };
+      delete asOld.campaign.constituents;
+      delete asOld.campaign.record;
+      delete asOld.campaign.volunteers;
+      delete asOld.campaign.warchest;
+      delete asOld.campaign.focusUntil;
+      check(
+        "a save from before the ground game still validates",
+        politician.validateData!(asOld) === true,
+      );
+      const wreck = (fn: (c: Record<string, unknown>) => void) => {
+        const copy = JSON.parse(JSON.stringify(good.data)) as {
+          campaign: Record<string, unknown>;
+        };
+        fn(copy.campaign);
+        return politician.validateData!(copy);
+      };
+      check(
+        "a case from a bloc the seat has never heard of is rejected",
+        !wreck((c) => {
+          c.constituents = [
+            {
+              id: "x",
+              name: "Mr. Nobody",
+              bloc: "lizards",
+              matter: "everything",
+              arrived: 1,
+              deadline: 6,
+            },
+          ];
+        }),
+      );
+      check(
+        "a negative fund is rejected",
+        !wreck((c) => {
+          c.warchest = -400;
+        }),
+      );
+      check(
+        "a record entry that is not a number is rejected",
+        !wreck((c) => {
+          c.record = { retired: "lots" };
+        }),
+      );
+    }
   }
 }
 
@@ -7928,6 +8392,192 @@ console.log("\nThe Architect\n" + "───────────────
       "no other career\u2019s language reaches the Architect",
       !/patient|clinic|covers|larder|brigade|runway|churn|polling|bloc/i.test(text),
     );
+  }
+
+  /*
+   * THE BRIEF, THE COMMITTEE, THE COST PLAN AND THE PALETTE (Phase 5).
+   * First claim first: a commission that chooses none of it draws, banks
+   * and risks exactly what it always did.
+   */
+  {
+    /* -------------------------------------------- the compatibility proof */
+    {
+      const f = withJob(90);
+      const a = studio(f);
+      const c = a.commissions[0];
+      const kind = KIND_BY_ID.get(c.kind)!;
+      check(
+        "an unbriefed commission draws to exactly the old stage lengths",
+        DESIGN_STAGES.every(
+          (st) => stageWeeksOf(c, kind, st) === Math.round(stageWeeks(kind, st)),
+        ),
+      );
+      check(
+        "and a programme brief genuinely shortens a real stage",
+        /* On a big job — a two-week stage on an extension rounds back to
+           two, which is honest: no brief makes a small job much faster. */
+        (() => {
+          const tower = KIND_BY_ID.get("tower")!;
+          return (
+            stageWeeksOf({ ...c, brief: "programme" }, tower, DESIGN_STAGES[2]) <
+            stageWeeksOf(c, tower, DESIGN_STAGES[2])
+          );
+        })(),
+      );
+      check(
+        "and exactly the risk it always had",
+        Math.abs(
+          revisionRisk(a, c, f.week) -
+            revisionRisk(a, { ...c, brief: undefined }, f.week),
+        ) < 1e-12 && budgetLoad(c) === 0,
+      );
+    }
+
+    /* ---------------------------------------------------------- the brief */
+    {
+      const f = withJob(91);
+      const id = studio(f).commissions[0].id;
+      const g = runCommand(architect, f, "setBrief", `${id}:signature`);
+      const c = studio(g).commissions[0];
+      check(
+        "a brief can be agreed at concept",
+        c.brief === "signature",
+      );
+      check(
+        "and it is binding — the meeting does not repeat",
+        studio(runCommand(architect, g, "setBrief", `${id}:economy`))
+          .commissions[0].brief === "signature",
+      );
+      check(
+        "signature pays better and risks more; economy the reverse",
+        BRIEFS.signature.fee > 1 &&
+          BRIEFS.signature.risk > 1 &&
+          BRIEFS.economy.fee < 1 &&
+          BRIEFS.economy.risk < 1,
+      );
+      check(
+        "a signature scheme runs the same drawing risk higher",
+        revisionRisk(studio(g), c, g.week) >
+          revisionRisk(studio(f), studio(f).commissions[0], f.week),
+      );
+      check(
+        "and garbage is refused",
+        studio(runCommand(architect, f, "setBrief", `${id}:vibes`))
+          .commissions[0].brief === undefined,
+      );
+    }
+
+    /* ------------------------------------------------------ the committee */
+    {
+      const f = withJob(92);
+      const a = studio(f);
+      const id = a.commissions[0].id;
+      const kind = KIND_BY_ID.get(a.commissions[0].kind)!;
+      const cost = consentCost(a, kind);
+      const cashBefore = f.r.cash;
+      let g = runCommand(architect, f, "lodgeConsent", id);
+      check(
+        "lodging planning costs real money and starts the clock",
+        cashBefore - g.r.cash === cost &&
+          studio(g).commissions[0].consent === "lodged",
+      );
+      /* Walk weeks until the committee answers. Deterministic per seed. */
+      let guard = 0;
+      while (
+        studio(g).commissions[0].consent === "lodged" &&
+        guard++ < 12
+      ) {
+        g = advanceWeek(architect, g, { client: 1, rest: 2 }).state;
+      }
+      const c = studio(g).commissions[0];
+      check(
+        "the committee eventually answers, and the answer is consent",
+        c.consent === "granted",
+      );
+      check(
+        "which halves the revision maths for good",
+        revisionRisk(studio(g), c, g.week) <
+          revisionRisk(studio(g), { ...c, consent: undefined }, g.week) * 0.6,
+      );
+    }
+
+    /* ------------------------------------------- the cost plan and the VE */
+    {
+      const f = withJob(93);
+      const id = studio(f).commissions[0].id;
+      let g = runCommand(architect, f, "setBrief", `${id}:signature`);
+      g = runCommand(architect, g, "chooseMaterial", `${id}:steel`);
+      const c = studio(g).commissions[0];
+      check(
+        "a signature scheme in steel is over budget",
+        overBudget(c),
+        `load ${budgetLoad(c).toFixed(2)}`,
+      );
+      check(
+        "value engineering is refused while the design is still young",
+        studio(runCommand(architect, g, "valueEngineer", id)).commissions[0]
+          .valueEngineered !== true,
+      );
+      const later = {
+        ...g,
+        data: JSON.parse(JSON.stringify(g.data)) as typeof g.data,
+      };
+      (later.data as { studio: { commissions: { stage: number }[] } }).studio
+        .commissions[0].stage = 2;
+      const ve = runCommand(architect, later, "valueEngineer", id);
+      const cv = studio(ve).commissions[0];
+      check(
+        "at technical design it is allowed, and it works",
+        cv.valueEngineered === true && !overBudget(cv),
+      );
+      check(
+        "an over-budget scheme fights at tender; a value-engineered one does not",
+        (() => {
+          const atTender = { ...c, stage: 3 };
+          const veAtTender = { ...cv, stage: 3 };
+          return (
+            revisionRisk(studio(g), atTender, g.week) >
+            revisionRisk(studio(ve), veAtTender, ve.week)
+          );
+        })(),
+      );
+    }
+
+    /* --------------------------------------------- saves that lie, again */
+    {
+      const good = withJob(94);
+      const wreck = (fn: (c: Record<string, unknown>) => void) => {
+        const copy = JSON.parse(JSON.stringify(good.data)) as {
+          studio: { commissions: Record<string, unknown>[] };
+        };
+        fn(copy.studio.commissions[0]);
+        return architect.validateData!(copy);
+      };
+      check(
+        "a commission from before any of this still validates",
+        architect.validateData!(
+          JSON.parse(JSON.stringify(good.data)),
+        ) === true,
+      );
+      check(
+        "a brief the meeting never offered is rejected",
+        !wreck((c) => {
+          c.brief = "vibes";
+        }),
+      );
+      check(
+        "a palette the catalogue does not know is rejected",
+        !wreck((c) => {
+          c.material = "plutonium";
+        }),
+      );
+      check(
+        "a consent state that is not a state is rejected",
+        !wreck((c) => {
+          c.consent = "bribed";
+        }),
+      );
+    }
   }
 }
 
@@ -8236,6 +8886,585 @@ console.log("\nThe Engineer\n" + "───────────────�
         shown,
       ),
     );
+  }
+
+  /*
+   * THE SPEC, THE ARCHITECTURE, THE LAB AND THE DISCIPLINES (Phase 5).
+   * First claim first: a product that chose nothing designs, earns and
+   * fails at exactly the old numbers.
+   */
+  {
+    /* -------------------------------------------- the compatibility proof */
+    {
+      const f = designed(60);
+      const w = workshop(f);
+      const p0 = w.products[0];
+      const kind = ENGINE_KIND_BY_ID.get(p0.kind)!;
+      check(
+        "an unnegotiated product needs exactly the old design weeks",
+        designNeededFor(p0, kind) === kind.designWeeks,
+      );
+      check(
+        "yields exactly the old testing",
+        Math.abs(testYieldFor(w, p0) - testYieldFor({ ...w, rigs: [] }, p0)) <
+          1e-12,
+      );
+      check(
+        "and fails at exactly the old price",
+        faultCost(w, { ...p0, stage: "shipped", reach: 0.5 }) ===
+          faultCost(w, {
+            ...p0,
+            stage: "shipped",
+            reach: 0.5,
+            architecture: undefined,
+          }),
+      );
+    }
+
+    /* --------------------------------------------------------- the spec */
+    {
+      let f = startE(61);
+      f = runCommand(engineer, f, "startProduct", "bracket");
+      const id = workshop(f).products[0].id;
+      const g = runCommand(engineer, f, "setSpec", `${id}:hardened`);
+      const p0 = workshop(g).products[0];
+      const kind = ENGINE_KIND_BY_ID.get(p0.kind)!;
+      check(
+        "requirements can be hardened while designing",
+        p0.spec === "hardened" &&
+          designNeededFor(p0, kind) > kind.designWeeks,
+      );
+      check(
+        "and the negotiation does not repeat",
+        workshop(runCommand(engineer, g, "setSpec", `${id}:lean`))
+          .products[0].spec === "hardened",
+      );
+      /* Design BOTH to completion: what matters is what each spec ships
+         with, not the per-week rate — an earlier cut of the numbers had
+         the two cancelling almost exactly, and this is the test that
+         noticed. */
+      const lean = runCommand(engineer, f, "setSpec", `${id}:lean`);
+      let a = g;
+      let b = lean;
+      for (let i = 0; i < 8; i++) {
+        a = advanceWeek(engineer, a, { design: 4 }).state;
+        b = advanceWeek(engineer, b, { design: 4 }).state;
+      }
+      check(
+        "a lean product finishes design dirtier than a hardened one",
+        workshop(b).products[0].latent > workshop(a).products[0].latent,
+        `lean ${workshop(b).products[0].latent.toFixed(1)} vs hardened ${workshop(a).products[0].latent.toFixed(1)}`,
+      );
+      check(
+        "garbage requirements are refused",
+        workshop(runCommand(engineer, f, "setSpec", `${id}:vibes`))
+          .products[0].spec === undefined,
+      );
+    }
+
+    /* --------------------------------------------------- the architecture */
+    {
+      let f = startE(62);
+      f = runCommand(engineer, f, "startProduct", "bracket");
+      const id = workshop(f).products[0].id;
+      const g = runCommand(engineer, f, "setArchitecture", `${id}:modular`);
+      const w = workshop(g);
+      const p0 = w.products[0];
+      check(
+        "a modular product strips faster on the rig and fails cheaper",
+        testYieldFor(w, p0) > testYieldFor(w, { ...p0, architecture: undefined }) &&
+          faultCost(w, { ...p0, stage: "shipped", reach: 0.5 }) <
+            faultCost(w, {
+              ...p0,
+              stage: "shipped",
+              reach: 0.5,
+              architecture: undefined,
+            }),
+      );
+      check(
+        "integrated earns the premium instead",
+        ARCHITECTURES.integrated.revenue > 1 &&
+          ARCHITECTURES.integrated.fault > 1,
+      );
+      check(
+        "and the decision is closed once made",
+        workshop(runCommand(engineer, g, "setArchitecture", `${id}:integrated`))
+          .products[0].architecture === "modular",
+      );
+    }
+
+    /* ------------------------------------------------ the lab and the bench */
+    {
+      let f = designed(63);
+      const w0 = workshop(f);
+      const rig = RIGS[0];
+      const cost = rigCost(w0, rig);
+      const cashBefore = f.r.cash;
+      f = runCommand(engineer, f, "buyRig", rig.id);
+      check(
+        "a rig is bought once, at the stated price",
+        cashBefore - f.r.cash === cost && rigsOf(workshop(f)).includes(rig.id),
+      );
+      check(
+        "and cannot be bought twice",
+        runCommand(engineer, f, "buyRig", rig.id).r.cash === f.r.cash,
+      );
+      check(
+        "the thermal chamber makes every test week remove more",
+        testYieldFor(workshop(f), workshop(f).products[0]) >
+          testYieldFor({ ...workshop(f), rigs: [] }, workshop(f).products[0]),
+      );
+
+      f = runCommand(engineer, f, "hireBench", "mechanical");
+      check(
+        "a discipline joins the bench and is paid weekly",
+        benchOf(workshop(f)).length === 1 && benchWages(workshop(f)) > 0,
+      );
+      check(
+        "one of each discipline, at most",
+        benchOf(workshop(runCommand(engineer, f, "hireBench", "mechanical")))
+          .length === 1,
+      );
+      /* The bench works: a fresh product designs faster with a mechanical
+         engineer than without one. */
+      let withTeam = runCommand(engineer, f, "startProduct", "bracket");
+      const fresh = workshop(withTeam).products.find((x) => x.design === 0)!;
+      withTeam = runCommand(engineer, withTeam, "focusProduct", fresh.id);
+      const solo = JSON.parse(JSON.stringify(withTeam)) as typeof withTeam;
+      (solo.data as { workshop: { team: unknown[] } }).workshop.team = [];
+      const wk1 = advanceWeek(engineer, withTeam, { design: 2, rest: 1 }).state;
+      const wk2 = advanceWeek(engineer, solo, { design: 2, rest: 1 }).state;
+      check(
+        "and the bench genuinely designs",
+        workshop(wk1).products.find((x) => x.id === fresh.id)!.design >
+          workshop(wk2).products.find((x) => x.id === fresh.id)!.design,
+      );
+    }
+
+    /* ------------------------------------------------------ the prototype */
+    {
+      let f = designed(64);
+      const w = workshop(f);
+      const id = w.products[0].id;
+      const kind = ENGINE_KIND_BY_ID.get(w.products[0].kind)!;
+      const cost = prototypeCost(w, kind);
+      const estBefore = estimateOf(w.products[0]);
+      const cashBefore = f.r.cash;
+      f = runCommand(engineer, f, "buildPrototype", id);
+      const p0 = workshop(f).products[0];
+      const estAfter = estimateOf(p0);
+      check(
+        "a prototype costs its bill, narrows the band and pulls a fault",
+        cashBefore - f.r.cash === cost &&
+          p0.prototyped === true &&
+          estAfter.high - estAfter.low < estBefore.high - estBefore.low,
+      );
+      check(
+        "and the second prototype is called production",
+        runCommand(engineer, f, "buildPrototype", id).r.cash === f.r.cash,
+      );
+    }
+
+    /* --------------------------------------------- saves that lie, again */
+    {
+      const good = designed(65);
+      const wreck = (fn: (w: Record<string, unknown>) => void) => {
+        const copy = JSON.parse(JSON.stringify(good.data)) as {
+          workshop: Record<string, unknown>;
+        };
+        fn(copy.workshop);
+        return engineer.validateData!(copy);
+      };
+      check(
+        "a workshop from before any of this still validates",
+        engineer.validateData!(JSON.parse(JSON.stringify(good.data))) === true,
+      );
+      check(
+        "a rig the lab has never heard of is rejected",
+        !wreck((w) => {
+          w.rigs = ["croissant-oven"];
+        }),
+      );
+      check(
+        "a discipline that is not a discipline is rejected",
+        !wreck((w) => {
+          w.team = [{ id: "x", name: "X", role: "vibes", salary: 1, since: 1 }];
+        }),
+      );
+      check(
+        "a spec level the negotiation never offered is rejected",
+        !wreck((w) => {
+          (w.products as Record<string, unknown>[])[0].spec = "yolo";
+        }),
+      );
+    }
+  }
+}
+
+
+console.log("\nEvery career has things happen to it\n" + "────────────────────────────────────────────────────");
+{
+  /*
+   * Four careers shipped with `events: []` and nobody noticed for weeks,
+   * because an empty catalogue is not an error — it is just a run where
+   * nothing ever happens. This is the check that says that is not allowed.
+   */
+  for (const career of CAREERS) {
+    /* Three rather than four: the Solicitor carries three events plus a
+       whole crisis system of its own, so the honest claim is that nobody has
+       an empty catalogue — not that everybody has the same number. */
+    check(
+      `the ${career.label} has a catalogue of events`,
+      career.events.length >= 3,
+      `${career.events.length} events`,
+    );
+  }
+
+  /*
+   * AND EVERY CHOICE IN THEM WORKS.
+   *
+   * Every branch of every event, applied against a real run of that
+   * career. This catches the whole class of failure that only shows up
+   * when somebody actually picks the second option in week ninety: a
+   * missing accessor, an undefined lookup, a state shape that moved.
+   */
+  let applied = 0;
+  let skipped = 0;
+  for (const career of CAREERS) {
+    for (const event of career.events) {
+      /*
+       * Built once per event, and only exercised where the event would
+       * actually fire.
+       *
+       * `apply` is only ever reached through `eligible`, so applying a choice
+       * to a state the event would have refused tests something the game
+       * cannot do — the first version of this called the Physician's
+       * resignation handler on a practice with no staff and reported a crash
+       * that no player could ever reach.
+       */
+      let f = startRun(career, 4242);
+      f.r.cash = 500_000;
+      f.r.skill = 70;
+      f.r.reputation = 60;
+      /*
+       * Actually play it, rather than letting weeks pass empty.
+       *
+       * Most events are gated on the run having got somewhere — customers,
+       * a product on the bench, a job on the boards — so an idle state makes
+       * nearly all of them ineligible and the check measures nothing. Two
+       * blocks on each of the career's own actions is a crude but genuine
+       * run, and it triples what this reaches.
+       */
+      const plan: Record<string, number> = {};
+      for (const a of career.actions.slice(0, 3)) plan[a.id] = 2;
+      for (let w = 0; w < 30 && !event.eligible(f); w++) {
+        f = advanceWeek(career, f, plan).state;
+        f.r.cash = Math.max(f.r.cash, 200_000);
+      }
+      if (!event.eligible(f)) {
+        skipped++;
+        continue;
+      }
+
+      for (let i = 0; i < event.choices.length; i++) {
+        const choice = event.choices[i];
+        let line = "";
+        let threw: string | null = null;
+        try {
+          const copy = JSON.parse(JSON.stringify(f)) as typeof f;
+          line = choice.apply(copy, makeRng(7));
+        } catch (e) {
+          threw = e instanceof Error ? e.message : String(e);
+        }
+        check(
+          `${career.id}/${event.id} choice ${i + 1} applies without throwing`,
+          threw === null,
+          threw ?? "",
+        );
+        check(
+          `${career.id}/${event.id} choice ${i + 1} says what happened`,
+          typeof line === "string" && line.length > 12,
+          line.slice(0, 40),
+        );
+        applied++;
+      }
+    }
+  }
+  console.log(
+    `  ..    ${applied} event branches exercised, ${skipped} events never eligible`,
+  );
+
+  /*
+   * Events must be eligible for the career they belong to and nobody
+   * else — an event wired to the wrong catalogue reads state that is not
+   * there, which is a crash rather than a wrong number.
+   */
+  {
+    const ids = new Map<string, string>();
+    let clash: string | null = null;
+    for (const career of CAREERS) {
+      for (const e of career.events) {
+        const owner = ids.get(e.id);
+        if (owner && owner !== career.id) clash = `${e.id}: ${owner} and ${career.id}`;
+        ids.set(e.id, career.id);
+      }
+    }
+    check("no event belongs to two careers", clash === null, clash ?? "");
+  }
+
+  /* Every event can be asked whether it is eligible, on a fresh run. */
+  {
+    let broke: string | null = null;
+    for (const career of CAREERS) {
+      const f = startRun(career, 11);
+      for (const e of career.events) {
+        try {
+          e.eligible(f);
+          e.weight(f);
+          e.body(f);
+        } catch (err) {
+          broke = `${career.id}/${e.id}: ${err instanceof Error ? err.message : err}`;
+        }
+      }
+    }
+    check(
+      "every event can be evaluated against a week-one run",
+      broke === null,
+      broke ?? "",
+    );
+  }
+}
+
+
+console.log("\nSaves that lie\n" + "────────────────────────────────────────────────────");
+{
+  /*
+   * DATA INTEGRITY, TESTED THE WAY IT FAILS.
+   *
+   * Three defects lived here until the audit named them: the archive was
+   * read scoped and written unscoped, the resource validator accepted a
+   * save with `cash` deleted, and a message answered with index 99 on a
+   * two-choice thread passed validation and crashed the render. Each of
+   * these tests is the failure it fixes, replayed.
+   */
+
+  /* ------------------------------------------------ required resources */
+  {
+    let holes = 0;
+    let leaks: string | null = null;
+    for (const career of CAREERS) {
+      const good = startRun(career, 5);
+      /* Through JSON, exactly the way a stored save reaches the validator. */
+      if (!validateRun(JSON.parse(JSON.stringify(good))))
+        leaks = `${career.id}: intact save rejected`;
+      for (const res of career.resources) {
+        const broken = JSON.parse(JSON.stringify(good)) as Record<
+          string,
+          Record<string, unknown>
+        >;
+        delete broken.r[res.id];
+        if (validateRun(broken as never)) {
+          leaks = `${career.id} accepts a save missing ${res.id}`;
+        }
+        holes++;
+      }
+    }
+    check(
+      "no career accepts a save missing any of its declared resources",
+      leaks === null,
+      leaks ?? `${holes} deletions tried across ${CAREERS.length} careers`,
+    );
+  }
+
+  /* -------------------------------------------------- the phone's shape */
+  {
+    /* A real phone, from a real run, so the fixture cannot drift. */
+    let f = startRun(chef, 8181);
+    f.r.cash = 100_000;
+    f = runCommand(chef, f, "hireKitchen", "sous");
+    const cook = kitchen(f).staff[0];
+    cook.skill = 80;
+    cook.loyalty = 30;
+    f = advanceWeek(chef, f, { rest: 1 }).state;
+    const withMsg = kitchen(f).phone!;
+    const poach = withMsg.messages.find((m) => m.choices);
+    check(
+      "the fixture has a real message with choices",
+      poach !== undefined && (poach.choices?.length ?? 0) >= 2,
+    );
+    check(
+      "a phone produced by the engine validates",
+      validatePhone(withMsg),
+    );
+
+    const mutate = (fn: (p: typeof withMsg) => void) => {
+      const copy = JSON.parse(JSON.stringify(withMsg)) as typeof withMsg;
+      fn(copy);
+      return validatePhone(copy);
+    };
+    check(
+      "an answer outside its choices is rejected",
+      !mutate((p) => {
+        const m = p.messages.find((x) => x.choices)!;
+        m.answered = 99;
+      }),
+    );
+    check(
+      "an answer inside its choices is accepted",
+      mutate((p) => {
+        const m = p.messages.find((x) => x.choices)!;
+        m.answered = 0;
+      }),
+    );
+    check(
+      "an answer with no choices at all is rejected",
+      !mutate((p) => {
+        const m = p.messages.find((x) => !x.choices)!;
+        m.answered = 0;
+      }),
+    );
+    check(
+      "a choice that is not really a choice is rejected",
+      !mutate((p) => {
+        const m = p.messages.find((x) => x.choices)!;
+        (m.choices as unknown[])[0] = { label: "only a label" };
+      }),
+    );
+    check(
+      "a feed post with no body is rejected",
+      !mutate((p) => {
+        p.feed.unshift({} as never);
+      }),
+    );
+
+    /* Every career rejects a garbage phone; the ones whose phone is
+       optional still accept its absence. */
+    let weak: string | null = null;
+    for (const career of CAREERS) {
+      const run = startRun(career, 9);
+      const data = JSON.parse(JSON.stringify(run.data)) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const slice = Object.values(data)[0];
+      if (!slice) continue;
+      slice.phone = { social: { followers: "many" } };
+      if (career.validateData && career.validateData(data)) {
+        weak = `${career.id} accepts a garbage phone`;
+      }
+    }
+    check(
+      "every career rejects a save whose phone is garbage",
+      weak === null,
+      weak ?? "",
+    );
+
+    let strict: string | null = null;
+    for (const career of CAREERS) {
+      if (career.id === "doctor") continue;
+      const run = startRun(career, 9);
+      const data = JSON.parse(JSON.stringify(run.data)) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const slice = Object.values(data)[0];
+      if (!slice) continue;
+      delete slice.phone;
+      if (career.validateData && !career.validateData(data)) {
+        strict = `${career.id} rejects a save from before it had a phone`;
+      }
+    }
+    check(
+      "and absence still loads, for every career whose phone is optional",
+      strict === null,
+      strict ?? "",
+    );
+  }
+
+  /* --------------------------------------------------- archive scoping */
+  {
+    /*
+     * `save.ts` refuses to touch storage without a window, so one is
+     * installed for the duration of this block. That is not cheating —
+     * it is the only way node can execute the exact code the browser
+     * runs, and the bug this covers (scoped read, unscoped write) lived
+     * precisely in that code.
+     */
+    const store = new Map<string, string>();
+    (globalThis as Record<string, unknown>).window = {
+      localStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+        removeItem: (k: string) => void store.delete(k),
+        key: (i: number) => [...store.keys()][i] ?? null,
+        get length() {
+          return store.size;
+        },
+      },
+    };
+    try {
+      /*
+       * The full `ArchivedCareer` shape, because `loadArchive` filters what
+       * it reads through the real guard — the first fixture here was five
+       * fields and silently filtered out, which made the scoping look broken
+       * when it was the fixture that was.
+       */
+      const character = {
+        id: "arch-1",
+        careerId: "chef",
+        careerLabel: "Chef",
+        name: "Tester",
+        weeks: 10,
+        retiredWeek: 10,
+        netWorth: 1_000,
+        overall: 50,
+        businesses: 1,
+        cities: ["lyon"],
+        traits: [],
+        setbacksSurvived: [],
+        ambitionsCompleted: [],
+        reputation: [],
+        relationships: [],
+        timeline: [],
+        milestones: [],
+        retiredNote: "Went out on a good year.",
+      } as never;
+
+      setSaveScope("alice");
+      saveArchive([character]);
+      check(
+        "a signed-in archive is written under that player's key",
+        [...store.keys()].some((k) => k.includes("p.alice:")) &&
+          !store.has("career-tycoon:archive:v1"),
+        [...store.keys()].join(", "),
+      );
+      check(
+        "and the same player reads it back",
+        loadArchive().length === 1,
+      );
+
+      setSaveScope("bob");
+      check(
+        "a different player does not see it",
+        loadArchive().length === 0,
+      );
+
+      /* The stranded case the bug produced: an archive under the bare
+         key while somebody is signed in. The read adopts it. */
+      store.set("career-tycoon:archive:v1", JSON.stringify([character]));
+      const rescued = loadArchive();
+      check(
+        "a stranded unscoped archive is rescued into the signed-in scope",
+        rescued.length === 1 && !store.has("career-tycoon:archive:v1"),
+      );
+      check(
+        "and stays where it was rescued to",
+        loadArchive().length === 1,
+      );
+    } finally {
+      setSaveScope(null);
+      delete (globalThis as Record<string, unknown>).window;
+    }
   }
 }
 
@@ -8574,7 +9803,7 @@ console.log("\nStarting somewhere\n" + "─────────────�
       "lawyer: London is the neutral market every earlier run practised in",
       feeIn(practice(london), kind) === kind.fee &&
         chambersRent(practice(london)) === 640 &&
-        london.r.cash === 9_000,
+        london.r.cash === 14_000,
     );
     check(
       "lawyer: the same instruction bills what the market pays",
@@ -9866,7 +11095,7 @@ console.log("\nNavigation per career\n" + "────────────�
     check(
       `${career}: tapping a destination lands on a screen that destination owns`,
       sections.every((sec) =>
-        sec.screens.some((sc) => sc.id === defaultScreen(sec.id)),
+        sec.screens.some((sc) => sc.id === defaultScreen(sec.id, career)),
       ),
     );
     check(
@@ -9895,22 +11124,22 @@ console.log("\nNavigation per career\n" + "────────────�
    */
   check(
     "the Chef has one restaurant, not a second business in the bar",
-    sectionsFor("chef").filter((s) => s.id === "kitchen").length === 1 &&
+    sectionsFor("chef").filter((s) => s.id === "work").length === 1 &&
       sectionsFor("chef").length === 4,
     sectionsFor("chef")
       .map((s) => s.label)
       .join(" / "),
   );
   check(
-    "and the fourth destination is the chef, not a second restaurant",
-    (sectionsFor("chef").find((s) => s.id === "chef")?.screens ?? []).every(
+    "and the Career destination is the chef, not a second restaurant",
+    (sectionsFor("chef").find((s) => s.id === "career")?.screens ?? []).every(
       (sc) => sc.id === "craft" || sc.id === "beyond",
     ),
   );
   check(
     "and that one destination carries the seven screens the career has",
-    sectionsFor("chef").find((s) => s.id === "kitchen")?.screens.length === 7,
-    String(sectionsFor("chef").find((s) => s.id === "kitchen")?.screens.length),
+    sectionsFor("chef").find((s) => s.id === "work")?.screens.length === 7,
+    String(sectionsFor("chef").find((s) => s.id === "work")?.screens.length),
   );
   check(
     "the Chef's screens are its own — nothing medical, nothing generic",
@@ -9938,8 +11167,8 @@ console.log("\nNavigation per career\n" + "────────────�
   );
   check(
     "and that one destination carries the four screens the career has",
-    sectionsFor("lawyer").find((s) => s.id === "chambers")?.screens.length === 4,
-    String(sectionsFor("lawyer").find((s) => s.id === "chambers")?.screens.length),
+    sectionsFor("lawyer").find((s) => s.id === "work")?.screens.length === 4,
+    String(sectionsFor("lawyer").find((s) => s.id === "work")?.screens.length),
   );
   check(
     "the instructions, the casework, the books and the firm",
@@ -9968,7 +11197,7 @@ console.log("\nNavigation per career\n" + "────────────�
   check(
     "the generic shell survives the Solicitor leaving it",
     screensOf(sectionsFor("a-career-nobody-has-written")).includes("operation") &&
-      defaultScreen("business") === "operation",
+      defaultScreen("work", "a-career-nobody-has-written") === "operation",
   );
   check(
     "the Physician is untouched",
@@ -12939,7 +14168,8 @@ console.log("\nWhat the city thinks\n" + "─".repeat(52));
     );
     check(
       "and neither of them routes a Chef into a medical section",
-      sectionOf("reviews").id === "kitchen" && sectionOf("scene").id === "where",
+      sectionOf("reviews", "chef").id === "work" &&
+        sectionOf("scene", "chef").id === "world",
     );
     check(
       "every Chef screen still states what it decides",
@@ -13875,9 +15105,9 @@ console.log("\nThe craft and the top of the trade\n" + "─".repeat(52));
       screens.includes("craft") && screens.includes("beyond"),
     );
     check(
-      "and both sit under the chef rather than under the restaurant",
-      sectionOf("craft", "chef").id === "chef" &&
-        sectionOf("beyond", "chef").id === "chef",
+      "and both sit under Career — the chef — rather than under the restaurant",
+      sectionOf("craft", "chef").id === "career" &&
+        sectionOf("beyond", "chef").id === "career",
     );
     check(
       "the Physician is untouched by any of it",
@@ -15436,6 +16666,504 @@ console.log("\nThe Solicitor: chambers\n" + "─".repeat(52));
         lawyer.validateData!(moved.data) &&
         validateRun(JSON.parse(JSON.stringify(moved)))
       );
+    })(),
+  );
+}
+
+
+
+/**
+ * MONEY THAT ARRIVES ON A DAY YOU CAN NAME
+ *
+ * A retainer is the premise's opposite number: steady weekly income in a
+ * career built on lumps that are months away and uncertain. These assert it
+ * is a trade rather than a button — that it costs hours off the top, costs
+ * you that client's instructions, and costs the flow of new work.
+ */
+console.log("\nThe Solicitor: retainers\n" + "─".repeat(52));
+{
+  const fresh = (city = "london") => practice(startRun(lawyer, 71, { city }));
+  const held = (kind: string, client = "Vance Holdings") => ({
+    id: `r-${kind}`,
+    kind,
+    client,
+    fromWeek: 1,
+    weeks: 20,
+  });
+
+  check(
+    "there are three of them, and the bigger ones want more of your week",
+    RETAINERS.length === 3 &&
+      RETAINERS.every(
+        (x, i, arr) =>
+          i === 0 ||
+          (x.fee > arr[i - 1].fee &&
+            x.hours > arr[i - 1].hours &&
+            x.needs > arr[i - 1].needs),
+      ),
+  );
+  check(
+    "every one of them says what it is and what it takes",
+    RETAINERS.every((x) => x.blurb.length > 60 && x.weeks > 0),
+  );
+  check(
+    "and every one pays less an hour than a live matter returns",
+    RETAINERS.every((x) => x.fee / x.hours < 240),
+    RETAINERS.map((x) => Math.round(x.fee / x.hours)).join(", "),
+  );
+
+  /* --------------------------------------------------------- what it pays */
+  {
+    const p = { ...fresh(), retainers: [held("general")] };
+    check(
+      "it pays every week, in this market's money",
+      retainerIncome(p) === 1_300 &&
+        retainerIncome({ ...p, city: "lagos" }) < retainerIncome(p),
+    );
+    check(
+      "and it reserves hours whether or not the client rings",
+      retainerHours(p) === 10,
+    );
+    check(
+      "a practice holding none has neither",
+      retainerIncome(fresh()) === 0 && retainerHours(fresh()) === 0,
+    );
+  }
+
+  /* ------------------------------------------------------- what it costs */
+  check(
+    "a client who pays you weekly stops instructing you separately",
+    (() => {
+      const plain = fresh();
+      const retained = { ...fresh(), retainers: [held("general", "Vance Holdings")] };
+      const sees = (q: PracticeState) => {
+        for (let seed = 1; seed <= 200; seed++) {
+          for (const o of newOffers(q, 90, 10, 2, makeRng(seed))) {
+            if (o.client === "Vance Holdings") return true;
+          }
+        }
+        return false;
+      };
+      return sees(plain) && !sees(retained);
+    })(),
+  );
+  check(
+    "and a firm on retainer has less time to go and find work",
+    (() => {
+      const count = (n: number) => {
+        const q = {
+          ...fresh(),
+          retainers: RETAINERS.slice(0, n).map((k, i) =>
+            held(k.id, `Client ${i}`),
+          ),
+        };
+        let total = 0;
+        for (let seed = 1; seed <= 300; seed++) {
+          total += newOffers(q, 90, 10, 2, makeRng(seed)).length;
+        }
+        return total;
+      };
+      return count(3) < count(0) * 0.85;
+    })(),
+  );
+
+  /* -------------------------------------------------------- taking one on */
+  {
+    const s = startRun(lawyer, 72);
+    s.week = 12;
+    const p = practice(s);
+    p.retainerOffers = [
+      {
+        id: "ro-1",
+        kind: "general",
+        client: "Cormack Retail",
+        expiresWeek: s.week + 3,
+      },
+    ];
+    const taken = runCommand(lawyer, s, "takeRetainer", "ro-1");
+    check(
+      "an arrangement can be accepted",
+      retainersOf(practice(taken)).length === 1 &&
+        retainerOffersOf(practice(taken)).length === 0,
+    );
+    check(
+      "and it runs for a stated number of weeks rather than for ever",
+      retainersOf(practice(taken))[0].weeks ===
+        RETAINER_BY_ID.get("general")!.weeks,
+    );
+    check(
+      "one that is not on the table is refused",
+      retainersOf(practice(runCommand(lawyer, s, "takeRetainer", "ro-9")))
+        .length === 0,
+    );
+
+    const ended = runCommand(lawyer, taken, "endRetainer", retainersOf(practice(taken))[0].id);
+    check(
+      "giving notice ends it and costs you standing",
+      retainersOf(practice(ended)).length === 0 &&
+        ended.r.reputation < taken.r.reputation,
+    );
+  }
+
+  check(
+    "a practice can only be available for so many at once",
+    (() => {
+      let s = startRun(lawyer, 73);
+      s.week = 12;
+      practice(s).retainers = RETAINERS.map((k, i) => held(k.id, `Client ${i}`));
+      practice(s).retainerOffers = [
+        { id: "ro-x", kind: "advice", client: "Ms Lindqvist", expiresWeek: 20 },
+      ];
+      s = runCommand(lawyer, s, "takeRetainer", "ro-x");
+      return retainersOf(practice(s)).length === MAX_RETAINERS;
+    })(),
+  );
+
+  /* ----------------------------------------------------------- the week */
+  {
+    const s = startRun(lawyer, 74);
+    s.week = 12;
+    practice(s).retainers = [held("general")];
+    const out = advanceWeek(lawyer, s, { casework: 2 });
+    const line = out.ledger.find((x) => /retainer/i.test(x.label));
+    check(
+      "the week books it as income, whatever the courts did",
+      Boolean(line) && line!.amount === 1_300,
+      `${line?.amount}`,
+    );
+    check(
+      "and says what it cost in hours",
+      /10 hours/.test(line?.note ?? ""),
+      line?.note ?? "",
+    );
+    check(
+      "and the arrangement is a week closer to its end",
+      retainersOf(practice(out.state))[0].weeks === 19,
+    );
+  }
+
+  check(
+    "an arrangement that runs out ends, and the hours come back",
+    (() => {
+      let s = startRun(lawyer, 75);
+      s.week = 12;
+      practice(s).retainers = [{ ...held("advice"), weeks: 1 }];
+      s = advanceWeek(lawyer, s, { rest: 1 }).state;
+      return (
+        retainersOf(practice(s)).length === 0 &&
+        retainerHours(practice(s)) === 0 &&
+        s.log.some((x) => /come to its end/i.test(x.text))
+      );
+    })(),
+  );
+
+  check(
+    "retained hours come off the top, before any matter sees one",
+    (() => {
+      const build = (withRetainer: boolean) => {
+        const s = startRun(lawyer, 76);
+        s.week = 12;
+        const q = practice(s);
+        const k = CASE_BY_ID.get("commercial")!;
+        q.cases = [
+          {
+            id: "c-1",
+            kind: "commercial",
+            client: "Vance Holdings",
+            openedWeek: 1,
+            dueWeek: s.week + 20,
+            hoursDone: 0,
+            settlementOffer: 0,
+            payer: "prompt",
+          },
+        ];
+        void k;
+        if (withRetainer) q.retainers = [held("panel", "Ardal Construction")];
+        return advanceWeek(lawyer, s, { casework: 4 }).state;
+      };
+      return (
+        practice(build(true)).cases[0].hoursDone <
+        practice(build(false)).cases[0].hoursDone
+      );
+    })(),
+  );
+
+  /* ------------------------------------------------------------ the save */
+  check(
+    "a save from before retainers is a firm with none",
+    (() => {
+      const p = fresh();
+      delete p.retainers;
+      delete p.retainerOffers;
+      return (
+        lawyer.validateData!({ practice: p }) &&
+        retainerIncome(p) === 0 &&
+        retainerHours(p) === 0
+      );
+    })(),
+  );
+  check(
+    "an arrangement the catalogue does not have is refused",
+    !lawyer.validateData!({
+      practice: { ...fresh(), retainers: [held("handshake")] },
+    }),
+  );
+}
+
+
+/**
+ * EVERY CAREER IS ORGANISED, AND STAYS THAT WAY
+ *
+ * Four of the seven careers shipped on the generic shell: one "Business" page
+ * carrying every option on a single scroll, no alerts, no next step, no
+ * lessons and an empty glossary. The machinery was always career-agnostic —
+ * only the content was missing — which is exactly the kind of gap that is
+ * invisible until somebody plays the career nobody opened.
+ *
+ * So these are invariants over `CAREERS` rather than tests of any one of them.
+ * The next career added is held to the same bar the moment it is registered,
+ * and the failure mode that produced this work cannot recur silently.
+ */
+console.log("\nEvery career is organised\n" + "─".repeat(52));
+{
+  const contentSectionsOf = (careerId: string) =>
+    sectionsFor(careerId).filter((s) => s.id === "work");
+
+  check(
+    "every career has a section set of its own, not the generic shell",
+    CAREERS.every((c) => {
+      const mine = sectionsFor(c.id);
+      const generic = sectionsFor("nobody-in-particular");
+      return mine !== generic && mine.length >= 3;
+    }),
+    CAREERS.filter((c) => sectionsFor(c.id) === sectionsFor("x"))
+      .map((c) => c.id)
+      .join(", "),
+  );
+
+  /*
+   * THE PHASE 4 GATE, ENFORCED RATHER THAN CLAIMED.
+   *
+   * Five destinations with stable meanings — Week, Work, World, Career,
+   * Life — in an order that never changes. A career that lacks the systems
+   * behind Career or Life simply omits it: a missing destination is skipped,
+   * never reshuffled, and nothing may invent a sixth. The Physician used to
+   * be excused from this rule for calling its map "network"; since the
+   * unification there are no excuses left to write.
+   */
+  check(
+    "every career's bar is the five destinations, in order, nothing else",
+    CAREERS.every((c) => {
+      const canon = ["week", "work", "world", "career", "life"];
+      const ids = sectionsFor(c.id).map((s) => s.id);
+      let at = -1;
+      return ids.every((id) => {
+        const pos = canon.indexOf(id);
+        if (pos <= at) return false;
+        at = pos;
+        return true;
+      });
+    }),
+    CAREERS.map(
+      (c) => `${c.id}: ${sectionsFor(c.id).map((s) => s.id).join(">")}`,
+    ).join("; "),
+  );
+
+  check(
+    "every one of them opens on the week and can say where it works",
+    CAREERS.every((c) => {
+      const s = sectionsFor(c.id);
+      return s[0].id === "week" && s.some((x) => x.id === "world");
+    }),
+    CAREERS.filter((c) => {
+      const s = sectionsFor(c.id);
+      return s[0].id !== "week" || !s.some((x) => x.id === "world");
+    })
+      .map((c) => c.id)
+      .join(", "),
+  );
+
+  check(
+    "and carries a Work destination with real screens behind it",
+    CAREERS.every(
+      (c) =>
+        contentSectionsOf(c.id).length === 1 &&
+        contentSectionsOf(c.id)[0].screens.length >= 1,
+    ),
+  );
+
+  check(
+    "every screen says what it is for",
+    CAREERS.every((c) =>
+      sectionsFor(c.id).every((s) =>
+        s.screens.every((x) => x.label.length > 0 && x.purpose.length > 20),
+      ),
+    ),
+  );
+
+  /*
+   * The bug this one exists for is real and was found by Playwright: the
+   * screen index is flat across every career, so a screen id used by two
+   * careers routes one of them into the other's section — and the
+   * sub-navigation then renders the wrong tabs, or none.
+   */
+  check(
+    "no two careers share a screen id, apart from the two they all share",
+    (() => {
+      const seen = new Map<string, string>();
+      const clashes: string[] = [];
+      for (const c of CAREERS) {
+        for (const s of sectionsFor(c.id)) {
+          for (const x of s.screens) {
+            if (x.id === "overview" || x.id === "home") continue;
+            const owner = seen.get(x.id);
+            if (owner && owner !== c.id) clashes.push(`${x.id}: ${owner}/${c.id}`);
+            else seen.set(x.id, c.id);
+          }
+        }
+      }
+      return clashes.length === 0;
+    })(),
+  );
+
+  check(
+    "every screen resolves back to the section it was declared in",
+    CAREERS.every((c) =>
+      sectionsFor(c.id).every((s) =>
+        s.screens.every((x) => sectionOf(x.id, c.id).id === s.id),
+      ),
+    ),
+  );
+
+  check(
+    "tapping a destination lands on a screen that destination owns",
+    CAREERS.every((c) =>
+      sectionsFor(c.id).every((s) =>
+        s.screens.some((x) => x.id === defaultScreen(s.id, c.id)),
+      ),
+    ),
+  );
+
+  check(
+    "and every screen id it declares is one `screenOf` knows",
+    CAREERS.every((c) =>
+      sectionsFor(c.id).every((s) =>
+        s.screens.every((x) => screenOf(x.id).label === x.label),
+      ),
+    ),
+  );
+
+  /* ------------------------------------------------- what it is told, in week one */
+  check(
+    "every career is taught something, on a screen it actually has",
+    CAREERS.every((c) => {
+      const ids = lessonOrderFor(c.id);
+      if (ids.length === 0) return false;
+      const screens = new Set(
+        sectionsFor(c.id).flatMap((s) => s.screens.map((x) => x.id)),
+      );
+      return ids.every((id) => screens.has(LESSONS[id].screen));
+    }),
+    CAREERS.filter((c) => lessonOrderFor(c.id).length === 0)
+      .map((c) => c.id)
+      .join(", "),
+  );
+
+  check(
+    "and the first thing it is taught is its own week, in its own words",
+    (() => {
+      const titles = CAREERS.map((c) => LESSONS[lessonOrderFor(c.id)[0]]);
+      return (
+        titles.every((l) => l.screen === "overview") &&
+        new Set(titles.map((l) => l.title)).size === titles.length
+      );
+    })(),
+  );
+
+  check(
+    "every career has words of its own",
+    CAREERS.every((c) => glossaryFor(c.id).length >= 5),
+    CAREERS.filter((c) => glossaryFor(c.id).length < 5)
+      .map((c) => `${c.id}:${glossaryFor(c.id).length}`)
+      .join(", "),
+  );
+
+  check(
+    "and nobody else's",
+    (() => {
+      const owner = new Map<string, string>();
+      const shared: string[] = [];
+      for (const c of CAREERS) {
+        for (const t of glossaryFor(c.id)) {
+          const had = owner.get(t.term.toLowerCase());
+          if (had && had !== c.id) shared.push(`${t.term}: ${had}/${c.id}`);
+          else owner.set(t.term.toLowerCase(), c.id);
+        }
+      }
+      return shared.length === 0;
+    })(),
+  );
+
+  /* ------------------------------------------------------ alerts and the step */
+  check(
+    "every career derives alerts without throwing, and points them somewhere real",
+    CAREERS.every((c) => {
+      const s = startRun(c, 21);
+      const screens = new Set(
+        sectionsFor(c.id).flatMap((x) => x.screens.map((y) => y.id)),
+      );
+      return deriveAlerts(s).every(
+        (a) => a.title.length > 0 && screens.has(a.destination),
+      );
+    }),
+  );
+
+  check(
+    "and its next step, when it has one, points at a screen it has",
+    CAREERS.every((c) => {
+      const s = startRun(c, 22);
+      const screens = new Set(
+        sectionsFor(c.id).flatMap((x) => x.screens.map((y) => y.id)),
+      );
+      const step = nextStep(s, { rest: 6 }, 6, 6, true);
+      return !step || !step.destination || screens.has(step.destination);
+    }),
+  );
+
+  /*
+   * The house rule, enforced rather than trusted: no career may borrow
+   * another's vocabulary. Medical words are the ones that leak, because the
+   * Physician's systems are the ones every shared module was written against.
+   */
+  check(
+    "no career's own words belong to another profession",
+    (() => {
+      const forbidden: Record<string, RegExp> = {
+        doctor: /larder|brigade|chambers|runway|polling day|certifier/i,
+        chef: /patient|triage|outbreak|chambers|runway|dilution/i,
+        lawyer: /patient|triage|larder|brigade|runway|dilution/i,
+        founder: /patient|triage|larder|brigade|chambers|hearing/i,
+        politician: /patient|triage|larder|brigade|chambers|runway/i,
+        architect: /patient|triage|larder|brigade|hearing|runway/i,
+        engineer: /patient|triage|larder|brigade|chambers|hearing/i,
+      };
+      const bad: string[] = [];
+      for (const c of CAREERS) {
+        const rx = forbidden[c.id];
+        if (!rx) continue;
+        const words = glossaryFor(c.id)
+          .map((t) => `${t.term} ${t.plain} ${t.detail}`)
+          .join(" ");
+        const taught = lessonOrderFor(c.id)
+          .map((id) => {
+            const l = LESSONS[id];
+            return `${l.title} ${l.intro} ${l.points.map((p) => `${p.term} ${p.detail}`).join(" ")}`;
+          })
+          .join(" ");
+        const hit = `${words} ${taught}`.match(rx);
+        if (hit) bad.push(`${c.id}: ${hit[0]}`);
+      }
+      return bad.length === 0;
     })(),
   );
 }

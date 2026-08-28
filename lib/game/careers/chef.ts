@@ -2,6 +2,7 @@ import type { CareerDef, LedgerLine, RunState } from "../types";
 import type { SetbackKind } from "../setbacks";
 import { money } from "../format";
 import { pushLog } from "../engine";
+import { validatePhone } from "../phone/validate";
 import { makeRng } from "../rng";
 /* Metric arithmetic only — nothing medical despite the path. */
 import { applySocial } from "../medical/social";
@@ -2943,23 +2944,9 @@ export const chef: CareerDef = {
 
     /* The phone is optional — a save from before it existed simply has none —
        but a present one has to hold the shapes the handset renders. */
-    if (st.phone !== undefined) {
-      const ph = st.phone;
-      if (typeof ph !== "object" || ph === null) return false;
-      if (!Array.isArray(ph.feed) || !Array.isArray(ph.messages) || !Array.isArray(ph.news)) {
-        return false;
-      }
-      const soc = ph.social;
-      if (
-        typeof soc !== "object" ||
-        soc === null ||
-        [soc.followers, soc.trust, soc.sentiment, soc.scrutiny].some(
-          (v) => typeof v !== "number" || !Number.isFinite(v),
-        )
-      ) {
-        return false;
-      }
-    }
+    /* The shared validator: the sketch this replaces accepted malformed
+       messages and out-of-range answers. Optional stays optional. */
+    if (st.phone !== undefined && !validatePhone(st.phone)) return false;
     /* Same again for the city: absent means Lyon, present means real. */
     if (st.city !== undefined && !KITCHEN_CITY_BY_ID.has(st.city)) return false;
     if (

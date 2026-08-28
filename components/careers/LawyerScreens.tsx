@@ -15,7 +15,13 @@ import {
   areaSkill,
   billsOf,
   billsOwed,
+  MAX_RETAINERS,
+  RETAINER_BY_ID,
   chambersRent,
+  retainerHours,
+  retainerIncome,
+  retainerOffersOf,
+  retainersOf,
   chambersSeats,
   nextChambers,
   chambersOf,
@@ -350,6 +356,82 @@ function InstructionsScreen({
           </ul>
         )}
       </section>
+
+      {/*
+       * Standing arrangements sit above the instructions, because deciding to
+       * take one changes what the rest of this screen is worth: retained
+       * hours come off the top of every week before a single one reaches a
+       * matter, and a retained client stops appearing here at all.
+       */}
+      {retainerOffersOf(p).length > 0 && (
+        <section
+          aria-labelledby="retainer-h"
+          className="rounded-lg border border-rule bg-card p-4"
+        >
+          <h2 id="retainer-h" className="text-sm font-semibold text-ink">
+            Somebody wants you on a retainer
+          </h2>
+          <p className="mt-1 text-xs text-ink-faint">
+            The only money in this career that arrives on a day you can name —
+            paid for in hours off the top of every week, and in never being
+            instructed by them again.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {retainerOffersOf(p).map((o) => {
+              const kind = RETAINER_BY_ID.get(o.kind);
+              if (!kind) return null;
+              return (
+                <li
+                  key={o.id}
+                  className="rounded border border-rule-soft px-3 py-2.5 text-xs"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink">{kind.label}</p>
+                      <p className="text-ink-faint">from {o.client}</p>
+                    </div>
+                    <p className="num shrink-0 text-ink-faint">
+                      off the table after week {o.expiresWeek}
+                    </p>
+                  </div>
+                  <p className="mt-1.5 text-ink-faint">{kind.blurb}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-faint">
+                    <span>
+                      Pays{" "}
+                      <span className="text-good">
+                        {money(Math.round(kind.fee * legalCityOf(p).fee))}
+                      </span>{" "}
+                      a week
+                    </span>
+                    <span>
+                      Costs <span className="text-caution">{kind.hours}h</span> a
+                      week
+                    </span>
+                    <span>
+                      Runs <span className="text-ink">{kind.weeks} weeks</span>
+                    </span>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <button
+                      type="button"
+                      disabled={retainersOf(p).length >= MAX_RETAINERS}
+                      onClick={() => onCommand("takeRetainer", o.id)}
+                      className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      Take the retainer
+                    </button>
+                    <span className="text-ink-faint">
+                      {retainersOf(p).length >= MAX_RETAINERS
+                        ? `You already hold ${MAX_RETAINERS}, which is as many as a practice can be available for.`
+                        : "Fewer instructions will come in the door while you hold it."}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section
         aria-labelledby="offers-h"
@@ -745,6 +827,86 @@ function BooksScreen({
               );
             })}
           </ul>
+        )}
+      </section>
+
+      <section
+        aria-labelledby="retained-h"
+        className="rounded-lg border border-rule bg-card p-4"
+      >
+        <h2 id="retained-h" className="text-sm font-semibold text-ink">
+          Money that arrives on a day you can name
+        </h2>
+        <p className="mt-1 text-xs text-ink-faint">
+          Retainers are the only income here that does not wait for a court.
+          They are paid for in hours reserved every week whether or not the
+          client rings, and in never being instructed by them separately.
+        </p>
+
+        {retainersOf(p).length === 0 ? (
+          <Nothing>
+            Nothing standing. Every penny this firm earns is waiting on
+            somebody else&rsquo;s decision.
+          </Nothing>
+        ) : (
+          <>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+              <Stat
+                label="Every week"
+                value={`${money(retainerIncome(p))}/wk`}
+              />
+              <Stat label="Hours reserved" value={`${retainerHours(p)}/wk`} />
+              <Stat
+                label="Covers"
+                value={
+                  weekly > 0
+                    ? `${Math.round((retainerIncome(p) / weekly) * 100)}% of costs`
+                    : "—"
+                }
+                tone={retainerIncome(p) >= weekly ? "good" : undefined}
+              />
+            </dl>
+
+            <ul className="mt-3 space-y-2">
+              {retainersOf(p).map((held) => {
+                const kind = RETAINER_BY_ID.get(held.kind);
+                if (!kind) return null;
+                return (
+                  <li
+                    key={held.id}
+                    className="rounded border border-rule-soft px-3 py-2.5 text-xs"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-ink">{held.client}</p>
+                        <p className="text-ink-faint">{kind.label}</p>
+                      </div>
+                      <p className="num shrink-0 text-ink-faint">
+                        {held.weeks} weeks left
+                      </p>
+                    </div>
+                    <p className="mt-1 text-ink-faint">
+                      {money(Math.round(kind.fee * legalCityOf(p).fee))} a week ·{" "}
+                      {kind.hours}h a week reserved
+                    </p>
+                    <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                      <button
+                        type="button"
+                        onClick={() => onCommand("endRetainer", held.id)}
+                        className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint hover:border-alarm hover:text-alarm"
+                      >
+                        Give notice
+                      </button>
+                      <span className="text-ink-faint">
+                        You get the hours back and the profession hears you
+                        walked away from a client.
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </section>
 

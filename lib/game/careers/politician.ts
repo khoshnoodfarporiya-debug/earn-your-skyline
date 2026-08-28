@@ -1,8 +1,19 @@
 import type { CareerDef, LedgerLine, RunState } from "../types";
 import type { SetbackKind } from "../setbacks";
 import { pushLog } from "../engine";
+import { money } from "../format";
+import { validatePhone } from "../phone/validate";
+import { makeRng } from "../rng";
+import { SEAT_EVENTS } from "./newEvents";
+import {
+  generateWeekFrom,
+  initialPhoneFrom,
+  publishFrom,
+} from "../phone/voicePack";
+import { POLITICIAN_PACK } from "../phone/packs";
 import {
   BLOCS,
+  BLOC_BY_ID,
   ISSUE_BY_ID,
   OFFICE_BY_ID,
   SEATS,
@@ -20,8 +31,18 @@ import {
   survivesToPoll,
   thresholdFor,
   weeksToPoll,
-  wouldHold,
   type CampaignState,
+  campaign,
+  CASE_DESK,
+  FOCUS_GROUP_COST,
+  constituentsOf,
+  drawCase,
+  gotvBonus,
+  pollBandOf,
+  recordOf,
+  volunteerLift,
+  volunteersOf,
+  warchestOf,
 } from "./constituency";
 
 /**
@@ -39,11 +60,24 @@ import {
 const START_CASH = 9_000;
 const START_DEBT = 14_000;
 
-export const campaign = (s: RunState): CampaignState =>
-  s.data.campaign as CampaignState;
+/* Defined with the model; re-exported so every existing import of it
+   from this module keeps working. */
+export { campaign };
 
 /** A run's goal: climb the ladder and hold what you climbed to. */
 const goalFor = (): number => 3;
+
+/**
+ * The phone, created on first touch.
+ *
+ * Optional on the state so an older save loads; created here so that
+ * save gains a handset rather than being rejected for not having one.
+ */
+function ensurePhone(s: RunState) {
+  const st = campaign(s);
+  if (!st.phone) st.phone = initialPhoneFrom(POLITICIAN_PACK);
+  return st.phone;
+}
 
 export const politician: CareerDef = {
   id: "politician",
@@ -117,9 +151,9 @@ export const politician: CareerDef = {
       cashCost: 120,
       preview: (s) => {
         const c = campaign(s);
-        const lift = 3.2 + s.r.skill * 0.03;
+        const lift = (3.2 + s.r.skill * 0.03) * volunteerLift(c);
         return [
-          `Support +${lift.toFixed(1)} across every bloc`,
+          `Support +${lift.toFixed(1)} across every bloc${volunteersOf(c) > 0 ? " — the volunteers carry boards too" : ""}`,
           `About +${survivesToPoll(c, s.week, lift).toFixed(1)} of that survives to polling day`,
         ];
       },
@@ -132,7 +166,7 @@ export const politician: CareerDef = {
       timeCost: 1,
       cashCost: 260,
       preview: (s) => {
-        const lift = 7.5 + s.r.skill * 0.05;
+        const lift = (7.5 + s.r.skill * 0.05) * volunteerLift(campaign(s));
         return [
           `+${lift.toFixed(1)} with whichever bloc you have chosen`,
           "Chosen on the Seat screen. Everyone else is unmoved.",
@@ -146,10 +180,15 @@ export const politician: CareerDef = {
         "Housing letters and immigration cases. Slow, unglamorous, and it sticks.",
       timeCost: 1,
       cashCost: 0,
-      preview: () => [
-        "Support +1.8, and it decays at half the usual rate this week",
-        "Party standing +0.8 — the machine notices who does the work",
-      ],
+      preview: (s) => {
+        const open = constituentsOf(campaign(s));
+        return [
+          "Support +1.8, and it decays at half the usual rate this week",
+          open.length > 0
+            ? `And ${open[0].name}'s case gets worked — delivered cases move the lean itself, for good`
+            : "Party standing +0.8 — the machine notices who does the work",
+        ];
+      },
     },
     {
       id: "party",
@@ -162,6 +201,40 @@ export const politician: CareerDef = {
         `Party standing +${(2.6 + s.r.skill * 0.02).toFixed(1)}`,
         "Does nothing for the voters at all",
       ],
+    },
+    {
+      id: "organise",
+      label: "Organise",
+      blurb:
+        "Phone trees, rotas, and somebody to run them. Volunteers knock doors you cannot reach.",
+      timeCost: 1,
+      cashCost: 0,
+      preview: (s) => {
+        const c = campaign(s);
+        return [
+          `Volunteers +${(4 + s.r.skill * 0.05).toFixed(1)} — currently ${Math.round(volunteersOf(c))}, and they drift away untended`,
+          `They add ${Math.round((volunteerLift(c) - 1) * 100)}% to canvassing and knock doors on polling day itself`,
+        ];
+      },
+    },
+    {
+      id: "fundraise",
+      label: "Fundraise",
+      blurb:
+        "Dinners, raffles and asks. The fund pays for campaigning — never the rent, which is the law.",
+      timeCost: 1,
+      cashCost: 0,
+      preview: (s) => {
+        const c = campaign(s);
+        const take =
+          350 +
+          c.party * 11 +
+          ((c.support.business ?? 0) + (c.support.professional ?? 0)) * 4;
+        return [
+          `About ${money(Math.round(take))} into the campaign fund (now ${money(warchestOf(c))})`,
+          "The fund reimburses canvassing, targeting and media, and buys focus groups",
+        ];
+      },
     },
     {
       id: "media",
@@ -185,7 +258,7 @@ export const politician: CareerDef = {
     },
   ],
 
-  events: [],
+  events: SEAT_EVENTS,
 
   initialResources: () => ({
     cash: START_CASH,
@@ -197,7 +270,13 @@ export const politician: CareerDef = {
     _burnoutPeak: 0,
   }),
 
-  initialData: () => ({ campaign: initialCampaign() }),
+  initialData: () => {
+    /* The handset exists from week one, so the button is there the
+       first time anybody looks for it. */
+    const st = initialCampaign();
+    st.phone = initialPhoneFrom(POLITICIAN_PACK);
+    return { campaign: st };
+  },
 
   startCities: SEATS,
 
@@ -214,6 +293,32 @@ export const politician: CareerDef = {
   command: (s, cmd, arg) => {
     const c = campaign(s);
     switch (cmd) {
+      /*
+       * THE HANDSET.
+       *
+       * Four commands, identical in every career that has a phone.
+       * The content differs; the transaction does not.
+       */
+      case "post": {
+        const phone = ensurePhone(s);
+        publishFrom(
+          POLITICIAN_PACK,
+          phone,
+          s,
+          arg,
+          makeRng((s.seed ^ (s.week * 0x2f6f2b79)) >>> 0),
+        );
+        break;
+      }
+      case "readMessages": {
+        for (const m of ensurePhone(s).messages) m.read = true;
+        break;
+      }
+      case "readNews": {
+        for (const n of ensurePhone(s).news) n.read = true;
+        break;
+      }
+
       /*
        * TAKE A POSITION.
        *
@@ -272,6 +377,20 @@ export const politician: CareerDef = {
       }
 
       /* Stand again after losing. The only route back. */
+      case "focusGroup": {
+        /* Paid from the fund and nowhere else — a personal cheque for
+           polling is exactly the compliance story this career avoids. */
+        if (warchestOf(c) < FOCUS_GROUP_COST) return;
+        c.warchest = warchestOf(c) - FOCUS_GROUP_COST;
+        c.focusUntil = s.week + 6;
+        pushLog(
+          s,
+          `A focus group read the seat: for the next six weeks the count is a tighter band.`,
+          "neutral",
+        );
+        break;
+      }
+
       case "standAgain": {
         if (!c.outOfOffice) return;
         c.outOfOffice = false;
@@ -294,10 +413,11 @@ export const politician: CareerDef = {
     };
     switch (actionId) {
       case "canvass": {
-        const lift = 3.2 + s.r.skill * 0.03;
+        const lift = (3.2 + s.r.skill * 0.03) * volunteerLift(c);
         for (const b of BLOCS) bump(b.id, lift * (0.85 + rng.next() * 0.3));
         s.r.skill = Math.min(100, s.r.skill + 0.25);
         s.r.burnout = Math.min(100, s.r.burnout + 3.5);
+        s.r._campaignSpend = (s.r._campaignSpend ?? 0) + 120;
         break;
       }
       case "target": {
@@ -305,8 +425,9 @@ export const politician: CareerDef = {
           0,
           Math.min(BLOCS.length - 1, Math.round(s.r._target ?? 0)),
         );
-        bump(BLOCS[idx].id, 7.5 + s.r.skill * 0.05);
+        bump(BLOCS[idx].id, (7.5 + s.r.skill * 0.05) * volunteerLift(c));
         s.r.burnout = Math.min(100, s.r.burnout + 3);
+        s.r._campaignSpend = (s.r._campaignSpend ?? 0) + 260;
         break;
       }
       case "casework": {
@@ -314,6 +435,24 @@ export const politician: CareerDef = {
         c.party = Math.min(100, c.party + 0.8);
         /* Work done for people decays more slowly — see `resolveWeek`. */
         s.r._sticky = (s.r._sticky ?? 0) + 1;
+        /* And the oldest name on the desk gets their answer: a delivered
+           case moves this bloc's lean itself, capped in `leanOf`. A desk
+           that was always empty behaves exactly as it always did. */
+        const open = constituentsOf(c);
+        if (open.length > 0) {
+          const [done] = open.splice(0, 1);
+          c.constituents = open;
+          c.record = {
+            ...recordOf(c),
+            [done.bloc]: (recordOf(c)[done.bloc] ?? 0) + 2.5,
+          };
+          bump(done.bloc, 1.5);
+          pushLog(
+            s,
+            `${done.name}'s case — ${done.matter} — is settled. ${BLOC_BY_ID.get(done.bloc)?.label ?? done.bloc} remember.`,
+            "good",
+          );
+        }
         s.r.burnout = Math.min(100, s.r.burnout + 2.5);
         break;
       }
@@ -323,10 +462,26 @@ export const politician: CareerDef = {
         s.r.burnout = Math.min(100, s.r.burnout + 2.5);
         break;
       }
+      case "organise": {
+        c.volunteers = Math.min(120, volunteersOf(c) + 4 + s.r.skill * 0.05);
+        c.party = Math.min(100, c.party + 0.4);
+        s.r.burnout = Math.min(100, s.r.burnout + 2);
+        break;
+      }
+      case "fundraise": {
+        const take =
+          350 +
+          c.party * 11 +
+          ((c.support.business ?? 0) + (c.support.professional ?? 0)) * 4;
+        c.warchest = warchestOf(c) + Math.round(take * (0.85 + rng.next() * 0.3));
+        s.r.burnout = Math.min(100, s.r.burnout + 2.5);
+        break;
+      }
       case "media": {
         s.r.reputation = Math.min(100, s.r.reputation + 3.5);
         for (const b of BLOCS) bump(b.id, 1.4 + s.r.reputation * 0.05);
         s.r.burnout = Math.min(100, s.r.burnout + 3);
+        s.r._campaignSpend = (s.r._campaignSpend ?? 0) + 340;
         break;
       }
       case "rest": {
@@ -367,6 +522,51 @@ export const politician: CareerDef = {
     s.r.cash -= office_costs;
     s.r._lastRevenue = pay;
 
+    /* -------------------------------------------------- the campaign fund */
+    /* Donations pay for campaigning: what the week spent on canvassing,
+       targeting and media comes back out of the fund while it lasts. A
+       campaign with no fund pays out of pocket, exactly as it always did. */
+    {
+      const spend = s.r._campaignSpend ?? 0;
+      const refund = Math.min(spend, warchestOf(c));
+      if (refund > 0) {
+        c.warchest = warchestOf(c) - refund;
+        s.r.cash += refund;
+        out.push({
+          label: "Campaign costs met by the fund",
+          amount: refund,
+          kind: "income",
+          note: `${money(warchestOf(c))} left in it. The fund never pays the rent — that is the law.`,
+        });
+      }
+      s.r._campaignSpend = 0;
+    }
+
+    /* Volunteers drift away untended, like everything else here. */
+    if (volunteersOf(c) > 0) {
+      c.volunteers = volunteersOf(c) * 0.96;
+    }
+
+    /* ------------------------------------------------------- the postbag */
+    /* Names arrive on their own schedule — a derived stream, so the phone
+       and the dice cannot disturb each other. Cases past their deadline
+       are referred on silently: nobody punishes an office for a letter it
+       never took up, they simply stop being moved by it. */
+    {
+      const desk = constituentsOf(c).filter((k) => k.deadline >= s.week);
+      const post = makeRng((s.seed ^ (s.week * 0x3d8c74f1)) >>> 0);
+      let n = 0;
+      if (post.next() < 0.75 && desk.length < CASE_DESK) {
+        desk.push(drawCase(c, s.week, n++, post));
+      }
+      if (post.next() < 0.3 && desk.length < CASE_DESK) {
+        desk.push(drawCase(c, s.week, n++, post));
+      }
+      if (desk.length > 0 || c.constituents !== undefined) {
+        c.constituents = desk;
+      }
+    }
+
     /*
      * ------------------------------------------------------------- THE DRIFT
      *
@@ -392,11 +592,23 @@ export const politician: CareerDef = {
 
     /* ------------------------------------------------------- POLLING DAY */
     if (s.week >= c.electionWeek && !c.outOfOffice) {
-      const won = share >= need;
+      /* The turnout operation: every volunteer knocks doors on the day,
+         and knocked doors become cast votes. Worth up to two points, and
+         exactly nothing to a campaign that never organised. */
+      const gotv = gotvBonus(c);
+      const dayShare = share + gotv;
+      if (gotv > 0) {
+        out.push({
+          label: `Get-out-the-vote — ${Math.round(volunteersOf(c))} volunteers`,
+          kind: "info",
+          note: `Worth about ${(gotv * 100).toFixed(1)} points of turnout on the day.`,
+        });
+      }
+      const won = dayShare >= need;
       c.results.push({
         week: s.week,
         office: c.office,
-        share,
+        share: dayShare,
         threshold: need,
         won,
       });
@@ -407,13 +619,13 @@ export const politician: CareerDef = {
         s.r.reputation = Math.min(100, s.r.reputation + 6);
         c.party = Math.min(100, c.party + 8);
         out.push({
-          label: `Held the seat with ${(share * 100).toFixed(1)}%`,
+          label: `Held the seat with ${(dayShare * 100).toFixed(1)}%`,
           kind: "info",
           note: `Next polling day is week ${c.electionWeek}.`,
         });
         pushLog(
           s,
-          `You held ${seat.name} with ${(share * 100).toFixed(1)}% against a bar of ${(need * 100).toFixed(1)}%. The next election is week ${c.electionWeek}.`,
+          `You held ${seat.name} with ${(dayShare * 100).toFixed(1)}% against a bar of ${(need * 100).toFixed(1)}%. The next election is week ${c.electionWeek}.`,
           "good",
         );
       } else {
@@ -426,13 +638,13 @@ export const politician: CareerDef = {
         c.office = "candidate";
         s.r.reputation = Math.max(0, s.r.reputation - 8);
         out.push({
-          label: `Lost the seat on ${(share * 100).toFixed(1)}%`,
+          label: `Lost the seat on ${(dayShare * 100).toFixed(1)}%`,
           kind: "info",
           note: `The bar was ${(need * 100).toFixed(1)}%.`,
         });
         pushLog(
           s,
-          `You lost ${seat.name} on ${(share * 100).toFixed(1)}%, against a bar of ${(need * 100).toFixed(1)}%. You are out of office — and you can stand again.`,
+          `You lost ${seat.name} on ${(dayShare * 100).toFixed(1)}%, against a bar of ${(need * 100).toFixed(1)}%. You are out of office — and you can stand again.`,
           "bad",
         );
       }
@@ -445,6 +657,15 @@ export const politician: CareerDef = {
     }
 
     s.r.burnout = Math.max(0, s.r.burnout - 1);
+    /* What the world says about the week that just happened. Its own
+       stream, so the phone can never disturb the simulation's dice. */
+    generateWeekFrom(
+      POLITICIAN_PACK,
+      ensurePhone(s),
+      s,
+      makeRng((s.seed ^ (s.week * 0x2c9e4d13)) >>> 0),
+    );
+
     s.r._burnoutPeak = Math.max(s.r._burnoutPeak ?? 0, s.r.burnout);
     return out;
   },
@@ -465,6 +686,12 @@ export const politician: CareerDef = {
     if (typeof d !== "object" || d === null) return false;
     const c = d.campaign as CampaignState | undefined;
     if (typeof c !== "object" || c === null) return false;
+    /* The phone is optional — a save from before this career had one
+       still loads — but a present one must be the real shape. This
+       career previously did not look at it at all. */
+    if (c.phone !== undefined && !validatePhone(c.phone)) {
+      return false;
+    }
     if (!SEAT_BY_ID.has(c.seat)) return false;
     if (!OFFICE_BY_ID.has(c.office)) return false;
     if (typeof c.support !== "object" || c.support === null) return false;
@@ -485,6 +712,47 @@ export const politician: CareerDef = {
     if (!Array.isArray(c.reversals) || !Array.isArray(c.results)) return false;
     if (typeof c.electionWeek !== "number" || !Number.isFinite(c.electionWeek)) {
       return false;
+    }
+    /* Phase 5 fields, optional to the last: a save from before the ground
+       game carries none of them and still loads. */
+    for (const n of [c.volunteers, c.warchest]) {
+      if (
+        n !== undefined &&
+        (typeof n !== "number" || !Number.isFinite(n) || n < 0)
+      ) {
+        return false;
+      }
+    }
+    if (
+      c.focusUntil !== undefined &&
+      (!Number.isInteger(c.focusUntil) || c.focusUntil < 0)
+    ) {
+      return false;
+    }
+    if (c.record !== undefined) {
+      if (typeof c.record !== "object" || c.record === null) return false;
+      for (const [bloc, n] of Object.entries(c.record)) {
+        if (!BLOC_BY_ID.has(bloc)) return false;
+        if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return false;
+      }
+    }
+    if (c.constituents !== undefined) {
+      if (!Array.isArray(c.constituents)) return false;
+      for (const k of c.constituents) {
+        if (
+          typeof k !== "object" ||
+          k === null ||
+          typeof k.id !== "string" ||
+          typeof k.name !== "string" ||
+          k.name.length === 0 ||
+          !BLOC_BY_ID.has(k.bloc) ||
+          typeof k.matter !== "string" ||
+          !Number.isInteger(k.arrived) ||
+          !Number.isInteger(k.deadline)
+        ) {
+          return false;
+        }
+      }
     }
     return true;
   },
@@ -516,12 +784,25 @@ export const politician: CareerDef = {
     const survives = survivesToPoll(c, s.week, lift);
     const need = thresholdFor(c) * 100;
 
+    /* Nobody knows the share to a decimal. The band is what a campaign
+       would actually know, and a recent focus group tightens it. */
+    const band = pollBandOf(c, s.week);
     const out = [
       {
         label: "Share today",
-        value: `${today.toFixed(1)}%`,
-        tone: wouldHold(c) ? ("good" as const) : ("bad" as const),
-        note: `The bar is ${need.toFixed(1)}%.`,
+        value: `${today.toFixed(1)}% ± ${band.toFixed(0)}`,
+        tone:
+          today - band >= need
+            ? ("good" as const)
+            : today + band < need
+              ? ("bad" as const)
+              : ("neutral" as const),
+        note:
+          today - band >= need
+            ? `The bar is ${need.toFixed(1)}% — clear of it even at the bottom of the band.`
+            : today + band < need
+              ? `The bar is ${need.toFixed(1)}% — short of it even at the top of the band.`
+              : `The bar is ${need.toFixed(1)}% — inside the margin. A focus group narrows it.`,
       },
       {
         label: "Of this week's push",

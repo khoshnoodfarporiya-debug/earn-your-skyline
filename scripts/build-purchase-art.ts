@@ -94,6 +94,23 @@ const CAREER_ART_GROUPS = ["careers", "events", "setbacks", "milestones"] as con
  * rather than converting the whole directory and rewriting the covers.
  */
 const CAREER_ART_FILES = new Set([
+  /* Founder environments. */
+  "founder-runway-v1.png",
+  "founder-team-v1.png",
+  "founder-raising-v1.png",
+  /* Politician environments. */
+  "politician-polling-v1.png",
+  "politician-electorate-v1.png",
+  "politician-positions-v1.png",
+  "politician-office-v1.png",
+  /* Architect environments. */
+  "architect-boards-v1.png",
+  "architect-offers-v1.png",
+  "architect-competitions-v1.png",
+  "architect-studio-v1.png",
+  /* Engineer environments. */
+  "engineer-bench-v1.png",
+  "engineer-newbuild-v1.png",
   /* Chef environments. */
   "chef-market-kitchen-v1.png",
   "chef-premises-bistro-v1.png",

@@ -62,7 +62,7 @@ export interface Orientation {
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
 export function orient(state: RunState, screen: ScreenId): Orientation {
-  const section = sectionOf(screen);
+  const section = sectionOf(screen, state.careerId);
   const def = screenOf(screen);
   const base = {
     section: section.label,

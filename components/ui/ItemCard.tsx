@@ -150,7 +150,7 @@ export function ItemCard({
       aria-label={title}
       className={`spine px-4 py-3.5 ${owned ? "bg-card-high" : "bg-card"}`}
       style={{
-        ["--dept" as string]: owned ? "#2DD4BF" : (accent ?? "transparent"),
+        ["--dept" as string]: owned ? "rgb(var(--accent))" : (accent ?? "transparent"),
       }}
     >
       {visual ? (

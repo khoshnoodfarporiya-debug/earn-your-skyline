@@ -1,4 +1,6 @@
 import type { StartCity } from "../types";
+import type { PhoneState } from "../medical/types";
+import type { RunState } from "../types";
 
 /**
  * THE STUDIO
@@ -45,12 +47,19 @@ export interface StudioCity extends StartCity {
   wageIndex: number;
   /** Studio rent, weekly. */
   rent: number;
+  /**
+   * Whether this market prices embodied carbon — planning policy, client
+   * boards, prizes. Optional and absent by default: a city that has never
+   * heard of it behaves exactly as it always did.
+   */
+  lowCarbon?: boolean;
 }
 
 export const STUDIO_CITIES: StudioCity[] = [
   {
     id: "amsterdam",
     name: "Amsterdam",
+    lowCarbon: true,
     country: "Netherlands",
     position: "amsterdam",
     blurb:
@@ -69,6 +78,7 @@ export const STUDIO_CITIES: StudioCity[] = [
   {
     id: "milan",
     name: "Milan",
+    lowCarbon: true,
     country: "Italy",
     position: "milan",
     blurb: "A city that will forgive a late building but never an ugly one.",
@@ -352,7 +362,161 @@ export interface Commission {
   lastSeen: number;
   startedWeek: number;
   done?: boolean;
+  /*
+   * PHASE 5, ALL OPTIONAL: a commission from an older save carries none of
+   * these and draws, banks and revises exactly as it always did.
+   */
+  /** The brief's agreed emphasis. Settled early, or never. */
+  brief?: BriefEmphasis;
+  /** The palette the building is priced and judged in. */
+  material?: MaterialId;
+  /** Planning consent: lodged and waiting, or granted. */
+  consent?: "lodged" | "granted";
+  /** The week the application went in. */
+  consentWeek?: number;
+  /** Whether the committee asked for another look first. */
+  consentDelayed?: boolean;
+  /** Whether the cost plan has been value-engineered. Once, ever. */
+  valueEngineered?: boolean;
 }
+
+/* ------------------------------------------------------- the brief itself */
+
+export type BriefEmphasis = "economy" | "signature" | "programme";
+
+/**
+ * THE BRIEF AS A TRADE, AGREED ONCE
+ *
+ * Every client wants all three of cheap, extraordinary and soon; the brief
+ * meeting is where somebody finally says which one wins. Settled while the
+ * job is still at concept or design, and binding after that — repricing a
+ * building at tender is what the revision system is for.
+ *
+ * A commission with no agreed emphasis multiplies everything by exactly
+ * one, which is every commission in every save from before this existed.
+ */
+export const BRIEFS: Record<
+  BriefEmphasis,
+  {
+    label: string;
+    blurb: string;
+    fee: number;
+    risk: number;
+    weeks: number;
+    prestige: number;
+  }
+> = {
+  economy: {
+    label: "Economy",
+    blurb: "A building the budget can love. Less fee, far fewer surprises.",
+    fee: 0.92,
+    risk: 0.7,
+    weeks: 1,
+    prestige: -1,
+  },
+  signature: {
+    label: "Signature",
+    blurb: "The one they will photograph. Better fee, and a braver client.",
+    fee: 1.12,
+    risk: 1.25,
+    weeks: 1,
+    prestige: 2,
+  },
+  programme: {
+    label: "Programme",
+    blurb: "Opening day is the design. Faster stages, tighter nerves.",
+    fee: 1,
+    risk: 1.1,
+    weeks: 0.85,
+    prestige: 0,
+  },
+};
+
+/* --------------------------------------------------------- the materials */
+
+export type MaterialId = "brick" | "timber" | "concrete" | "steel";
+
+export interface MaterialDef {
+  id: MaterialId;
+  label: string;
+  blurb: string;
+  /** Multiplies the cost plan. Above one is a conversation at tender. */
+  cost: number;
+  /** Embodied carbon, 0-1ish. Markets that price it reward the low end. */
+  carbon: number;
+  /** What finishing in it does for the practice's name. */
+  prestige: number;
+}
+
+export const MATERIALS: MaterialDef[] = [
+  {
+    id: "brick",
+    label: "Brick",
+    blurb: "Patient, local, and nobody has ever objected to it.",
+    cost: 1,
+    carbon: 0.55,
+    prestige: 0,
+  },
+  {
+    id: "timber",
+    label: "Mass timber",
+    blurb: "Warm, fast to raise, and the lowest carbon on the table.",
+    cost: 1.05,
+    carbon: 0.2,
+    prestige: 1,
+  },
+  {
+    id: "concrete",
+    label: "Concrete",
+    blurb: "Cheapest span for the money, and the dirtiest number in the row.",
+    cost: 0.92,
+    carbon: 1,
+    prestige: 0,
+  },
+  {
+    id: "steel",
+    label: "Steel and glass",
+    blurb: "The skyline material. Dear, bright, and photographed at dusk.",
+    cost: 1.15,
+    carbon: 0.85,
+    prestige: 2,
+  },
+];
+
+export const MATERIAL_BY_ID = new Map(MATERIALS.map((m) => [m.id, m]));
+
+/* --------------------------------------------- what the choices work out to */
+
+/** The brief's multiplier set, identity for the unbriefed. */
+export const briefOf = (c: Commission) =>
+  c.brief ? BRIEFS[c.brief] : { fee: 1, risk: 1, weeks: 1, prestige: 0 };
+
+/**
+ * The cost plan's pressure: how far the choices have pushed the building
+ * past what the client budgeted. A signature brief leans on it, an economy
+ * brief relieves it, and the palette does the rest. Past the threshold the
+ * tender stage becomes a fight — unless the plan was value-engineered.
+ */
+export function budgetLoad(c: Commission): number {
+  const brief =
+    c.brief === "signature" ? 0.15 : c.brief === "economy" ? -0.1 : 0;
+  const mat = c.material ? (MATERIAL_BY_ID.get(c.material)?.cost ?? 1) - 1 : 0;
+  const relief = c.valueEngineered ? -0.2 : 0;
+  return brief + mat + relief;
+}
+
+export const OVER_BUDGET = 0.12;
+
+export const overBudget = (c: Commission): boolean =>
+  budgetLoad(c) > OVER_BUDGET;
+
+/** What lodging a planning application costs here: council fees, drawings,
+    the consultant who knows the committee. */
+export const consentCost = (a: StudioState, kind: ProjectKind): number =>
+  Math.round(feeFor(a, kind) * 0.03);
+
+/** Weeks between lodging and the committee sitting. */
+export const CONSENT_WEEKS = 3;
 
 export interface CompetitionEntry {
   id: string;
@@ -365,6 +529,11 @@ export interface CompetitionEntry {
 }
 
 export interface StudioState {
+  /**
+   * The handset. Optional so a save from before this career had one
+   * still loads; it is created on first touch.
+   */
+  phone?: PhoneState;
   city: string;
   commissions: Commission[];
   offers: { id: string; kind: string; client: string }[];
@@ -403,6 +572,13 @@ export const stageFee = (
 ): number => Math.round(feeFor(a, kind) * stage.feeShare);
 
 /** Weeks of drawing this stage needs for this project. */
+/** Stage length for one commission: the kind's weeks at the brief's pace. */
+export const stageWeeksOf = (
+  c: Commission,
+  kind: ProjectKind,
+  stage: Stage,
+): number => Math.max(1, Math.round(stageWeeks(kind, stage) * briefOf(c).weeks));
+
 export const stageWeeks = (kind: ProjectKind, stage: Stage): number =>
   Math.max(1, Math.round(stage.weeks * kind.size));
 
@@ -452,7 +628,13 @@ export function revisionRisk(
   const cover = Math.max(0.45, 1 - associateCount(a) * 0.18);
   /* A brief already reinvented twice belongs to a client who does that. */
   const form = 1 + c.revisions * 0.12;
-  return Math.min(0.6, base * neglect * cover * form);
+  /* Phase 5: what was agreed, consented and priced. All exactly one for a
+     commission that never engaged. */
+  const brief = briefOf(c).risk;
+  const consent = c.consent === "granted" ? 0.55 : 1;
+  const budget =
+    overBudget(c) && c.stage >= 3 && !c.valueEngineered ? 1.5 : 1;
+  return Math.min(0.6, base * neglect * cover * form * brief * consent * budget);
 }
 
 /** How far back a revision throws you. Bigger projects fall further. */
@@ -482,7 +664,7 @@ export const stageOf = (c: Commission): Stage =>
 export function stageProgress(c: Commission): number {
   const kind = KIND_BY_ID.get(c.kind);
   if (!kind) return 0;
-  return Math.min(1, c.progress / stageWeeks(kind, stageOf(c)));
+  return Math.min(1, c.progress / stageWeeksOf(c, kind, stageOf(c)));
 }
 
 /** 0-1 through the whole building, by fee rather than by stage count. */
@@ -535,3 +717,14 @@ const CLIENTS = [
 ];
 
 export const clientName = (n: number) => CLIENTS[n % CLIENTS.length];
+
+/**
+ * This career's slice of the run.
+ *
+ * It lives here rather than beside the CareerDef because it is about
+ * the *state shape*, and because anything that needs it — the event
+ * catalogue, the voice pack — would otherwise have to import the
+ * career module and form an import cycle with it.
+ */
+export const studio = (s: RunState): StudioState =>
+  s.data.studio as StudioState;
