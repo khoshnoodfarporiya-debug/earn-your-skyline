@@ -1,5 +1,11 @@
 # Earn Your Skyline
 
+## Quick tour
+
+Earn Your Skyline is a browser game about managing a career one week at a time. Each profession has its own constraints, from ingredient spoilage as a chef to cash runway as a founder. The physician path is the most developed and is a good first run.
+
+The game uses TypeScript, Next.js and React. Start with [simulation logic](lib/game), [interface components](components), or [Playwright tests and fixtures](e2e). See [Verification](#verification) for command checks and seeded balance simulations.
+
 A turn-based management sim where **each career runs on its own rules**, not a
 shared economy with a different skin. Inspired by Business Inc. Tycoon
 Simulator, built against the opposite principle: there, every player is a
