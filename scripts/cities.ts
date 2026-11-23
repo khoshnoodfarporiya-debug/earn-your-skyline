@@ -163,6 +163,13 @@ const wanted = (title: string): boolean =>
  */
 const LOAN_STEP = 10_000;
 const HORIZON = 120;
+/**
+ * The Politician is judged over three years, not 120 weeks. Its goal is three
+ * won counts, and with one rung per count the honest calendar is roughly weeks
+ * 40, 93 and 146 — so a 120-week window could only ever see two of them and
+ * printed a 33% that measured the window, not the career.
+ */
+const POLITICIAN_HORIZON = 156;
 
 interface Result {
   reached: boolean;
@@ -885,7 +892,7 @@ function playPolitician(cityId: string, seed: number): Result {
   s = runCommand(politician, s, "takePosition", "care:fund");
   s = runCommand(politician, s, "takePosition", "tax:hold");
 
-  for (let week = 1; week <= HORIZON; week++) {
+  for (let week = 1; week <= POLITICIAN_HORIZON; week++) {
     const c = campaign(s);
 
     if (c.outOfOffice) {
@@ -944,7 +951,7 @@ function playAmbitiousPolitician(cityId: string, seed: number): Result {
   s = runCommand(politician, s, "takePosition", "care:fund");
   s = runCommand(politician, s, "takePosition", "tax:hold");
 
-  for (let week = 1; week <= HORIZON; week++) {
+  for (let week = 1; week <= POLITICIAN_HORIZON; week++) {
     const c = campaign(s);
 
     if (c.outOfOffice) {
@@ -1436,9 +1443,10 @@ function report(
   cities: { id: string; name: string; difficulty: string }[],
   play: (cityId: string, seed: number) => Result,
   contract?: Contract,
+  horizon = HORIZON,
 ) {
   if (!wanted(title)) return;
-  console.log(`\n${title} — ${RUNS} runs per city, ${HORIZON} weeks\n${"─".repeat(76)}`);
+  console.log(`\n${title} — ${RUNS} runs per city, ${horizon} weeks\n${"─".repeat(76)}`);
   console.log(
     `${"city".padEnd(12)}${"stated".padEnd(9)}${"reached".padEnd(9)}${"progress".padEnd(10)}${"median worth".padEnd(15)}${"wks overdrawn".padEnd(15)}trough`,
   );
@@ -1513,7 +1521,7 @@ report("Politician", SEATS, playPolitician, {
   maxBrokeWeeks: SOLVENT,
   minProgress: 0.3,
   catastrophicTrough: -30_000,
-});
+}, POLITICIAN_HORIZON);
 /* The ground game, played as designed. Same thresholds as the plain
    campaign: engaging must never be a trap, and the two tables printing
    together is how a free lunch would show. */
@@ -1521,7 +1529,7 @@ report("Politician (ground game)", SEATS, playAmbitiousPolitician, {
   maxBrokeWeeks: SOLVENT,
   minProgress: 0.3,
   catastrophicTrough: -30_000,
-});
+}, POLITICIAN_HORIZON);
 report("Architect", STUDIO_CITIES, playArchitect, {
   maxBrokeWeeks: SOLVENT,
   minProgress: 0.15,
