@@ -7,7 +7,10 @@ import { campaign } from "@/lib/game/careers/politician";
 import {
   BLOC_BY_ID,
   FOCUS_GROUP_COST,
+  HEADROOM,
+  TERM_FATIGUE,
   constituentsOf,
+  termsServed,
   pollBandOf,
   recordOf,
   volunteerLift,
@@ -257,7 +260,16 @@ function ElectorateScreen({
       <p className="mt-1 text-xs text-ink-faint">
         Every bloc drifts toward where your positions leave it, at{" "}
         {Math.round(seat.drift * 100)}% a week. Campaigning lifts you above
-        that line; it never moves the line.
+        that line, by less the further above it you already are and never
+        more than {HEADROOM} points; it never moves the line.
+        {termsServed(c) > 0 && (
+          <span className="text-caution">
+            {" "}
+            You have won {termsServed(c)} count
+            {termsServed(c) === 1 ? "" : "s"}, and time in charge has cost{" "}
+            {termsServed(c) * TERM_FATIGUE} points with every bloc.
+          </span>
+        )}
       </p>
 
       <ul className="mt-3 space-y-3">

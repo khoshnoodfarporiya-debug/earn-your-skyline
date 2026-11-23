@@ -23,6 +23,9 @@ import {
   inOffice,
   initialCampaign,
   leanOf,
+  liftRoom,
+  HEADROOM,
+  seatRoom,
   nextOffice,
   officeOf,
   projectedShare,
@@ -36,6 +39,7 @@ import {
   campaign,
   CASE_DESK,
   FOCUS_GROUP_COST,
+  POLLING_DAY_SWING,
   constituentsOf,
   drawCase,
   gotvBonus,
@@ -163,10 +167,13 @@ export const politician: CareerDef = {
       cashCost: 120,
       preview: (s) => {
         const c = campaign(s);
-        const lift = (3.2 + s.r.skill * 0.03) * volunteerLift(c);
+        const room = seatRoom(c);
+        const lift = (3.2 + s.r.skill * 0.03) * volunteerLift(c) * room;
         return [
           `Support +${lift.toFixed(1)} across every bloc${volunteersOf(c) > 0 ? " — the volunteers carry boards too" : ""}`,
-          `About +${survivesToPoll(c, s.week, lift).toFixed(1)} of that survives to polling day`,
+          room < 0.95
+            ? `Less than a fresh seat would give: you are already ${Math.round((1 - room) * HEADROOM)} of the ${HEADROOM} points campaigning can win above where your positions leave it`
+            : `About +${survivesToPoll(c, s.week, lift).toFixed(1)} of that survives to polling day`,
         ];
       },
     },
@@ -178,7 +185,10 @@ export const politician: CareerDef = {
       timeCost: 1,
       cashCost: 260,
       preview: (s) => {
-        const lift = (7.5 + s.r.skill * 0.05) * volunteerLift(campaign(s));
+        const c = campaign(s);
+        const idx = Math.max(0, Math.min(BLOCS.length - 1, Math.round(s.r._target ?? 0)));
+        const lift =
+          (7.5 + s.r.skill * 0.05) * volunteerLift(c) * liftRoom(c, BLOCS[idx].id);
         return [
           `+${lift.toFixed(1)} with whichever bloc you have chosen`,
           "Chosen on the Seat screen. Everyone else is unmoved.",
@@ -195,7 +205,7 @@ export const politician: CareerDef = {
       preview: (s) => {
         const open = constituentsOf(campaign(s));
         return [
-          `Support +${CASEWORK_LIFT.toFixed(1)}, and it decays at half the usual rate this week`,
+          `Support +${(CASEWORK_LIFT * seatRoom(campaign(s))).toFixed(1)}, and it decays at half the usual rate this week`,
           open.length > 0
             ? `And ${open[0].name}'s case gets worked — delivered cases move the lean itself, for good`
             : "Party standing +0.8 — the machine notices who does the work",
@@ -257,7 +267,7 @@ export const politician: CareerDef = {
       cashCost: 340,
       preview: (s) => [
         "Profile +3.5",
-        `Support +${(1.4 + s.r.reputation * 0.05).toFixed(1)}, scaled by how known you already are`,
+        `Support +${((1.4 + s.r.reputation * 0.05) * seatRoom(campaign(s))).toFixed(1)}, scaled by how known you already are`,
       ],
     },
     {
@@ -419,8 +429,11 @@ export const politician: CareerDef = {
 
   applyAction: (s, actionId, rng) => {
     const c = campaign(s);
+    /* A lift lands in proportion to the room left above the bloc's lean —
+       see HEADROOM. Nothing that lowers support is softened. */
     const bump = (blocId: string, n: number) => {
-      c.support[blocId] = Math.max(0, Math.min(100, (c.support[blocId] ?? 0) + n));
+      const lands = n > 0 ? n * liftRoom(c, blocId) : n;
+      c.support[blocId] = Math.max(0, Math.min(100, (c.support[blocId] ?? 0) + lands));
     };
     switch (actionId) {
       case "canvass": {
@@ -607,7 +620,16 @@ export const politician: CareerDef = {
          and knocked doors become cast votes. Worth up to two points, and
          exactly nothing to a campaign that never organised. */
       const gotv = gotvBonus(c);
-      const dayShare = share + gotv;
+      /* The mood on the day, which no poll could see coming. Its own
+         derived stream, so nothing else in the week can move it. */
+      const mood = makeRng((s.seed ^ (s.week * 0x51ed2701)) >>> 0);
+      const swing = (mood.next() + mood.next() - 1) * POLLING_DAY_SWING;
+      const dayShare = Math.max(0, share + gotv + swing);
+      out.push({
+        label: swing >= 0 ? "The mood on the day was with you" : "The mood on the day was against you",
+        kind: "info",
+        note: `${swing >= 0 ? "+" : "−"}${Math.abs(swing * 100).toFixed(1)} points that no poll could see.`,
+      });
       if (gotv > 0) {
         out.push({
           label: `Get-out-the-vote — ${Math.round(volunteersOf(c))} volunteers`,
@@ -804,10 +826,13 @@ export const politician: CareerDef = {
      * not "what is my support" but "what will it be when it is counted". So
      * it projects the drift forward to polling day rather than showing today.
      */
+    /* Only what lands counts: near the ceiling above the lean, most of a
+       push is spent on people who were never going to move further. */
     const lift =
-      (alloc.canvass ?? 0) * (3.2 + s.r.skill * 0.03) +
-      (alloc.casework ?? 0) * CASEWORK_LIFT +
-      (alloc.media ?? 0) * (1.4 + s.r.reputation * 0.05);
+      ((alloc.canvass ?? 0) * (3.2 + s.r.skill * 0.03) +
+        (alloc.casework ?? 0) * CASEWORK_LIFT +
+        (alloc.media ?? 0) * (1.4 + s.r.reputation * 0.05)) *
+      seatRoom(c);
     const today = projectedShare(c) * 100;
     const survives = survivesToPoll(c, s.week, lift);
     const need = thresholdFor(c) * 100;
