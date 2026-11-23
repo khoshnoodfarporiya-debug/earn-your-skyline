@@ -18,6 +18,7 @@ import {
   BLOCS,
   ISSUES,
   allowanceOf,
+  contestedOffice,
   driftTable,
   nextOffice,
   officeOf,
@@ -139,6 +140,7 @@ function CountScreen({
   const c = campaign(state);
   const seat = seatOf(c);
   const office = officeOf(c);
+  const contest = contestedOffice(c);
   const share = projectedShare(c);
   const need = thresholdFor(c);
   const weeks = weeksToPoll(c, state.week);
@@ -154,7 +156,11 @@ function CountScreen({
         }`}
       >
         <h2 id="poll-h" className="text-sm font-semibold text-ink">
-          {c.outOfOffice ? "Out of office" : `${office.label} for ${seat.name}`}
+          {c.outOfOffice
+            ? "Out of office"
+            : contest.id !== office.id
+              ? `${office.label} for ${seat.name}, standing for ${contest.label.toLowerCase()}`
+              : `${office.label} for ${seat.name}`}
         </h2>
 
         {c.outOfOffice ? (

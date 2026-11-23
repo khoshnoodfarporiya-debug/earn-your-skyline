@@ -367,8 +367,10 @@ import {
   BLOCS,
   FOCUS_GROUP_COST,
   ISSUES,
+  allowanceOf,
   blocWeight,
   constituentsOf,
+  contestedOffice,
   gotvBonus,
   leanOf,
   pollBandOf,
@@ -7813,14 +7815,83 @@ console.log("\nThe Politician\n" + "──────────────�
       selectionBlocker(campaign(f)) !== null,
       selectionBlocker(campaign(f)) ?? "",
     );
+    /* Not even a party that rates you can skip the first count. */
     let g = startP();
     campaign(g).party = 90;
     g = runCommand(politician, g, "seekSelection", "");
     check(
-      "a party that rates you puts you up for the next rung",
-      campaign(g).office === "councillor" &&
-        campaign(g).electionWeek > g.week,
-      campaign(g).office,
+      "a candidate cannot be selected past an election they have not won",
+      campaign(g).office === "candidate" &&
+        campaign(g).standingFor === undefined &&
+        contestedOffice(campaign(g)).id === "councillor",
+      `${campaign(g).office} / ${campaign(g).standingFor}`,
+    );
+
+    /* A councillor the party rates is put up for the rung above — as a
+       candidate. The office, and the pay, stay where they were. */
+    let h = startP();
+    campaign(h).office = "councillor";
+    campaign(h).party = 90;
+    const payBefore = allowanceOf(campaign(h));
+    h = runCommand(politician, h, "seekSelection", "");
+    check(
+      "selection makes you the candidate for the next rung, not its holder",
+      campaign(h).office === "councillor" &&
+        campaign(h).standingFor === "member" &&
+        campaign(h).electionWeek > h.week &&
+        allowanceOf(campaign(h)) === payBefore,
+      `${campaign(h).office} / ${campaign(h).standingFor}`,
+    );
+    const chained = runCommand(politician, h, "seekSelection", "");
+    check(
+      "and there is no second selection until that count is in",
+      campaign(chained).standingFor === "member" &&
+        selectionBlocker(campaign(chained)) !== null,
+      campaign(chained).standingFor ?? "",
+    );
+
+    /* The count is the only way onto the rung. */
+    const poll = campaign(h).electionWeek;
+    let won = h;
+    while (won.week <= poll) {
+      for (const b of BLOCS) campaign(won).support[b.id] = 92;
+      won = advanceWeek(politician, won, { canvass: 6 }).state;
+    }
+    const after = campaign(won);
+    check(
+      "winning the count puts you on the rung you stood for",
+      after.office === "member" &&
+        after.standingFor === undefined &&
+        after.results.at(-1)?.office === "member" &&
+        after.results.at(-1)?.won === true,
+      `${after.office} / ${after.standingFor}`,
+    );
+
+    let lost = h;
+    while (lost.week <= poll) {
+      for (const b of BLOCS) campaign(lost).support[b.id] = 5;
+      lost = advanceWeek(politician, lost, { rest: 6 }).state;
+    }
+    check(
+      "and losing it costs the seat as well as the selection",
+      campaign(lost).outOfOffice === true &&
+        campaign(lost).office === "candidate" &&
+        campaign(lost).standingFor === undefined,
+      `${campaign(lost).office} / ${campaign(lost).standingFor}`,
+    );
+
+    /* A candidate's first win is a council seat, with its pay. */
+    let first = startP();
+    const firstPoll = campaign(first).electionWeek;
+    while (first.week <= firstPoll) {
+      for (const b of BLOCS) campaign(first).support[b.id] = 92;
+      first = advanceWeek(politician, first, { canvass: 6 }).state;
+    }
+    check(
+      "a candidate's first win makes them a councillor, with an allowance",
+      campaign(first).office === "councillor" &&
+        allowanceOf(campaign(first)) > 0,
+      campaign(first).office,
     );
   }
 
@@ -7844,6 +7915,12 @@ console.log("\nThe Politician\n" + "──────────────�
       "a save holding an office that does not exist is rejected",
       !politician.validateData!({
         campaign: { ...campaign(startP()), office: "emperor" },
+      }),
+    );
+    check(
+      "and so is one standing for an office that does not exist",
+      !politician.validateData!({
+        campaign: { ...campaign(startP()), standingFor: "emperor" },
       }),
     );
     check(
@@ -9128,7 +9205,7 @@ console.log("\nEvery career has things happen to it\n" + "───────�
    * when somebody actually picks the second option in week ninety: a
    * missing accessor, an undefined lookup, a state shape that moved.
    */
-  let applied = 0;
+  let applied = 0;
   let skipped = 0;
   for (const career of CAREERS) {
     for (const event of career.events) {

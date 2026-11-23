@@ -19,6 +19,7 @@ import {
   SEATS,
   SEAT_BY_ID,
   allowanceOf,
+  contestedOffice,
   inOffice,
   initialCampaign,
   leanOf,
@@ -66,6 +67,17 @@ export { campaign };
 
 /** A run's goal: climb the ladder and hold what you climbed to. */
 const goalFor = (): number => 3;
+
+/**
+ * What a surgery block lifts every bloc by.
+ *
+ * Small on purpose. Casework also slows the drift that week, and the drift
+ * closes a fixed fraction of the gap, so any steady weekly lift is held as a
+ * gap of lift ÷ rate above the lean. At 1.8 two surgeries a week held every
+ * bloc near 100% in every seat and the drift never bit. The lasting reward
+ * for casework is the record, which moves the lean itself.
+ */
+const CASEWORK_LIFT = 0.6;
 
 /**
  * The phone, created on first touch.
@@ -183,7 +195,7 @@ export const politician: CareerDef = {
       preview: (s) => {
         const open = constituentsOf(campaign(s));
         return [
-          "Support +1.8, and it decays at half the usual rate this week",
+          `Support +${CASEWORK_LIFT.toFixed(1)}, and it decays at half the usual rate this week`,
           open.length > 0
             ? `And ${open[0].name}'s case gets worked — delivered cases move the lean itself, for good`
             : "Party standing +0.8 — the machine notices who does the work",
@@ -361,11 +373,10 @@ export const politician: CareerDef = {
         if (!next || selectionBlocker(c)) return;
         /*
          * Selection does not make you a member of anything — it makes you the
-         * candidate, and the voters still decide. The clock restarts at the
-         * new office's term.
+         * candidate, and the voters still decide. You keep the office you won
+         * (and its pay) until that count; only a win moves `office`.
          */
-        c.office = next.id;
-        c.outOfOffice = false;
+        c.standingFor = next.id;
         c.electionWeek = s.week + Math.min(52, next.term / 2);
         s.r.debt += 9_000;
         pushLog(
@@ -431,7 +442,7 @@ export const politician: CareerDef = {
         break;
       }
       case "casework": {
-        for (const b of BLOCS) bump(b.id, 1.8);
+        for (const b of BLOCS) bump(b.id, CASEWORK_LIFT);
         c.party = Math.min(100, c.party + 0.8);
         /* Work done for people decays more slowly — see `resolveWeek`. */
         s.r._sticky = (s.r._sticky ?? 0) + 1;
@@ -605,27 +616,41 @@ export const politician: CareerDef = {
         });
       }
       const won = dayShare >= need;
+      /* What this count was for, read before anything below moves it. */
+      const contest = contestedOffice(c);
+      const promoted = contest.id !== c.office;
       c.results.push({
         week: s.week,
-        office: c.office,
+        office: contest.id,
         share: dayShare,
         threshold: need,
         won,
       });
+      /* Either way the selection is spent: won, it is the office; lost, it
+         went with the seat. */
+      c.standingFor = undefined;
 
       if (won) {
-        /* Banked. The only moment in the run that anything is. */
-        c.electionWeek = s.week + office.term;
+        /* Banked. The only moment in the run that anything is — and the
+           only way onto a rung: the office and its pay arrive with the
+           count, never with the selection. */
+        c.office = contest.id;
+        c.electionWeek = s.week + contest.term;
         s.r.reputation = Math.min(100, s.r.reputation + 6);
         c.party = Math.min(100, c.party + 8);
+        const verb = promoted
+          ? `Elected ${contest.label.toLowerCase()}`
+          : "Held the seat";
         out.push({
-          label: `Held the seat with ${(dayShare * 100).toFixed(1)}%`,
+          label: `${verb} with ${(dayShare * 100).toFixed(1)}%`,
           kind: "info",
           note: `Next polling day is week ${c.electionWeek}.`,
         });
         pushLog(
           s,
-          `You held ${seat.name} with ${(dayShare * 100).toFixed(1)}% against a bar of ${(need * 100).toFixed(1)}%. The next election is week ${c.electionWeek}.`,
+          promoted
+            ? `${seat.name} elected you ${contest.label.toLowerCase()} with ${(dayShare * 100).toFixed(1)}% against a bar of ${(need * 100).toFixed(1)}%. The next election is week ${c.electionWeek}.`
+            : `You held ${seat.name} with ${(dayShare * 100).toFixed(1)}% against a bar of ${(need * 100).toFixed(1)}%. The next election is week ${c.electionWeek}.`,
           "good",
         );
       } else {
@@ -694,6 +719,9 @@ export const politician: CareerDef = {
     }
     if (!SEAT_BY_ID.has(c.seat)) return false;
     if (!OFFICE_BY_ID.has(c.office)) return false;
+    if (c.standingFor !== undefined && !OFFICE_BY_ID.has(c.standingFor)) {
+      return false;
+    }
     if (typeof c.support !== "object" || c.support === null) return false;
     if (
       BLOCS.some(
@@ -765,7 +793,7 @@ export const politician: CareerDef = {
       value: `${(share * 100).toFixed(1)}%`,
       sub: c.outOfOffice
         ? `Out of office · ${c.results.filter((r) => r.won).length} won, ${c.results.filter((r) => !r.won).length} lost`
-        : `Polling day week ${c.electionWeek} · bar is ${(thresholdFor(c) * 100).toFixed(1)}% · party standing ${Math.round(c.party)}`,
+        : `${contestedOffice(c).id !== c.office ? `Standing for ${contestedOffice(c).label.toLowerCase()} · ` : ""}Polling day week ${c.electionWeek} · bar is ${(thresholdFor(c) * 100).toFixed(1)}% · party standing ${Math.round(c.party)}`,
     };
   },
 
@@ -778,7 +806,7 @@ export const politician: CareerDef = {
      */
     const lift =
       (alloc.canvass ?? 0) * (3.2 + s.r.skill * 0.03) +
-      (alloc.casework ?? 0) * 1.8 +
+      (alloc.casework ?? 0) * CASEWORK_LIFT +
       (alloc.media ?? 0) * (1.4 + s.r.reputation * 0.05);
     const today = projectedShare(c) * 100;
     const survives = survivesToPoll(c, s.week, lift);

@@ -415,6 +415,13 @@ export interface CampaignState {
   results: ElectionResult[];
   /** Set the week an election is lost, so the UI can say what happened. */
   outOfOffice?: boolean;
+  /**
+   * The rung the party has selected you to contest, when it is above the
+   * one you hold. Selection makes you a candidate, not an office-holder:
+   * `office` (and its pay) only changes when the count goes your way.
+   * Optional, so a save from before this rule still loads.
+   */
+  standingFor?: string;
   /*
    * PHASE 5, ALL OPTIONAL: a save written before the ground game still
    * loads, and absence means "never engaged", which changes nothing.
@@ -622,9 +629,25 @@ export function projectedShare(c: CampaignState): number {
   return cast > 0 ? mine / cast : 0;
 }
 
-/** What you have to beat, including the opposition this office attracts. */
+/**
+ * The office the next polling day decides.
+ *
+ * A candidate's first count is for the council seat; after a selection it is
+ * the rung the party put you up for; otherwise it is the office you hold,
+ * defended. Nothing above the council is reached except through a count.
+ */
+export function contestedOffice(c: CampaignState): Office {
+  if (c.standingFor) {
+    const target = OFFICE_BY_ID.get(c.standingFor);
+    if (target) return target;
+  }
+  if (c.office === "candidate") return OFFICES[1];
+  return officeOf(c);
+}
+
+/** What you have to beat, including the opposition the contested office attracts. */
 export const thresholdFor = (c: CampaignState): number =>
-  seatOf(c).threshold + officeOf(c).opposition;
+  seatOf(c).threshold + contestedOffice(c).opposition;
 
 export const wouldHold = (c: CampaignState): boolean =>
   projectedShare(c) >= thresholdFor(c);
@@ -656,6 +679,15 @@ export const inOffice = (c: CampaignState): boolean => c.office !== "candidate";
 export function selectionBlocker(c: CampaignState): string | null {
   const next = nextOffice(c);
   if (!next) return "There is nothing above this.";
+  if (c.outOfOffice) return "Not while you are out of office.";
+  /* One rung per count: the party puts up people who have won something. */
+  if (c.office === "candidate") {
+    return "Win your first election before the party will put you up for anything else.";
+  }
+  if (c.standingFor) {
+    const label = OFFICE_BY_ID.get(c.standingFor)?.label ?? "the rung above";
+    return `You are already the candidate for ${label}. Win that count first.`;
+  }
   if (c.party < next.needsParty) {
     return `The party wants ${next.needsParty} standing before they will select you. You have ${Math.round(c.party)}.`;
   }

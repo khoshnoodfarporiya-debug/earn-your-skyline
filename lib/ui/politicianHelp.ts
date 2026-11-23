@@ -200,6 +200,11 @@ export function politicianStep(
   const next = nextOffice(c);
   if (next && holding) {
     const blocked = selectionBlocker(c);
+    /* Party work only helps when party standing is the thing in the way.
+       A candidate who has not won yet, or one already selected for the
+       rung above, is waiting on a count — no block of party work moves it. */
+    if (blocked && c.party >= next.needsParty) return null;
+    if (blocked && (c.office === "candidate" || c.standingFor)) return null;
     return blocked
       ? {
           id: "pol:party",
