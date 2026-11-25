@@ -139,9 +139,8 @@ touched. Run the browser tests when you change a screen.
 - **`main`** has the codebase review, `WORKING_PLAN.md`, and the Politician
   fix where you only climb a rung by winning an election
   ([PR 3](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/3), merged).
-- **[PR 4](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/4)**,
-  branch `balance/politician-can-lose`, is **open** and green apart from the
-  known Chef balance check. It makes elections losable:
+- **[PR 4](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/4)**
+  (merged) makes elections losable:
   - a 10-point ceiling on campaign lifts above the lean
   - a casework record cap of 4
   - 5 points of "time for a change" per election won
@@ -149,8 +148,8 @@ touched. Run the browser tests when you change a screen.
   - a ±8-point polling-day mood swing
 
   Even seats now win 75–88% of runs, Milan 95–98%, Lagos 8–13%.
-- **This branch** (`docs/handoff-and-visuals`) adds this file and
-  [`VISUALS.md`](VISUALS.md).
+- **[PR 5](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/5)**
+  (merged) added this file and [`VISUALS.md`](VISUALS.md).
 
 ### Balance snapshot
 
@@ -204,7 +203,7 @@ Keep entries short. Newest at the bottom. Move finished to-do items in
 - Merged as PR 3.
 
 ### 23–25 Nov 2026 — Claude (Claude Code)
-- Made Politician elections losable (PR 4, open). Measured first: positions
+- Made Politician elections losable (PR 4, merged). Measured first: positions
   plus the record beat every bar by 9–25 points, and nothing on polling day was
   random.
 - Added 5 engine checks. The type check, lint, 2,078 checks and the build pass.
