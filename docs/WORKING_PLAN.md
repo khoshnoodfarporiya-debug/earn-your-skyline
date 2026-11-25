@@ -71,8 +71,37 @@ Balance snapshot (4 seeds, 120 weeks, so treat this as a signal, not a verdict):
 - [ ] Positions still stack for free: taking all five best-weighted stances is worth about
       +17 points of lean against the bot's +9. A human who reads the turnout weights may
       find the even seats easy again; watch for it in the playtest
-- [ ] Rebalance the Chef until the plain kitchen doesn't end below zero
-- [ ] Bring the ambitious Chef back inside its contract (CI already allows it to fail)
+- [x] Rebalance the Chef (branch `balance/chef-rebalance`). Full write-up in
+      `docs/COMMUNICATION.md`, section 6 and the session log
+  - Traced where the money goes with the harness's own bots. Four findings:
+    1. **A dead end:** below the price of one crate a kitchen could never cook
+       again, while wages kept going out (Paris: 40 weeks serving nobody, −$200k)
+    2. **Labour cost too much:** wages took ~52% of covers revenue against ~30–35%
+       in real kitchens, so every staffing level at the stall roughly broke even
+    3. **Mumbai's food cost 15% more than its covers were worth,** relative to
+       every other city, so its stall made nothing
+    4. **Harness bug:** both bots used fixed dollar thresholds in a career where
+       everything is in local money, so Mumbai waited 47 weeks to hire
+  - Fixes:
+    - trade credit (`TRADE_CREDIT`, `creditLine`)
+    - a market last resort to cook alone
+    - unpaid payroll sheds the last hire
+    - salaries cut 30%
+    - Mumbai produce 0.52 → 0.46
+    - local-money bot thresholds
+  - Result at 40 seeds, ambitious bot: 27–48% of the goal in every city, 0 weeks
+    overdrawn. **Every balance contract in the suite now holds, so CI `balance`
+    should go green**
+- [x] ~~Rebalance the Chef until the plain kitchen doesn't end below zero~~: **not a
+      real problem.** The plain bot is the control and never repays its fit-out
+      loan by design. Its cash stays positive everywhere (London ends with $31k in
+      the bank). The negative net worth is the unpaid loan compounding
+- [x] Bring the ambitious Chef back inside its contract: done, see above
+- [ ] Chef burnout sits at 98 for almost the whole run on any normal week (a full
+      week adds about 19 and only 1.6 drains). It costs one block, nothing more, so
+      the meter is meaningless rather than harmful. Worth a design look
+- [ ] The Chef bots never leave the market stall until late, and cap the brigade at 3.
+      A human who moves up sooner may find the Chef easier than these numbers say
 - [ ] Give the Solicitor and Engineer a bot strategy that reaches the objective somewhere
 - [ ] Look into the Founder's gap between cities (Berlin 100%, London 0%)
 - [ ] Rerun at 40+ seeds before calling anything fixed

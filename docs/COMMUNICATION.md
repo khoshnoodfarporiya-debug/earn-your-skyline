@@ -64,6 +64,16 @@ Playwright for browser tests. There's no backend; saves live in the browser.
    decorative images get `alt=""`, and layouts must work from 375px wide.
 8. **Don't commit, push, merge or change git settings unless the owner asks.**
    Work on a branch, never directly on `main`.
+9. **Write everything down, in the same change.** This is the owner's standing
+   rule (25 Nov 2026). Whatever you do (a fix, an investigation, a balance
+   change, a dead end), record it here before you finish:
+   - update section 6, "Where the work stands"
+   - add a session-log entry: what you found, the numbers, what you verified,
+     what you didn't, and what is left
+   - tick or add the item in [`WORKING_PLAN.md`](WORKING_PLAN.md)
+
+   Commit the write-up with the work itself, not later. Other assistants (and
+   the owner) rely on it to see what happened without redoing it.
 
 ---
 
@@ -118,10 +128,12 @@ touched. Run the browser tests when you change a screen.
 - **Node isn't on the Bash `PATH`.** It is at `C:\Program Files\nodejs`. In
   PowerShell, prefix commands with
   `$env:Path = "C:\Program Files\nodejs;$env:Path";`. Python isn't installed.
-- **Line endings:** `core.autocrlf=true`. `scripts/commands.ts` is stored
-  with CRLF line endings in git, so a normal `git add` turns it into a
-  whole-file diff. Stage it with `git -c core.autocrlf=false add scripts/commands.ts`
-  and confirm with `git diff --cached --stat` that only your lines changed.
+- **Line endings:** `core.autocrlf=true`. Some files are stored with CRLF
+  line endings in git: at least `scripts/commands.ts` and
+  `lib/game/careers/chef.ts`. A normal `git add` turns them into a whole-file
+  diff. Stage them with `git -c core.autocrlf=false add <file>`, keeping the
+  file's CRLF endings. Then confirm with `git diff --cached --stat` that only
+  your lines changed, and do that before every commit, for every file.
 - **The browser tests hang on Windows after passing.** Playwright workers
   don't shut down, the run takes about 12 minutes, and it exits with code 1
   even when every test passed. Read the `N passed` line, not the exit code.
@@ -150,13 +162,26 @@ touched. Run the browser tests when you change a screen.
   Even seats now win 75–88% of runs, Milan 95–98%, Lagos 8–13%.
 - **[PR 5](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/5)**
   (merged) added this file and [`VISUALS.md`](VISUALS.md).
+- **The Chef rebalance** (branch `balance/chef-rebalance`, not merged yet). See
+  the session log for the full investigation. In short:
+  - **Trade credit.** Suppliers deliver on account down to `creditLine`
+    (`TRADE_CREDIT` = 4,000 Lyon money, scaled per city). Past that line, the
+    covered market still sells plain crates, but only enough for the chef to
+    cook alone.
+  - **Unpaid payroll.** A week that ends past the credit line loses the last
+    cook hired.
+  - **Salaries cut 30%** in `KITCHEN_ROLES`.
+  - **Mumbai food** 0.52 → 0.46.
+  - **The harness's Chef bots** use local-money thresholds.
+  - **Every balance contract in the suite now holds**, so CI `balance` should be
+    green.
 
 ### Balance snapshot
 
 | Career | Bots reach the objective | Note |
 | --- | --- | --- |
-| Chef (plain) | 0% | Ends below zero net worth everywhere |
-| Chef (ambitious) | 0% | Breaks its contract in 7 cities; the reason CI `balance` is red |
+| Chef (plain) | 0% | The control: never repays its loan by design. Cash stays positive. Net worth is negative only by the unpaid loan in four cities |
+| Chef (ambitious) | 0% full goal; **27–48%** of it by week 120 | After the rebalance; 0 weeks overdrawn in every city |
 | Solicitor | 0% | 12–28% progress |
 | Founder | Berlin 100%, elsewhere 0% | Unexplained gap between cities |
 | Politician | 75–98%, Lagos about 10% | After PR 4 |
@@ -166,14 +191,13 @@ touched. Run the browser tests when you change a screen.
 ### What to pick up next
 
 In priority order (details in [`WORKING_PLAN.md`](WORKING_PLAN.md)):
-1. Rebalance the Chef until the plain kitchen doesn't end below zero, and bring
-   the ambitious Chef inside its contract. That turns CI fully green.
-2. Give the Solicitor and Engineer bots a strategy that reaches the objective
+1. Give the Solicitor and Engineer bots a strategy that reaches the objective
    somewhere.
-3. Explain the Founder's Berlin-vs-everywhere-else gap.
-4. Fix the victory screen, which shows the Physician's hospital for every
+2. Explain the Founder's Berlin-vs-everywhere-else gap.
+3. Fix the victory screen, which shows the Physician's hospital for every
    career. The images are specified in [`VISUALS.md`](VISUALS.md), batch 1.
-5. Human playtests: one full run per career, with notes.
+4. Human playtests: one full run per career, with notes. For the Chef, watch
+   whether a human who moves up from the stall early finds it too easy.
 
 ---
 
@@ -218,3 +242,102 @@ Keep entries short. Newest at the bottom. Move finished to-do items in
 - Found that the victory screen uses the Physician's hospital art for every
   career. Images for the fix are prompt batch 1. The code change, choosing
   the image by career in `components/Outcome.tsx`, isn't done yet.
+
+### 25 Nov 2026 — Claude (Claude Code): the Chef rebalance
+Branch `balance/chef-rebalance`.
+
+**How it was measured.** Two scratch scripts ran the harness's own Chef bots and
+totalled every ledger line, command and event by category, then printed one run
+week by week. To make that possible, `playChef` and `playAmbitiousChef` are now
+exported from `scripts/cities.ts`.
+
+**What was wrong (four separate things):**
+
+1. **A dead end with no way out.** `buyProduce` refused any crate the account
+   couldn't pay in cash. Once wages pushed a kitchen below the price of one
+   crate, it served nobody, earned nothing and stayed there while rent and
+   salaries kept going out.
+   - Ambitious Paris, seed 0: 40 weeks of zero covers, ending at −$198k.
+   - Mumbai: 70–94 weeks overdrawn in some seeds.
+
+   That contradicts the README's own rule that a run has no forced ending.
+2. **Labour cost too much.**
+   - Wages took about 52% of covers revenue (Lyon, ambitious), against roughly
+     30–35% in real kitchens.
+   - A chef de partie cost about $16 per cover they added, food about $9, and a
+     stall cover sold for $17–27.
+   - So every staffing level at the stall roughly broke even, and the business
+     only grew on pop-up ventures.
+3. **Mumbai's food was mispriced.** Its produce index was 0.52 against spend of
+   0.45, the only city where food cost noticeably more than its covers were worth
+   (every other city is within 2.5% or cheaper). A Mumbai stall cleared about $74
+   a week.
+4. **A harness bug.** Both bots used fixed dollar thresholds:
+   - $25k before hiring
+   - $60k before the cold room
+   - $90k before the cellar
+   - $2.5k as a floor on food buying
+
+   Everything else in this career is in local money, so Mumbai waited 47 weeks to
+   make its first hire, and the plain bot never hired there at all.
+
+**What changed:**
+
+- `lib/game/careers/kitchen.ts`:
+  - `TRADE_CREDIT` and `creditLine(k)`
+  - `soloCovers` split out of `brigadeCovers`, with no behaviour change
+  - every `KITCHEN_ROLES` salary cut by 30% (partie 1,280 → 900, and so on). Hire
+    fees are unchanged, and saved staff keep their saved pay
+  - Mumbai produce 0.52 → 0.46
+- `lib/game/careers/chef.ts`:
+  - `buyProduce` and `buyIngredient` deliver on account down to the credit line
+  - past the line, the covered market still sells `basic` crates while the
+    larder holds fewer than `soloCovers`
+  - in `resolveWeek`, a week that settles past the credit line loses the most
+    recent hire, logs it, and drops the rest of the brigade's morale by 8
+- `scripts/cities.ts`: the Chef bots' fixed sums are now `localOf(kitchen(s), …)`.
+  No other bot logic changed.
+- `scripts/commands.ts`: one check rewritten for credit ("cannot afford" now means
+  "past the line"), plus 6 new checks:
+  - a short squeeze still buys food
+  - a broke kitchen can cook alone, and not a crate more
+  - payroll past the line loses the last hire
+  - no city prices food above what its covers are worth
+
+**Experiments that didn't work** (so nobody retries them blind):
+- **Raising cook productivity** (×1.25, ×1.5 covers per role) helped Milan and
+  Madrid but sank Lyon (6% → 2%) and London (−$90k), even after the credit fix.
+- **Moving the payroll line** to 0 or to half the credit line changed almost
+  nothing.
+- **Wage levels tried:** ×0.8 still let London and New York spiral (44–52 weeks
+  overdrawn). ×0.6 and ×0.65 work but are more generous than needed. ×0.7 is
+  the smallest cut that clears the contracts.
+
+**Results at 40 seeds** (ambitious bot, share of the goal at week 120, before →
+after):
+
+| City | Before | After |
+| --- | --- | --- |
+| Lyon | 6% | 42% |
+| Milan | 18% | 48% |
+| Madrid | 12% | 44% |
+| Paris | 0%, 27–32 weeks overdrawn | 40% |
+| London | 0% | 28% |
+| New York | 0%, 15 weeks overdrawn | 28% |
+| Mumbai | 4%, 36 weeks overdrawn | 27% |
+
+Every city now has 0 median weeks overdrawn. Nobody reaches the full goal in 120
+weeks; the career runs to 156. `npx tsx scripts/cities.ts 12` (what CI runs):
+**all balance contracts hold for every career.**
+
+**Verified:** type check, lint, 2,083 engine checks, build, and the full balance
+suite. All 48 Chef browser tests pass (`npx playwright test -g chef`, mobile and
+desktop).
+
+**Left open** (in `WORKING_PLAN.md`):
+- Chef burnout sits at 98 on any normal week. It only costs one block, so the
+  meter is meaningless rather than harmful.
+- The bots cap the brigade at 3 and move up late, so a human may find the Chef
+  easier than these numbers say.
+- The "plain kitchen ends below zero" item was a misreading: that bot is the
+  control and never repays its loan by design.

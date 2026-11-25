@@ -306,7 +306,7 @@ export const KITCHEN_CITIES: KitchenCity[] = [
     rent: 0.5,
     spend: 0.45,
     demand: 1.6,
-    produce: 0.52,
+    produce: 0.46,
     shelfLife: -1,
     difficulty: "hard",
   },
@@ -381,6 +381,16 @@ export interface KitchenRole {
   label: string;
   blurb: string;
   hireCost: number;
+  /**
+   * Weekly pay in Lyon money; `rolePay` converts it to the city's.
+   *
+   * Cut by 30% in the November 2026 rebalance. At the old rates labour took
+   * about 52% of what the covers brought in — real kitchens run nearer 30-35%
+   * — and every staffing level at the stall came out roughly break-even, so a
+   * brigade never paid for itself and the career could only grow on side
+   * ventures. The balance harness found no city where a competent kitchen
+   * reached a fifth of its goal in 120 weeks; at these rates every one does.
+   */
   salary: number;
   /** Covers this person can put out per week. */
   covers: number;
@@ -411,7 +421,7 @@ export const KITCHEN_ROLES: KitchenRole[] = [
     label: "Commis chef",
     blurb: "Young, quick, and learning on your time. Cheap hands on the pass.",
     hireCost: 900,
-    salary: 640,
+    salary: 450,
     covers: 45,
     craft: 1,
     /* Prep is what a commis is for, and they can stand on the pass when the
@@ -423,7 +433,7 @@ export const KITCHEN_ROLES: KitchenRole[] = [
     label: "Chef de partie",
     blurb: "Runs a section without being told twice. The backbone of a brigade.",
     hireCost: 2_400,
-    salary: 1_280,
+    salary: 900,
     covers: 80,
     craft: 4,
     /* The backbone of the hot line. */
@@ -436,7 +446,7 @@ export const KITCHEN_ROLES: KitchenRole[] = [
     blurb:
       "Runs the kitchen when you are not in it, which is what lets you leave it.",
     hireCost: 5_200,
-    salary: 2_350,
+    salary: 1_650,
     covers: 115,
     craft: 9,
     /* Runs the pass, which is the job that keeps a night in order — and can
@@ -450,7 +460,7 @@ export const KITCHEN_ROLES: KitchenRole[] = [
     blurb:
       "Seats people, reads the room, and keeps a bad night from becoming a bad review.",
     hireCost: 700,
-    salary: 560,
+    salary: 390,
     covers: 30,
     craft: 3,
     /* Seats, takes the order and carries the plate. Nothing reaches a table
@@ -463,7 +473,7 @@ export const KITCHEN_ROLES: KitchenRole[] = [
     blurb:
       "Their own section and their own oven. Puddings stop being the thing that jams the pass at nine o'clock.",
     hireCost: 3_100,
-    salary: 1_520,
+    salary: 1_060,
     covers: 55,
     craft: 6,
     stations: { pastry: 4, prep: 1 },
@@ -474,7 +484,7 @@ export const KITCHEN_ROLES: KitchenRole[] = [
     blurb:
       "Plates back on the shelf, pans back on the stove. Invisible right up until there is nothing clean to plate on.",
     hireCost: 500,
-    salary: 480,
+    salary: 340,
     covers: 20,
     craft: 0,
     stations: { wash: 5, prep: 1 },
@@ -491,7 +501,7 @@ export const KITCHEN_ROLES: KitchenRole[] = [
     blurb:
       "Knows what is in the racks, what it is worth, and how to get a table to order the bottle above the one they were going to.",
     hireCost: 3_600,
-    salary: 1_720,
+    salary: 1_200,
     covers: 12,
     craft: 2,
     stations: { front: 2 },
@@ -502,7 +512,7 @@ export const KITCHEN_ROLES: KitchenRole[] = [
     blurb:
       "Runs the room: who sits where, who is waiting, and who is about to complain. The kitchen cooks better when the floor is calm.",
     hireCost: 4_200,
-    salary: 1_950,
+    salary: 1_370,
     covers: 25,
     craft: 2,
     stations: { front: 3, pass: 1 },
@@ -1942,6 +1952,28 @@ export const localOf = (k: KitchenState, amount: number): number =>
   Math.round(amount * cityOf(k).spend);
 
 /**
+ * TRADE CREDIT — how far into the red a kitchen can go and keep trading.
+ *
+ * Suppliers deliver on account down to this line, and payroll is met down to
+ * it. Below it the kitchen sheds the cook it can no longer pay (see
+ * `resolveWeek`).
+ *
+ * Before this existed, `buyProduce` refused any crate the account could not
+ * cover in cash. A kitchen that dipped below the price of one crate could not
+ * cook, so it took nothing, so it stayed below the price of a crate — while
+ * the rent and three salaries went out every week regardless. The balance
+ * harness showed that spiral in four cities out of seven: forty weeks of
+ * nothing served and a quarter of a million lost, with no move a player could
+ * make except firing people the game never suggested firing. Real kitchens
+ * run on thirty-day accounts, and real cooks leave when they are not paid.
+ *
+ * Quoted in Lyon money, like every sum in this career.
+ */
+export const TRADE_CREDIT = 4_000;
+
+export const creditLine = (k: KitchenState): number => localOf(k, TRADE_CREDIT);
+
+/**
  * What a cover is worth here.
  *
  * The room sets the expectation and the city sets the money. Every takings
@@ -2033,8 +2065,12 @@ export function brigadeCovers(k: KitchenState, skill: number): number {
   );
   /* Your own hands. A good cook is worth a section on their own, which is why
      a solo stall is viable at the start and hopeless by the end. */
-  return staff + kitCovers(k) + 40 + skill * 0.6;
+  return staff + soloCovers(k, skill);
 }
+
+/** What the chef and the kit plate with nobody else in the kitchen. */
+export const soloCovers = (k: KitchenState, skill: number): number =>
+  kitCovers(k) + 40 + skill * 0.6;
 
 export const craftOf = (k: KitchenState): number =>
   k.staff.reduce(
