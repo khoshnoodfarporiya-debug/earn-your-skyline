@@ -230,7 +230,7 @@ export const OFFICES: Office[] = [
     term: 156,
     pay: 2.6,
     needsParty: 50,
-    opposition: 0.03,
+    opposition: 0.06,
   },
   {
     id: "minister",
@@ -240,7 +240,7 @@ export const OFFICES: Office[] = [
     term: 156,
     pay: 4.2,
     needsParty: 72,
-    opposition: 0.06,
+    opposition: 0.12,
   },
 ];
 
@@ -466,8 +466,70 @@ export const recordOf = (c: CampaignState): Record<string, number> =>
 export const volunteersOf = (c: CampaignState): number => c.volunteers ?? 0;
 export const warchestOf = (c: CampaignState): number => c.warchest ?? 0;
 
-/** How much a bloc's lean can ever owe to delivered casework. */
-export const RECORD_CAP = 12;
+/**
+ * How much a bloc's lean can ever owe to delivered casework.
+ *
+ * At 12 the record alone was worth twelve points of share by week 40 — a
+ * steady surgery filled it inside a single term — and on top of two sensible
+ * positions that cleared every bar in every seat before a single doorstep.
+ * The record is an edge, not the foundation.
+ */
+export const RECORD_CAP = 4;
+
+/**
+ * How far above its lean campaigning can push a bloc.
+ *
+ * The drift closes a fixed fraction of the gap each week, so without a limit
+ * any steady weekly lift is held as a gap of lift ÷ rate — and a campaign that
+ * canvassed every week sat at 97% in every seat. Persuasion has diminishing
+ * returns instead: each lift is scaled by the room left under this ceiling,
+ * so the last few points above where your positions leave a bloc are the
+ * hardest to win, and none past it can be won at all. Positions decide where
+ * the ceiling is; campaigning decides how close to it you are on the day.
+ */
+export const HEADROOM = 10;
+
+/**
+ * What each count you have won costs with every bloc, for good.
+ *
+ * The climb gets harder as it goes: the first count is won as a fresh face,
+ * every one after it as the person who has been in charge. Together with the
+ * opposition each rung attracts, this is what stops two sensible positions
+ * from carrying a run all the way to the top.
+ */
+export const TERM_FATIGUE = 5;
+
+/** Counts won so far — the terms the electorate now holds against you. */
+export const termsServed = (c: CampaignState): number =>
+  c.results.filter((r) => r.won).length;
+
+/**
+ * The most the mood on polling day can move the share, either way.
+ *
+ * Drawn on the day, so no campaign knows it in advance: the poll band the
+ * count screen prints is the honest width of what a campaign can know. Two
+ * draws summed, so a small swing is common and the full one rare.
+ */
+export const POLLING_DAY_SWING = 0.08;
+
+/** The share of a lift that still lands on a bloc, 0–1. */
+export function liftRoom(c: CampaignState, blocId: string): number {
+  const above = (c.support[blocId] ?? 0) - (leanOf(c)[blocId] ?? 0);
+  return Math.max(0, Math.min(1, 1 - above / HEADROOM));
+}
+
+/** The same, across the whole seat, weighted by the votes each bloc casts —
+    what a lift to every bloc is worth in share, as a fraction of its size. */
+export function seatRoom(c: CampaignState): number {
+  let cast = 0;
+  let room = 0;
+  for (const b of BLOCS) {
+    const w = blocWeight(b);
+    cast += w;
+    room += w * liftRoom(c, b.id);
+  }
+  return cast > 0 ? room / cast : 0;
+}
 
 /** How many cases fit on one member's desk. The rest are referred on. */
 export const CASE_DESK = 6;
@@ -487,9 +549,9 @@ export const gotvBonus = (c: CampaignState): number =>
  *
  * Nobody knows the share to a decimal — least of all this far out. The
  * margin tightens as polling day approaches, and a recent focus group
- * tightens it further. Display honesty only: the simulation always knows
- * the true figure, the *player* is told what a campaign would actually
- * know.
+ * tightens it further. The simulation knows the projected figure; what it
+ * does not know until the day is the mood (POLLING_DAY_SWING), so a count
+ * inside the band can genuinely go either way.
  */
 export const pollBandOf = (c: CampaignState, week: number): number => {
   const out = 2 + Math.min(4, weeksToPoll(c, week) * 0.15);
@@ -604,8 +666,10 @@ export function leanOf(c: CampaignState): Record<string, number> {
   for (const b of BLOCS) {
     out[b.id] = (out[b.id] ?? 0) + Math.min(RECORD_CAP, record[b.id] ?? 0);
   }
-  /* Being seen to change your mind is its own position, and a bad one. */
-  const cost = c.reversals.length * 6;
+  /* Being seen to change your mind is its own position, and a bad one.
+     So is having been in charge: every term served is a record of people
+     you disappointed, and "time for a change" is the oldest slogan there is. */
+  const cost = c.reversals.length * 6 + termsServed(c) * TERM_FATIGUE;
   for (const b of BLOCS) {
     out[b.id] = Math.max(0, Math.min(100, (out[b.id] ?? 0) - cost));
   }

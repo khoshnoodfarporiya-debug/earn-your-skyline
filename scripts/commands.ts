@@ -366,18 +366,23 @@ import { politician, campaign } from "../lib/game/careers/politician";
 import {
   BLOCS,
   FOCUS_GROUP_COST,
+  HEADROOM,
   ISSUES,
+  POLLING_DAY_SWING,
+  TERM_FATIGUE,
   allowanceOf,
   blocWeight,
   constituentsOf,
   contestedOffice,
   gotvBonus,
   leanOf,
+  liftRoom,
   pollBandOf,
   projectedShare,
   recordOf,
   selectionBlocker,
   survivesToPoll,
+  termsServed,
   volunteerLift,
   volunteersOf,
   warchestOf,
@@ -7892,6 +7897,68 @@ console.log("\nThe Politician\n" + "──────────────�
       campaign(first).office === "councillor" &&
         allowanceOf(campaign(first)) > 0,
       campaign(first).office,
+    );
+  }
+
+  /* Elections can be lost: persuasion runs out, office wears, the day
+     decides. Before these, two sensible positions and a steady canvass held
+     every bloc near 97% and no seed in any seat ever lost a count. */
+  {
+    /* A lift lands in full at the lean and not at all at the ceiling. */
+    const f = startP();
+    const lean = leanOf(campaign(f));
+    for (const b of BLOCS) campaign(f).support[b.id] = lean[b.id];
+    check(
+      "a bloc sitting on its lean takes a campaign lift in full",
+      BLOCS.every((b) => liftRoom(campaign(f), b.id) === 1),
+    );
+    for (const b of BLOCS) campaign(f).support[b.id] = lean[b.id] + HEADROOM;
+    const before = projectedShare(campaign(f));
+    const pushed = advanceWeek(politician, f, { canvass: 6 }).state;
+    check(
+      "and a bloc already at the ceiling above its lean takes none of it",
+      BLOCS.every((b) => liftRoom(campaign(f), b.id) === 0) &&
+        projectedShare(campaign(pushed)) <= before,
+      `${(before * 100).toFixed(1)} -> ${(projectedShare(campaign(pushed)) * 100).toFixed(1)}`,
+    );
+
+    /* Every count won costs a little with everybody, for good. */
+    const g = startP();
+    const fresh = leanOf(campaign(g));
+    campaign(g).results.push(
+      { week: 40, office: "councillor", share: 0.5, threshold: 0.42, won: true },
+      { week: 60, office: "member", share: 0.3, threshold: 0.48, won: false },
+    );
+    const worn = leanOf(campaign(g));
+    check(
+      "each count won costs every bloc's lean, and a lost one costs nothing",
+      termsServed(campaign(g)) === 1 &&
+        BLOCS.every((b) => Math.abs(fresh[b.id] - worn[b.id] - TERM_FATIGUE) < 1e-9),
+      BLOCS.map((b) => `${b.id} ${fresh[b.id]}->${worn[b.id]}`).join(", "),
+    );
+
+    /* The mood on the day: bounded, seeded, and not the same every time. */
+    const day = (seed: number) => {
+      const h = startP(seed);
+      const c = campaign(h);
+      const at = leanOf(c);
+      for (const b of BLOCS) c.support[b.id] = at[b.id];
+      c.electionWeek = h.week;
+      const expected = projectedShare(c);
+      const after = advanceWeek(politician, h, { rest: 6 }).state;
+      return { swing: campaign(after).results[0].share - expected };
+    };
+    const swings = Array.from({ length: 20 }, (_, i) => day(500 + i).swing);
+    check(
+      "the mood on polling day moves the count, within its stated limit",
+      swings.every((x) => Math.abs(x) <= POLLING_DAY_SWING + 1e-9) &&
+        swings.some((x) => x > 0.005) &&
+        swings.some((x) => x < -0.005),
+      swings.map((x) => (x * 100).toFixed(1)).join(" "),
+    );
+    check(
+      "and the same seed meets the same mood",
+      day(507).swing === day(507).swing,
     );
   }
 

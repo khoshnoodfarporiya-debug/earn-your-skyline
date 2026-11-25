@@ -57,10 +57,20 @@ Balance snapshot (4 seeds, 120 weeks, so treat this as a signal, not a verdict):
   - All 22 Politician browser tests pass (`npx playwright test -g politician`, mobile and desktop).
     On Windows the run exits 1 anyway because workers don't shut down after the tests; that isn't a test failure
   - Result at 40 seeds: **100% in every city, with both bots.** The wall is gone, but the career is now too easy
-- [ ] Make the Politician lose sometimes. Support still settles around 97% against a 42–51% bar.
-      Openings plus two sensible positions already clear every bar, and steady canvassing holds
-      a gap of lift ÷ drift above the lean. Candidates: higher bars per rung, a ceiling on support,
-      or drift that speeds up the further you are above your lean
+- [x] Make the Politician lose sometimes (branch `balance/politician-can-lose`)
+  - Measured first: the lean alone (two positions + a full casework record) beat every bar by
+    9–25 points, campaigning added ~34 more, and nothing on polling day was random
+  - Campaign lifts shrink as a bloc rises above its lean and stop at 10 points (`HEADROOM`)
+  - The casework record is capped at 4 points per bloc, down from 12 (`RECORD_CAP`)
+  - Every count won costs 5 points of lean with every bloc (`TERM_FATIGUE`)
+  - Higher rungs attract more opposition: member +6 points, minister +12 (was +3 and +6)
+  - Polling day draws a mood swing of up to ±8 points (`POLLING_DAY_SWING`), so the poll band is honest
+  - 5 new engine checks; previews and the briefing show the lift that actually lands
+  - Result at 40 seeds (plain / ground game): London 75% / 85%, Lyon 83% / 88%,
+    Milan 95% / 98%, Lagos 13% / 8% (Lagos median progress 67%). All contracts hold
+- [ ] Positions still stack for free: taking all five best-weighted stances is worth about
+      +17 points of lean against the bot's +9. A human who reads the turnout weights may
+      find the even seats easy again; watch for it in the playtest
 - [ ] Rebalance the Chef until the plain kitchen doesn't end below zero
 - [ ] Bring the ambitious Chef back inside its contract (CI already allows it to fail)
 - [ ] Give the Solicitor and Engineer a bot strategy that reaches the objective somewhere
