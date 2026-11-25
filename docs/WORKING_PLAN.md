@@ -166,8 +166,22 @@ Suggestions, highest value first:
   - The Chef's Week page on a phone: 5,180 → 3,992px.
   - Rows came out at about 75px, not the 56px target, because the effect line
     was too useful to truncate to one line.
-- [ ] **Pin the planner and commit on desktop Week too.** Use the same sticky
-      right column the Work screens use.
+- [x] **Pin the commit on desktop Week** (`components/overview/Overview.tsx`).
+  - The inline commit button at the foot of the forecast card is gone.
+  - A commit card now leads the right column: blocks free, the key forecast
+    figure, and the button with the same labels as before.
+  - The whole right column is pinned under the status strip
+    (`lg:sticky lg:top-24`), and scrolls on its own if it is taller than the
+    window, like the Work rail. Pinning only the card let the meters slide
+    under it.
+  - The alerts and the next step moved from full width into the left column,
+    so the right column starts level with them.
+  - Result at 1280 and 1024 wide: the commit is on screen at the top (468px),
+    the middle and the bottom of every Week screen. Before, it was about
+    2,330px down on the Chef.
+  - On week 1 the "Learning the ropes" card still pushes it to 882px, just
+    below the fold, until that card is hidden.
+  - Phones keep their CommitBar unchanged.
 - [ ] **Build screen as a shop, not a gallery.**
   - Filters: Can buy now, Owned, Later.
   - Collapsible groups.
@@ -187,6 +201,14 @@ Suggestions, highest value first:
   - Fewer taps for the same information.
 - [ ] **Per-career Week hero art,** or no picture for careers without one. This
       bug is listed above; the images can come from `VISUALS.md`.
+
+### 6. Artwork
+
+- [x] Generate the 24 PNG masters specified in [`VISUALS.md`](VISUALS.md).
+- [ ] Convert the masters to WebP, wire the two banners and sixteen event
+      images, and check their crops in the game.
+- [ ] Choose whether the six career milestone scenes belong on retirement
+      or a career-goal celebration, then wire and verify the chosen surface.
 
 ## Dropped
 

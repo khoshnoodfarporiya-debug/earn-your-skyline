@@ -146,7 +146,13 @@ touched. Run the browser tests when you change a screen.
 
 ---
 
-## 6. Where the work stands (25 Nov 2026)
+## 6. Where the work stands (26 Nov 2026)
+
+- All 24 PNG masters from the three written batches in [`VISUALS.md`](VISUALS.md)
+  are in `art-source/visuals/`: six career milestone scenes, two screen
+  banners and sixteen event illustrations. Runtime conversion and wiring are
+  open. The current end screen shows on retirement, so choose the milestone
+  artwork's display trigger before wiring batch 1.
 
 - **`main`** has the codebase review, `WORKING_PLAN.md`, and the Politician
   fix where you only climb a rung by winning an election
@@ -367,3 +373,26 @@ Branch `docs/layout-review`. Documentation only; no code changed.
 - **Artwork:** the owner has an image model (ChatGPT) producing the images from
   `docs/VISUALS.md`. When they land, follow that file's "For the coding AI"
   steps. The victory-screen fix waits on batch 1.
+
+### 26 Nov 2026 — Codex: artwork masters
+
+The checkout moved from `docs/layout-review` to `layout/pin-week-commit` during artwork generation.
+
+- Generated the 24 scene, banner and event PNGs from `VISUALS.md`, using the
+  existing game artwork as style references. Saved the masters in
+  `art-source/visuals/milestones/`, `careers/` and `events/`.
+- Verified all 24 files at 1536×1024 and reviewed the centre crops at 21:9
+  for milestones and events and 3:1 for the two screen banners.
+- The art still needs WebP conversion and game wiring. Browser checks belong
+  to that step. Decide where career-goal celebrations should show before
+  applying the victory artwork to the current retirement screen.
+
+### 26 Nov 2026 — Claude (Claude Code): pinned desktop commit
+Branch `layout/pin-week-commit`. This is the second item from the layout review.
+
+- On desktop, the Week screen's commit card now leads a pinned right column.
+  The button stays on screen everywhere instead of sitting about 2,330px down.
+- The details are in `WORKING_PLAN.md` section 5.
+- Type check, lint and the build pass.
+- The full browser suite was still running when this was committed. Its result
+  is recorded in a later entry.

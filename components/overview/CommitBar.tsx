@@ -6,9 +6,9 @@
  * The weekly allocation list is long enough that the commit button sat about
  * 1,700px down the page — the single most important control in the game, five
  * screens below the fold. On mobile it now rides above the nav bar with the
- * two numbers needed to decide whether to press it; on desktop, where the
- * whole loop fits on screen, the inline button in the forecast card is enough
- * and this is hidden.
+ * two numbers needed to decide whether to press it. On desktop this is hidden,
+ * and the Week screen pins its own commit card at the top of the right column
+ * (see `Overview`).
  */
 export function CommitBar({
   spent,

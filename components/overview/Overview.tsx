@@ -109,24 +109,27 @@ export function Overview({
 
       <StatusStrip state={state} spent={spent} budget={budget} />
 
-      {/* One primary recommendation and at most one secondary. Everything
-          else stays reachable through the section badges — see `topAlerts`. */}
-      <AlertStack
-        alerts={topAlerts(alerts)}
-        remaining={Math.max(0, alerts.length - topAlerts(alerts).length)}
-        onNavigate={onNavigate}
-      />
-
-      {step && (
-        <NextStep
-          step={step}
-          onDismiss={onDismissStep}
-          onNavigate={onNavigate}
-        />
-      )}
-
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <div className="min-w-0 space-y-5">
+          {/* One primary recommendation and at most one secondary. Everything
+              else stays reachable through the section badges — see
+              `topAlerts`. Inside the left column rather than above the grid,
+              so the pinned commit card beside it starts level with them
+              instead of a screen further down. */}
+          <AlertStack
+            alerts={topAlerts(alerts)}
+            remaining={Math.max(0, alerts.length - topAlerts(alerts).length)}
+            onNavigate={onNavigate}
+          />
+
+          {step && (
+            <NextStep
+              step={step}
+              onDismiss={onDismissStep}
+              onNavigate={onNavigate}
+            />
+          )}
+
           {/* -------------------------------------------------- objective */}
           <section className="form p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -219,21 +222,8 @@ export function Overview({
               ))}
             </div>
 
-            {/* Mobile gets the sticky CommitBar instead; duplicating the
-                control on small screens would just push content further down. */}
-            <div className="hidden border-t border-rule-soft p-3 lg:block">
-              <button
-                onClick={onCommit}
-                disabled={spent === 0}
-                className="min-h-[52px] w-full rounded-form bg-clinical px-4 text-[15px] font-bold text-on-accent transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
-              >
-                {spent === 0
-                  ? "Assign your time first"
-                  : spent < budget
-                    ? `Commit week — ${budget - spent} block${budget - spent === 1 ? "" : "s"} unused`
-                    : "Commit week"}
-              </button>
-            </div>
+            {/* The commit itself is not here: on desktop it is pinned at the
+                top of the right column (below), on mobile in the CommitBar. */}
           </section>
 
           {/* ------------------------------------------------------- debt */}
@@ -268,7 +258,58 @@ export function Overview({
         {/* ------------------------------------------------ supporting
             Secondary by construction: on desktop it sits beside the week, on
             mobile it falls below it, so the decision always comes first. */}
-        <div className="min-w-0 space-y-5">
+        <div className="scroll-thin min-w-0 space-y-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto">
+          {/*
+           * THE COMMIT, PINNED (desktop).
+           *
+           * It used to sit at the foot of the forecast card, about 2,300px
+           * down a Chef's Week screen at 1280px — below the planner, the
+           * objective and the forecast — while every Work screen already kept
+           * it pinned in a rail and phones pin a CommitBar. It now leads this
+           * column, with the two numbers needed to decide whether to press
+           * it, and the whole column is pinned under the sticky status strip
+           * (scrolling on its own if it is taller than the window), the same
+           * way the Work screens' rail is. Pinning only the card let the
+           * meters slide up underneath it. Mobile keeps the CommitBar.
+           */}
+          <section
+            aria-label="Commit the week"
+            className="form hidden p-3 lg:block"
+          >
+            <div className="mb-2.5 flex items-baseline justify-between gap-3 px-1">
+              <p className="sign text-[11.5px] text-ink-faint">
+                {budget - spent === 0
+                  ? "Week planned"
+                  : `${budget - spent} of ${budget} blocks free`}
+              </p>
+              {headline && (
+                <p
+                  className={`num truncate text-[14px] font-semibold ${
+                    headline.tone === "good"
+                      ? "text-good"
+                      : headline.tone === "bad"
+                        ? "text-alarm"
+                        : "text-ink"
+                  }`}
+                  title={headline.label}
+                >
+                  {headline.value}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onCommit}
+              disabled={spent === 0}
+              className="min-h-[52px] w-full rounded-form bg-clinical px-4 text-[15px] font-bold text-on-accent transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
+            >
+              {spent === 0
+                ? "Assign your time first"
+                : spent < budget
+                  ? `Commit week — ${budget - spent} block${budget - spent === 1 ? "" : "s"} unused`
+                  : "Commit week"}
+            </button>
+          </section>
+
           <Meters career={career} state={state} />
 
           {m && (
