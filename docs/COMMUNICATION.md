@@ -128,10 +128,12 @@ touched. Run the browser tests when you change a screen.
 - **Node isn't on the Bash `PATH`.** It is at `C:\Program Files\nodejs`. In
   PowerShell, prefix commands with
   `$env:Path = "C:\Program Files\nodejs;$env:Path";`. Python isn't installed.
-- **Line endings:** `core.autocrlf=true`. `scripts/commands.ts` is stored
-  with CRLF line endings in git, so a normal `git add` turns it into a
-  whole-file diff. Stage it with `git -c core.autocrlf=false add scripts/commands.ts`
-  and confirm with `git diff --cached --stat` that only your lines changed.
+- **Line endings:** `core.autocrlf=true`. Some files are stored with CRLF
+  line endings in git: at least `scripts/commands.ts` and
+  `lib/game/careers/chef.ts`. A normal `git add` turns them into a whole-file
+  diff. Stage them with `git -c core.autocrlf=false add <file>`, keeping the
+  file's CRLF endings. Then confirm with `git diff --cached --stat` that only
+  your lines changed, and do that before every commit, for every file.
 - **The browser tests hang on Windows after passing.** Playwright workers
   don't shut down, the run takes about 12 minutes, and it exits with code 1
   even when every test passed. Read the `N passed` line, not the exit code.
