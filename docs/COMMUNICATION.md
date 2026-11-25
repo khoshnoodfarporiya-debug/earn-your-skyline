@@ -137,6 +137,8 @@ touched. Run the browser tests when you change a screen.
 - **The browser tests hang on Windows after passing.** Playwright workers
   don't shut down, the run takes about 12 minutes, and it exits with code 1
   even when every test passed. Read the `N passed` line, not the exit code.
+- **Don't switch branches while the browser suite runs.** It serves the live
+  working tree, so a checkout mid-run tests the wrong code.
 - **Git has no global name or email set.** Commits so far used the
   identity of the repository's earlier commits, passed per command with `-c`.
   Don't set global git config without asking.
@@ -396,3 +398,29 @@ Branch `layout/pin-week-commit`. This is the second item from the layout review.
 - Type check, lint and the build pass.
 - The full browser suite was still running when this was committed. Its result
   is recorded in a later entry.
+
+### 26 Nov 2026 — Claude (Claude Code): artwork wired in
+Branch `art/newer-career-scenes`, built on top of `layout/pin-week-commit`.
+Merge the pinned-commit work first.
+
+- **Reviewed Codex's 24 masters** against the rejection checklist. All pass:
+  no lettering, subjects inside the cropped strip, and a match with the house
+  style.
+- **Converted all 24 to WebP and wired 18 of them:**
+  - 16 event pictures: every Founder, Politician, Architect and Engineer event
+    now opens with one
+  - 2 screen banners: the Politician's postbag and the Founder's product
+  - A new engine check keeps that coverage. Details are in `WORKING_PLAN.md`,
+    section 6.
+- **The six victory scenes are converted but not shown yet.** As Codex found,
+  the game's only "won" outcome is retirement (`retire()` in
+  `lib/game/retirement.ts`). The end screen shows "Milestone reached" and
+  the Physician's hospital picture for every retirement, whether or not the
+  career goal was met. Where the victory pictures should go is the owner's
+  decision.
+- **Verified:** type check, lint, 2,084 engine checks and the build pass. All
+  404 browser tests pass on this work by itself.
+- **Pinned-commit branch:** its own suite run was cut short at 184 of 404
+  (every phone test, no failures) when I switched branches. The working tree
+  is what the tests serve, so **don't switch branches while the browser suite
+  is running.** CI's `verify` covers the combined branch.

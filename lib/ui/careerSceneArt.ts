@@ -125,12 +125,14 @@ export const CAREER_SCREEN_ART: Record<
 > = {
   founder: {
     runway: scene("careers", "founder-runway", "center 50%"),
+    product: scene("careers", "founder-product", "center 48%"),
     crew: scene("careers", "founder-team", "center 48%"),
     raising: scene("careers", "founder-raising", "center 48%"),
   },
   politician: {
     polling: scene("careers", "politician-polling", "center 48%"),
     blocs: scene("careers", "politician-electorate", "center 50%"),
+    constituents: scene("careers", "politician-postbag", "center 50%"),
     positions: scene("careers", "politician-positions", "center 48%"),
     office: scene("careers", "politician-office", "center 45%"),
   },

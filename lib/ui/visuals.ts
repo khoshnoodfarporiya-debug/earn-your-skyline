@@ -6,6 +6,29 @@ import type {
 } from "../game/medical/types";
 import { CITIES } from "../game/medical/cities";
 import { CRITIC_ART } from "./chefArt";
+import { ART_SIZES } from "./purchaseArt.generated";
+
+/**
+ * An event picture built by `npm run build:art` from a master in
+ * `art-source/visuals/events/`. Sizes come from the generated table, so a
+ * re-rendered master can never leave a stale width behind.
+ */
+function eventScene(
+  file: string,
+  category: string,
+  alt: string,
+  focus = "center 50%",
+): EventPresentation {
+  const size = ART_SIZES[`events/${file}`] ?? { width: 720, height: 480 };
+  return {
+    src: `/visuals/events/${file}.webp`,
+    width: size.width,
+    height: size.height,
+    category,
+    alt,
+    focus,
+  };
+}
 
 /**
  * Visual asset registry.
@@ -109,6 +132,91 @@ export const EVENT_VISUALS: Record<string, EventPresentation> = {
     alt: CRITIC_ART.alt,
     focus: CRITIC_ART.focus,
   },
+
+  /*
+   * The four newer careers' events (November 2026, from docs/VISUALS.md
+   * batch 3). Before these, all sixteen opened as a dialog with no picture.
+   */
+  founder_acquihire: eventScene(
+    "event-founder-acquihire",
+    "Acquisition",
+    "Two relaxed executives across a glass-walled meeting table from a small start-up team sitting close together.",
+  ),
+  founder_cloudbill: eventScene(
+    "event-founder-cloudbill",
+    "Infrastructure",
+    "A founder alone at night with head in hand, a laptop chart spiking upward and a server cabinet glowing behind.",
+  ),
+  founder_enterprise: eventScene(
+    "event-founder-enterprise",
+    "Customers",
+    "Two young founders presenting from a laptop to a row of procurement managers in a large boardroom.",
+  ),
+  founder_bridge: eventScene(
+    "event-founder-bridge",
+    "Funding",
+    "An older investor at ease in a leather armchair opposite a tired founder perched on the edge of their seat.",
+  ),
+  pol_whip: eventScene(
+    "event-pol-whip",
+    "The party",
+    "A party whip leaning in to speak quietly to a younger politician in a wood-panelled parliamentary corridor.",
+  ),
+  pol_crisis: eventScene(
+    "event-pol-crisis",
+    "The ward",
+    "Residents and council workers in hi-vis on a flooded terraced street at dusk, a politician among them.",
+  ),
+  pol_donor: eventScene(
+    "event-pol-donor",
+    "Money",
+    "A property developer sliding a paper across a restaurant table toward a politician, a fenced building site beyond the window.",
+  ),
+  pol_defection: eventScene(
+    "event-pol-defection",
+    "The party",
+    "Two politicians talking quietly at a corner table in a pub's back room after closing time.",
+  ),
+  arch_value: eventScene(
+    "event-arch-value",
+    "Cost",
+    "A contractor in hi-vis tapping a cheap cladding sample beside the original one while an architect looks on, unconvinced.",
+  ),
+  arch_planning: eventScene(
+    "event-arch-planning",
+    "Planning",
+    "An architect alone on a bench in a council corridor reading a letter, a model of the building beside them.",
+  ),
+  arch_publication: eventScene(
+    "event-arch-publication",
+    "Press",
+    "A photographer shooting a long concrete and timber living room at golden hour while the architect watches.",
+  ),
+  arch_spouse: eventScene(
+    "event-arch-spouse",
+    "Client",
+    "A client's partner leaning over plans on a kitchen table, pointing at the stair while the client looks on.",
+  ),
+  eng_odd: eventScene(
+    "event-eng-odd",
+    "Quality",
+    "An engineer under a work lamp turning a worn, discoloured gear in gloved hands, studying the damage.",
+  ),
+  eng_cheaper: eventScene(
+    "event-eng-cheaper",
+    "Supply chain",
+    "An engineer measuring a cheap bearing with calipers beside a boxed premium one, a supplier's rep waiting behind.",
+  ),
+  eng_standard: eventScene(
+    "event-eng-standard",
+    "Regulation",
+    "An engineer at a night desk with head in hand over a thick technical standard and a drawing marked in red.",
+  ),
+  eng_rush: eventScene(
+    "event-eng-rush",
+    "Orders",
+    "A small team standing around a single crate on a loading dock at dawn, an empty lorry trailer waiting.",
+  ),
 };
 
 export const eventVisual = (eventId: string): EventPresentation | null =>

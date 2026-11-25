@@ -2196,6 +2196,16 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
     "every event visual carries a category",
     Object.values(EVENT_VISUALS).every((v) => v.category.length > 0),
   );
+  /* The newer careers' events all have pictures now (Nov 2026). A new event
+     for one of them without artwork should be a decision, not an accident. */
+  const newerEvents = CAREERS.filter((c) =>
+    ["founder", "politician", "architect", "engineer"].includes(c.id),
+  ).flatMap((c) => c.events.map((e) => e.id));
+  check(
+    "every Founder, Politician, Architect and Engineer event has artwork",
+    newerEvents.length === 16 && newerEvents.every((id) => id in EVENT_VISUALS),
+    newerEvents.filter((id) => !(id in EVENT_VISUALS)).join(", "),
+  );
 
   /*
    * Careers: every career you can actually *start* has a cover.

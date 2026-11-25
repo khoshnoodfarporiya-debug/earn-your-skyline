@@ -205,8 +205,23 @@ Suggestions, highest value first:
 ### 6. Artwork
 
 - [x] Generate the 24 PNG masters specified in [`VISUALS.md`](VISUALS.md).
-- [ ] Convert the masters to WebP, wire the two banners and sixteen event
-      images, and check their crops in the game.
+- [x] Convert the masters to WebP, wire the two banners and sixteen event
+      images, and check their crops in the game (branch `art/newer-career-scenes`)
+  - All 24 masters reviewed against the `VISUALS.md` rejection checklist on
+    contact sheets, with the 21:9 strip marked. Close-ups of the riskiest two
+    (hi-vis vests, a laptop chart) show no lettering. All 24 pass.
+  - `npm run build:art` converts all 24, including the six victory scenes,
+    which are converted but not used yet. Every existing WebP came out
+    byte-identical.
+  - The 16 events are in `EVENT_VISUALS`, each with a category and a
+    description over 30 characters, built by `eventScene` from the generated
+    sizes.
+  - New banners: the Politician's postbag (`constituents`) and the Founder's
+    `product`, with captions in `CareerSceneBanner`.
+  - New engine check: every Founder, Politician, Architect and Engineer event
+    has artwork.
+  - Checked in the game on phone and desktop. Both banners load with no
+    console or network errors.
 - [ ] Choose whether the six career milestone scenes belong on retirement
       or a career-goal celebration, then wire and verify the chosen surface.
 
