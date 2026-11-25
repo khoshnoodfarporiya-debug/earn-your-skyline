@@ -361,6 +361,9 @@ Branch `docs/layout-review`. Documentation only; no code changed.
   - Each action is now one row, with tap-to-expand details and a "Show details"
     switch kept per browser.
   - The planner is 54% shorter on a phone and 45% shorter on desktop.
-  - Type check, lint, engine checks and the build pass. The full browser suite:
-    see the last line of this entry.
+  - Type check, lint, engine checks and the build pass, and all 404 browser
+    tests pass (mobile and desktop, 8.2 minutes).
   - The other suggestions are still open.
+- **Artwork:** the owner has an image model (ChatGPT) producing the images from
+  `docs/VISUALS.md`. When they land, follow that file's "For the coding AI"
+  steps. The victory-screen fix waits on batch 1.
