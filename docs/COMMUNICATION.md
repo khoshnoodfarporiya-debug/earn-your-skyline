@@ -341,3 +341,26 @@ desktop).
   easier than these numbers say.
 - The "plain kitchen ends below zero" item was a misreading: that bot is the
   control and never repays its loan by design.
+
+### 25 Nov 2026 — Claude (Claude Code): layout review
+Branch `docs/layout-review`. Documentation only; no code changed.
+
+- **How it was measured.** A scratch Playwright script, kept outside the repo,
+  opened every destination and tab of four careers at 375px and 1280px. For each
+  screen it recorded the page height, the number of controls and words, and any
+  horizontal overflow, and saved screenshots. The Physician used the `midrun`
+  fixture; the others were new runs.
+- **Findings and the ranked suggestions** are in `WORKING_PLAN.md`, section 5.
+  The headline numbers:
+  - The Physician's Build screen is 16 screens long on a phone.
+  - The week planner takes about 1,700px on a phone.
+  - On desktop, the Week screen's commit button sits about 2,330px down, with
+    nothing pinned.
+  - Every career's Week hero shows the Physician's doctor picture.
+- **Built first: the compact week planner** (owner's choice). See WORKING_PLAN section 5.
+  - Each action is now one row, with tap-to-expand details and a "Show details"
+    switch kept per browser.
+  - The planner is 54% shorter on a phone and 45% shorter on desktop.
+  - Type check, lint, engine checks and the build pass. The full browser suite:
+    see the last line of this entry.
+  - The other suggestions are still open.
