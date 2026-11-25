@@ -122,6 +122,72 @@ Balance snapshot (4 seeds, 120 weeks, so treat this as a signal, not a verdict):
 - [ ] Error reporting and a "send feedback" button before any public playtest
 - [ ] Save export and import (a JSON download) as a cheap stand-in for cloud saves
 
+### 5. Layout and efficiency (review of 25 Nov 2026)
+
+Measured with a Playwright script over every destination and tab of the
+Physician (mid-run save), Chef, Politician and Founder, at 375px and 1280px.
+"Screens" means the page height divided by one viewport.
+
+Findings:
+- **Length varies wildly.**
+  - Phone: Physician Work → Build is 13,260px (**16 screens**), Life → Luxury 8.3,
+    the Week screens 4.5–6.6.
+  - Desktop: Build is 6.4 screens.
+  - Most Politician and Founder tabs are about 1 screen. Politician Count and
+    Ladder are about 80 words each.
+- **The week planner is the tallest thing on the most-used screen.** Each action
+  is a card with a blurb and 2–3 chips, so 8 Chef actions take about 1,700px on
+  a phone and about 1,000px on desktop. It is used every week, 156 times a run.
+- **Desktop Week has no pinned commit.** On the Chef's Week screen the commit
+  button sits about 2,330px down. The Work screens already pin the planner in
+  the right column, and phones pin a commit bar.
+- **The same numbers repeat.** On the Chef's Week screen, cash appears 3 times:
+  hero, status strip and observations. Week appears twice.
+- **The "Learning the ropes" card** is about 330px at the top of the Week screen.
+- **Desktop forecast grid** ("If you commit this week"): 5 tiles in a 4-column
+  grid leave a large blank area.
+- **Cramped chips on desktop.** In the narrow right-column planner (Politician
+  Work), the chips wrap to one or two words per line.
+- **Bug: every career's Week hero shows the Physician's banner** (a doctor in a
+  white coat), because `OverviewHero` always uses `sectionVisual("overview")`.
+- **Good news:** no screen overflows horizontally at 375px.
+
+Suggestions, highest value first:
+- [x] **Compact week planner** (`components/ActionBoard.tsx`, used by the Week
+      screen, the desktop rail and the phone sheet).
+  - Each row is icon, name, cost, the first effect line (up to two lines) and
+    the stepper.
+  - The name opens the blurb and every effect line (`aria-expanded`).
+  - "Show details" in the header opens every row. That preference is kept per
+    browser in localStorage (`career-tycoon:planner-details:v1`), not in the save.
+  - Planner height on a phone: Chef 1,530 → 701px, Politician 1,499 → 718px,
+    Physician 1,461 → 739px.
+  - Planner height on desktop: about 1,000 → 577px.
+  - The Chef's Week page on a phone: 5,180 → 3,992px.
+  - Rows came out at about 75px, not the 56px target, because the effect line
+    was too useful to truncate to one line.
+- [ ] **Pin the planner and commit on desktop Week too.** Use the same sticky
+      right column the Work screens use.
+- [ ] **Build screen as a shop, not a gallery.**
+  - Filters: Can buy now, Owned, Later.
+  - Collapsible groups.
+  - Compact rows with thumbnails on phones instead of full image cards.
+  - Default to what is affordable now; locked items collapse into one "Saving
+    toward" line.
+- [ ] **One status source.** Keep the sticky strip. Drop the duplicated figures
+      from the hero, or shrink the hero to a slim title bar after week 1.
+- [ ] **Collapse onboarding after first read** to a single line that reopens it,
+      or move its content into the glossary.
+- [ ] **Merge alerts and the next step** into one compact list, one row each,
+      with the action button inline.
+- [ ] **Fix the forecast grid** so the tiles fill their row.
+- [ ] **Merge thin tabs.**
+  - Politician: Count + Ladder.
+  - Founder: Runway + Raising.
+  - Fewer taps for the same information.
+- [ ] **Per-career Week hero art,** or no picture for careers without one. This
+      bug is listed above; the images can come from `VISUALS.md`.
+
 ## Dropped
 
 _Nothing yet._
