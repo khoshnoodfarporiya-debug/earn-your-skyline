@@ -501,10 +501,12 @@ import {
 import {
   PRODUCE_BY_ID,
   clearSpoiled,
+  creditLine,
   drawFromLarder,
   freshnessOf,
   larderCovers,
   plateQuality,
+  soloCovers,
 } from "../lib/game/careers/kitchen";
 import {
   lawyer,
@@ -10276,9 +10278,19 @@ console.log("\nThe Chef's dishes\n" + "─".repeat(52));
             1,
           ),
     );
+    /* Suppliers deliver on account down to the trade-credit line, so
+       "cannot afford" now means "would go past it". */
     check(
       "an order you cannot afford is refused, not part-filled",
-      pantryQty(kitchen(buy(startK(10), "beef")), "beef", 1) === 0,
+      pantryQty(
+        kitchen(buy(startK(-creditLine(kitchen(startK())) + 10), "beef")),
+        "beef",
+        1,
+      ) === 0,
+    );
+    check(
+      "but a short squeeze does not stop the kitchen buying food",
+      pantryQty(kitchen(buy(startK(10), "beef")), "beef", 1) > 0,
     );
     check(
       "the pantry counts towards what the business is worth",
@@ -10314,6 +10326,62 @@ console.log("\nThe Chef's dishes\n" + "─".repeat(52));
     check(
       "a dish with nothing behind it makes nothing at all",
       consumeForCovers(kitchen(startK()), roast, 10, 1).made === 0,
+    );
+  }
+
+  /* ------------------------------------- a kitchen that runs out of money
+   *
+   * Before the November 2026 rebalance a kitchen that dipped below the price
+   * of one crate could never cook again: no food, no takings, no way back,
+   * and the wages kept going out. These pin the three rules that replaced
+   * that dead end.
+   */
+  {
+    /* 1. Past the trade-credit line the covered market still sells plain
+          crates, but only enough for the chef to cook alone. */
+    const broke = startK(-80_000);
+    let fed = broke;
+    for (let i = 0; i < 12; i++) {
+      fed = runCommand(chef, fed, "buyProduce", "market:basic");
+    }
+    const solo = soloCovers(kitchen(fed), fed.r.skill);
+    const crate = PRODUCE_BY_ID.get("basic")!.covers;
+    check(
+      "a broke kitchen can still buy enough plain food to cook alone",
+      larderCovers(kitchen(fed)) >= Math.min(solo, crate) &&
+        fed.r.cash < broke.r.cash,
+      `${larderCovers(kitchen(fed))} covers in the larder`,
+    );
+    check(
+      "and not a crate more than that",
+      larderCovers(kitchen(fed)) < solo + crate,
+      `${larderCovers(kitchen(fed))} covers against ${Math.round(solo)} solo`,
+    );
+
+    /* 2. Payroll that cannot be met costs the last cook in — one a week. */
+    let staffed = startK(500_000);
+    staffed = runCommand(chef, staffed, "hireKitchen", "commis");
+    staffed = runCommand(chef, staffed, "hireKitchen", "partie");
+    const first = kitchen(staffed).staff[0]?.id;
+    staffed.r.cash = -creditLine(kitchen(staffed)) - 50_000;
+    const after = advanceWeek(chef, staffed, { rest: 1 }).state;
+    check(
+      "a kitchen past its credit line loses the last cook it hired",
+      kitchen(staffed).staff.length === 2 &&
+        kitchen(after).staff.length === 1 &&
+        kitchen(after).staff[0]?.id === first,
+      `${kitchen(staffed).staff.length} -> ${kitchen(after).staff.length}`,
+    );
+
+    /* 3. No city charges more for food, relative to what a cover sells for,
+          than its own diners pay. Mumbai did, by 15%, and its stall could
+          not clear a profit at any staffing level. */
+    check(
+      "no kitchen city prices food above what its covers are worth",
+      KITCHEN_CITIES.every((c) => c.produce <= c.spend * 1.05),
+      KITCHEN_CITIES.filter((c) => c.produce > c.spend * 1.05)
+        .map((c) => c.name)
+        .join(", "),
     );
   }
 

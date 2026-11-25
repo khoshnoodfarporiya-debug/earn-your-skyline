@@ -195,7 +195,7 @@ interface Result {
  * when there is more demand than hands. No city-specific cleverness: the same
  * rules run in Mumbai and in Paris, which is the point.
  */
-function playChef(cityId: string, seed: number): Result {
+export function playChef(cityId: string, seed: number): Result {
   let s = startRun(chef, seed, { city: cityId });
   let weeksBroke = 0;
   let troughCash = s.r.cash;
@@ -232,7 +232,7 @@ function playChef(cityId: string, seed: number): Result {
       const before = s.r.cash;
       s = runCommand(chef, s, "buyProduce", "market:basic");
       if (s.r.cash === before) break; /* refused — too dear, or below minimum */
-      if (s.r.cash < 2_500) break;
+      if (s.r.cash < localOf(kitchen(s), 2_500)) break;
     }
 
     /*
@@ -246,11 +246,11 @@ function playChef(cityId: string, seed: number): Result {
     if (next && full && s.r.cash > premisesPrice(here, next) * 3) {
       s = runCommand(chef, s, "takePremises", next.id);
     } else if (
-      s.r.cash > 60_000 &&
+      s.r.cash > localOf(kitchen(s), 60_000) &&
       !(kitchen(s).equipment ?? []).includes("coldroom")
     ) {
       s = runCommand(chef, s, "buyKit", "coldroom");
-    } else if (s.r.cash > 25_000 && kitchen(s).staff.length < 3) {
+    } else if (s.r.cash > localOf(kitchen(s), 25_000) && kitchen(s).staff.length < 3) {
       s = runCommand(chef, s, "hireKitchen", "partie");
     }
 
@@ -310,7 +310,7 @@ function playChef(cityId: string, seed: number): Result {
  * Somewhere in between is the answer, and the report prints both bots so the
  * gap is visible rather than asserted.
  */
-function playAmbitiousChef(cityId: string, seed: number): Result {
+export function playAmbitiousChef(cityId: string, seed: number): Result {
   let s = startRun(chef, seed, { city: cityId });
   let weeksBroke = 0;
   let troughCash = s.r.cash;
@@ -363,7 +363,7 @@ function playAmbitiousChef(cityId: string, seed: number): Result {
       const before = s.r.cash;
       s = runCommand(chef, s, "buyProduce", "market:basic");
       if (s.r.cash === before) break;
-      if (s.r.cash < 2_500) break;
+      if (s.r.cash < localOf(kitchen(s), 2_500)) break;
     }
 
     /* The room, the cold room, the brigade — all as before. */
@@ -373,11 +373,11 @@ function playAmbitiousChef(cityId: string, seed: number): Result {
     if (next && full && s.r.cash > premisesPrice(here, next) * 3) {
       s = runCommand(chef, s, "takePremises", next.id);
     } else if (
-      s.r.cash > 60_000 &&
+      s.r.cash > localOf(kitchen(s), 60_000) &&
       !(kitchen(s).equipment ?? []).includes("coldroom")
     ) {
       s = runCommand(chef, s, "buyKit", "coldroom");
-    } else if (s.r.cash > 25_000 && kitchen(s).staff.length < 3) {
+    } else if (s.r.cash > localOf(kitchen(s), 25_000) && kitchen(s).staff.length < 3) {
       s = runCommand(chef, s, "hireKitchen", "partie");
     }
 
@@ -390,7 +390,7 @@ function playAmbitiousChef(cityId: string, seed: number): Result {
      */
     if (
       slack > 10 &&
-      s.r.cash > 90_000 &&
+      s.r.cash > localOf(kitchen(s), 90_000) &&
       !(kitchen(s).equipment ?? []).includes("cellar")
     ) {
       s = runCommand(chef, s, "buyKit", "cellar");
@@ -424,7 +424,7 @@ function playAmbitiousChef(cityId: string, seed: number): Result {
       if (
         bottlesHeld(kitchen(s)) > 60 &&
         slack > 8 &&
-        s.r.cash > 30_000 &&
+        s.r.cash > localOf(kitchen(s), 30_000) &&
         !kitchen(s).staff.some((x) => x.role === "somm")
       ) {
         s = runCommand(chef, s, "hireKitchen", "somm");

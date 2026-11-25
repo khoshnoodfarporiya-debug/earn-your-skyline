@@ -67,6 +67,8 @@ import {
   labourIndex,
   capitalIndex,
   localOf,
+  creditLine,
+  soloCovers,
   skillOf,
   produceIndex,
   spendPerHead,
@@ -875,7 +877,23 @@ export const chef: CareerDef = {
         const price = priceFrom(sup, p, standing, produceIndex(k));
         /* A minimum order is a minimum *spend*: one crate may not reach it. */
         if (price < sup.minimum) return;
-        if (s.r.cash < price) return;
+        /* On account, down to the trade-credit line — see `creditLine` in
+           kitchen.ts. Food is the one thing a kitchen cannot trade without. */
+        if (s.r.cash - price < -creditLine(k)) {
+          /*
+           * Past the line, the covered market is the last resort: plain
+           * crates on tick, and only enough for you to cook alone. A kitchen
+           * that cannot buy food cannot earn the money to buy food, and this
+           * game has no forced ending — so a broke chef can always work their
+           * way back from the stall, one slow week at a time, and nothing
+           * more generous than that.
+           */
+          const lastResort =
+            sup.id === "market" &&
+            p.id === "basic" &&
+            larderCovers(k) < soloCovers(k, s.r.skill);
+          if (!lastResort) return;
+        }
 
         s.r.cash -= price;
 
@@ -1514,7 +1532,9 @@ export const chef: CareerDef = {
         const standing = standingWith(k, sup.id);
         const price = ingredientPrice(k, sup, ing, standing, s.week);
         if (price < sup.minimum) return;
-        if (s.r.cash < price) return;
+        /* On account, down to the trade-credit line — see `creditLine` in
+           kitchen.ts. Food is the one thing a kitchen cannot trade without. */
+        if (s.r.cash - price < -creditLine(k)) return;
         s.r.cash -= price;
 
         k.suppliers = {
@@ -2631,6 +2651,32 @@ export const chef: CareerDef = {
      */
     s.r.cash += revenue - r - w - kitCost - spoiled.cost;
     s.r._lastRevenue = revenue;
+
+    /*
+     * PAYROLL THAT CANNOT BE MET.
+     *
+     * Past the trade-credit line the wages bounce, and the last cook in is the
+     * first one out. One a week, so a bad fortnight costs a pair of hands
+     * rather than the brigade — and the cost base shrinks toward what the
+     * takings can carry instead of draining a kitchen that has stopped
+     * earning. Nobody is sacked by the game while the account is merely thin.
+     */
+    if (s.r.cash < -creditLine(k) && k.staff.length > 0) {
+      const gone = k.staff[k.staff.length - 1];
+      k.staff = k.staff.slice(0, -1);
+      for (const x of k.staff) x.morale = Math.max(0, moraleOf(x) - 8);
+      const role = ROLE_BY_ID.get(gone.role)?.label.toLowerCase() ?? gone.role;
+      out.push({
+        label: `${gone.name} left — wages unpaid`,
+        kind: "info",
+        note: `The account is past what the bank and the suppliers will carry. The ${role} has gone, and the rest of the brigade noticed.`,
+      });
+      pushLog(
+        s,
+        `You could not make payroll. ${gone.name}, your ${role}, has walked out.`,
+        "bad",
+      );
+    }
     /* Kept for the Money screen, which reports the week rather than recomputing
        it: what food cost, what was thrown away, and what the pantry is worth. */
     s.r._ingredientSpend = Math.round(ingredientCost);
@@ -2941,7 +2987,7 @@ export const chef: CareerDef = {
         }
       }
     }
-
+
     /* The phone is optional — a save from before it existed simply has none —
        but a present one has to hold the shapes the handset renders. */
     /* The shared validator: the sketch this replaces accepted malformed
