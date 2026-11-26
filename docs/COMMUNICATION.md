@@ -167,7 +167,7 @@ touched. Run the browser tests when you change a screen.
 - **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
   (Codex's, unmerged). Every merged branch has been deleted.
 - **`fix/news-repeats`**, merged into local `beta` (fast-forward) on the
-  owner's word, 26 Nov 2026; not pushed: the phone's news no longer runs the
+  owner's word and pushed, 26 Nov 2026: the phone's news no longer runs the
   same filler story week after week, and the Chef's stories have real
   headlines and bodies. See `WORKING_PLAN.md` section 1b.
 - **What's still open:** WORKING_PLAN section 8 steps 4–5 (prototype the
@@ -833,8 +833,8 @@ agree it before touching code.
 
 Branch `fix/news-repeats`, off `beta`, in its own worktree (another session
 was building the Week screen in the main checkout). The owner said "merge
-it": `beta` was fast-forwarded to it locally, without a checkout, and not
-pushed.
+it": `beta` was fast-forwarded to it locally, without a checkout, and then
+pushed on the owner's word ("Push beta").
 
 - **The bug:** a Chef save at week 8 showed The Pass's "half the city's
   kitchens are a sous chef short" at weeks 4, 5 and 6, and each body was the
