@@ -260,7 +260,9 @@ order. What exists today:
          branches are named `feature/…`, because git can't have a branch
          called `beta` alongside branches named `beta/…`. They merge into
          `beta`.
-     - [ ] Push `beta`. Vercel's preview URL for it becomes the beta link.
+     - [x] `beta` pushed 26 Nov 2026. The beta link, which always serves the
+           latest beta:
+           https://earn-your-skyline-git-beta-khoshnoodfarporiya-debugs-projects.vercel.app
    - [x] Version `0.9.0-beta.1` in `lib/version.ts` and `package.json`, kept
          equal by an engine check.
    - [x] "BETA vX" badge on the title screen and in the game header.
