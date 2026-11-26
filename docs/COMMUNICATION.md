@@ -150,7 +150,11 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`main` = `beta` = v0.9.0-beta.1, released 26 Nov 2026.** Everything below is
+- **`beta` is ahead of `main`** with the redesign's first passes, not yet
+  released: the new type (Fraunces and Inter), one button system, underlined
+  tabs and pill choices, and the 375px header fix. See the "type and buttons"
+  and "buttons, tabs and choices" entries in the session log.
+- **`main` = v0.9.0-beta.1, released 26 Nov 2026.** Everything below is
   in `main`:
   - the lit-window logo and lamplight palette
   - the iPhone install (PWA), the version and "What's new", and feature flags
@@ -162,7 +166,8 @@ touched. Run the browser tests when you change a screen.
   - the README with screenshots, and the `LICENSE` (all rights reserved)
 - **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
   (Codex's, unmerged). Every merged branch has been deleted.
-- **What's still open:** the brand design system (type and components), the
+- **What's still open:** the rest of the design system (spacing, the status
+  strip, the Life category tabs and about 110 one-off buttons), the
   rest of the layout review, real login, payments, the App Store, Solicitor
   and Engineer balance, and the Founder's gap between cities. See
   `WORKING_PLAN.md`.
@@ -701,3 +706,30 @@ interface work in code.
   - type check, lint, engine checks and the build pass
   - before and after screenshots compared
   - all 404 browser tests pass (6.9 minutes)
+
+### 26 Nov 2026 — Claude (Claude Code): buttons, tabs and choices
+
+Branch `feature/components`, merged into `beta` and pushed. The owner asked
+to carry on the redesign and make the game easier to understand.
+
+- **Three shapes, three meanings** (`app/globals.css`, `@layer components`).
+  Before, all three were the same bordered box:
+  - `.btn` (rounded rectangle) does something
+  - `.choice` (pill, `.is-on` when picked) picks one of a set
+  - `.tab` in a `.tab-row` (underlined word) shows another screen
+- **60 more buttons** in 21 files moved to `.btn`, by exact class string
+  (each was checked to be a `<button>`). New size `.btn-xs` (32px) for
+  inline choices in dense rows, such as the Architect's brief and palette.
+- **Tabs:** the section tabs under every destination and the glossary tabs.
+  **Choices:** post picker, "Mine only", the Founder's roadmap stance, the
+  Chef's service nights.
+- **Purchase cards:** chips slightly rounder and bolder; "Owned" is a lit
+  stamp with a tick.
+- **Still to do:** about 110 one-off buttons (whole-card rows, map pins,
+  icon and text buttons; each needs a look), the Life category tabs,
+  spacing, the status strip. `WORKING_PLAN.md` section 8, step 3.
+- **Verified:**
+  - type check and lint pass
+  - a survey of 124 screens (all seven careers, phone and desktop) finds
+    no horizontal overflow; phone screenshots checked by eye
+  - engine checks pass, and all 404 browser tests pass (7.5 minutes)

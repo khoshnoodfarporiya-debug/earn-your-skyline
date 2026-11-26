@@ -48,7 +48,7 @@ export function Chip({ text, tone = "neutral" }: ItemChip) {
             ? "bg-alarm-tint text-alarm"
             : "bg-paper text-ink-soft";
   return (
-    <li className={`num rounded-sm px-1.5 py-0.5 text-[12px] ${skin}`}>
+    <li className={`num rounded-md px-2 py-0.5 text-[12px] font-medium ${skin}`}>
       {text}
     </li>
   );
@@ -187,7 +187,8 @@ export function ItemCard({
 
         <div className="shrink-0 text-right">
           {owned ? (
-            <span className="sign text-[11.5px] text-clinical">
+            <span className="stamp inline-flex items-center gap-1 px-2 py-0.5 text-[12px] font-semibold">
+              <span aria-hidden>✓</span>
               {ownedLabel}
             </span>
           ) : price !== undefined ? (

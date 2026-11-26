@@ -255,7 +255,7 @@ export function BrigadePanel({
                       type="button"
                       disabled={resting}
                       onClick={() => onCommand("restStaff", person.id)}
-                      className="rounded border border-rule px-2.5 py-1 text-ink transition enabled:hover:border-chef disabled:cursor-not-allowed disabled:opacity-45"
+                      className="btn btn-sm btn-secondary"
                     >
                       {resting ? "Off this week" : "Give them the week"}
                     </button>
@@ -263,7 +263,7 @@ export function BrigadePanel({
                       type="button"
                       disabled={state.r.cash < train}
                       onClick={() => onCommand("trainStaff", person.id)}
-                      className="rounded border border-rule-soft px-2.5 py-1 text-ink-soft transition enabled:hover:border-chef enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
+                      className="btn btn-sm btn-quiet"
                     >
                       Train · {money(train)}
                     </button>

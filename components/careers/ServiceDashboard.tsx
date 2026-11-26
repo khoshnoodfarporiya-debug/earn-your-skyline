@@ -120,11 +120,7 @@ function NightReport({
               type="button"
               onClick={() => onPick(i)}
               aria-pressed={i === which}
-              className={`rounded-form border px-2.5 py-1 text-xs transition ${
-                i === which
-                  ? "border-chef bg-chef-tint text-ink"
-                  : "border-rule text-ink-soft hover:border-chef/60"
-              }`}
+              className={`choice ${i === which ? "is-on" : ""}`}
             >
               {SERVICE_BY_ID.get(n.service)?.label ?? n.service}
             </button>

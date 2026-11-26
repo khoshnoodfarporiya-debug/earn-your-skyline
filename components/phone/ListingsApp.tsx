@@ -158,7 +158,7 @@ export function ListingsApp({
                               onClick={() =>
                                 dispatch("briefCounsel", `${c.id}:${tier.id}`)
                               }
-                              className="rounded-form border border-rule bg-card/60 px-3.5 py-2 text-[13px] font-medium text-ink transition enabled:hover:border-clinical enabled:hover:bg-card-high enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                              className="btn btn-secondary"
                             >
                               {tier.label} · {money(fee)}
                             </button>

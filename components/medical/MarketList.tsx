@@ -132,11 +132,7 @@ export function MarketList({
           type="button"
           onClick={() => setMinesOnly((v) => !v)}
           aria-pressed={minesOnly}
-          className={`rounded-form border px-2.5 py-1.5 text-[12.5px] transition ${
-            minesOnly
-              ? "border-clinical bg-clinical-tint text-clinical"
-              : "border-rule bg-card text-ink-soft hover:border-clinical hover:text-clinical"
-          }`}
+          className={`choice ${minesOnly ? "is-on" : ""}`}
         >
           Mine only
         </button>

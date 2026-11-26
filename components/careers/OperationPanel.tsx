@@ -129,14 +129,14 @@ function PracticePanel({
                       <button
                         type="button"
                         onClick={() => onCommand("settleCase", c.id)}
-                        className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                        className="btn btn-sm btn-secondary"
                       >
                         Settle for {money(offer)}
                       </button>
                       <button
                         type="button"
                         onClick={() => onCommand("dropCase", c.id)}
-                        className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint hover:border-alarm hover:text-alarm"
+                        className="btn btn-sm btn-quiet btn-danger"
                       >
                         Come off the record
                       </button>

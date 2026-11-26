@@ -101,7 +101,7 @@ export function ScreenHeader({
                 <button
                   type="button"
                   onClick={() => onNavigate(o.primary!.destination)}
-                  className="min-h-[44px] rounded-form bg-clinical px-4 text-[13px] font-semibold text-on-accent transition hover:bg-clinical-hover"
+                  className="btn btn-primary"
                 >
                   {o.primary.label}
                 </button>

@@ -162,7 +162,7 @@ export function BeyondScreen({
                     type="button"
                     disabled={!!why}
                     onClick={() => onCommand("startVenture", v.id)}
-                    className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-sm btn-secondary"
                   >
                     {cost > 0 ? money(cost) : "Take it"}
                   </button>

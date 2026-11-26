@@ -81,7 +81,7 @@ export function LessonCard({
           <button
             type="button"
             onClick={() => onNavigate(lesson.action!.destination)}
-            className="min-h-[44px] rounded-form bg-clinical px-4 text-[13px] font-semibold text-on-accent transition hover:bg-clinical-hover"
+            className="btn btn-primary"
           >
             {lesson.action.label}
           </button>

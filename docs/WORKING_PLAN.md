@@ -402,8 +402,25 @@ screen at a time:
        over screen by screen.
    - [x] Before and after:
          `art-source/branding/concepts/type-and-buttons-before-after.png`.
-   - [ ] Spacing and the remaining components: cards, chips, tabs, the
-         status strip
+   - [x] **Buttons, tabs and choices** (branch `feature/components`,
+         26 Nov 2026)
+     - 60 more buttons in 21 files moved to `.btn` (every career's Work
+       screens, the phone apps, the visuals). A new `.btn-xs` (32px) is for
+       inline choices in a dense row.
+     - **Three shapes, three meanings,** so a player can tell what a control
+       does before touching it: a rounded rectangle (`.btn`) does something;
+       a pill (`.choice` + `.is-on`) picks one of a set; an underlined word
+       (`.tab` in a `.tab-row`) shows another screen. Section tabs and the
+       glossary tabs are now `.tab`; the post picker, "Mine only", the
+       Founder's roadmap stance and the Chef's service nights are `.choice`.
+     - Chips on purchase cards are a little rounder and bolder; "Owned" is
+       a lit stamp with a tick.
+     - A survey of 124 screens (all seven careers, phone and desktop) finds
+       no horizontal overflow.
+   - [ ] Still to do: about 110 one-off buttons (rows that are whole cards,
+         map pins, link-style text buttons; each needs a look, not a
+         find-and-replace), the Life category tabs, spacing, and the status
+         strip.
 4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,

@@ -125,7 +125,7 @@ export function CellarPanel({
                   <button
                     type="button"
                     onClick={() => onCommand("sellWine", lot.id)}
-                    className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                    className="btn btn-sm btn-secondary"
                   >
                     Sell for {money(sellPrice(k, lot, state.week))}
                   </button>
@@ -176,7 +176,7 @@ export function CellarPanel({
                   type="button"
                   disabled={!!why}
                   onClick={() => onCommand("buyWine", wine.id)}
-                  className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn btn-sm btn-secondary"
                 >
                   {money(casePrice(k, wine))}
                 </button>

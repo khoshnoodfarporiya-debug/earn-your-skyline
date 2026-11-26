@@ -396,7 +396,7 @@ function RecipeRow({
             type="button"
             disabled={!!locked || state.r.cash < develop}
             onClick={() => onCommand("developRecipe", recipe.id)}
-            className="rounded border border-rule px-2.5 py-1 text-ink transition enabled:hover:border-chef disabled:cursor-not-allowed disabled:opacity-45"
+            className="btn btn-sm btn-secondary"
           >
             {develop > 0 ? `Develop · ${money(develop)}` : "Develop"}
           </button>
@@ -416,7 +416,7 @@ function RecipeRow({
             type="button"
             disabled={state.r.cash < refine}
             onClick={() => onCommand("refineRecipe", recipe.id)}
-            className="rounded border border-rule-soft px-2.5 py-1 text-ink-soft transition enabled:hover:border-chef enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
+            className="btn btn-sm btn-quiet"
           >
             Refine · {money(refine)}
           </button>

@@ -231,7 +231,7 @@ function BenchScreen({
                               onClick={() =>
                                 onCommand("setSpec", `${p.id}:${id}`)
                               }
-                              className="rounded border border-rule px-1.5 py-0.5 text-ink hover:border-clinical hover:text-clinical"
+                              className="btn btn-xs btn-secondary"
                             >
                               {SPECS[id].label}
                             </button>
@@ -261,7 +261,7 @@ function BenchScreen({
                                 onClick={() =>
                                   onCommand("setArchitecture", `${p.id}:${id}`)
                                 }
-                                className="rounded border border-rule px-1.5 py-0.5 text-ink hover:border-clinical hover:text-clinical"
+                                className="btn btn-xs btn-secondary"
                               >
                                 {ARCHITECTURES[id].label}
                               </button>
@@ -283,7 +283,7 @@ function BenchScreen({
                         title="Finds one real fault and narrows the estimate."
                         onClick={() => onCommand("buildPrototype", p.id)}
                         disabled={state.r.cash < prototypeCost(w, kind)}
-                        className="rounded border border-rule px-1.5 py-0.5 text-ink transition hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40"
+                        className="btn btn-xs btn-secondary"
                       >
                         Build a prototype — {money(prototypeCost(w, kind))}
                       </button>
@@ -358,7 +358,7 @@ function BenchScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("focusProduct", p.id)}
-                      className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                      className="btn btn-sm btn-secondary"
                     >
                       Put this on the bench
                     </button>
@@ -367,7 +367,7 @@ function BenchScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("beginTesting", p.id)}
-                      className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                      className="btn btn-sm btn-secondary"
                     >
                       Move it to the test rig
                     </button>
@@ -380,7 +380,7 @@ function BenchScreen({
                       onClick={() =>
                         onCommand("submitForCertification", p.id)
                       }
-                      className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                      className="btn btn-sm btn-secondary"
                     >
                       Submit for certification · {money(kind.certCost)}
                     </button>
@@ -397,7 +397,7 @@ function BenchScreen({
                   <button
                     type="button"
                     onClick={() => onCommand("withdrawProduct", p.id)}
-                    className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint hover:border-alarm hover:text-alarm"
+                    className="btn btn-sm btn-quiet btn-danger"
                   >
                     Drop it
                   </button>
@@ -442,7 +442,7 @@ function BenchScreen({
                     type="button"
                     onClick={() => onCommand("buyRig", rig.id)}
                     disabled={state.r.cash < rigCost(w, rig)}
-                    className="shrink-0 rounded border border-rule px-2.5 py-1 text-ink transition hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40"
+                    className="btn btn-sm btn-secondary shrink-0"
                   >
                     Buy — {money(rigCost(w, rig))}
                   </button>
@@ -473,7 +473,7 @@ function BenchScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("letGoBench", hire.id)}
-                      className="rounded border border-rule-soft px-2 py-0.5 text-ink-faint hover:border-alarm hover:text-alarm"
+                      className="btn btn-xs btn-quiet btn-danger"
                     >
                       Let go
                     </button>
@@ -483,7 +483,7 @@ function BenchScreen({
                     type="button"
                     onClick={() => onCommand("hireBench", role.id)}
                     disabled={state.r.cash < benchSalary(w, role) * 4}
-                    className="shrink-0 rounded border border-rule px-2.5 py-1 text-ink transition hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40"
+                    className="btn btn-sm btn-secondary shrink-0"
                   >
                     Hire — {money(benchSalary(w, role))}/wk
                   </button>
@@ -547,7 +547,7 @@ function NewBuildScreen({
                   type="button"
                   disabled={locked}
                   onClick={() => onCommand("startProduct", k.id)}
-                  className="rounded-form border border-rule px-3 py-1.5 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn btn-sm btn-secondary"
                 >
                   Start it
                 </button>

@@ -176,7 +176,7 @@ function CountScreen({
             <button
               type="button"
               onClick={() => onCommand("standAgain", "")}
-              className="mt-3 rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+              className="btn btn-sm btn-secondary mt-3"
             >
               Stand again
             </button>

@@ -459,7 +459,7 @@ function LarderScreen({
             <button
               type="button"
               onClick={() => onCall("market")}
-              className="mt-3 rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+              className="btn btn-sm btn-secondary mt-3"
             >
               Call your suppliers
             </button>
@@ -872,7 +872,7 @@ function BrigadeScreen({
         <button
           type="button"
           onClick={() => onCall("agency")}
-          className="mt-3 rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+          className="btn btn-sm btn-secondary mt-3"
         >
           Ring the agency
         </button>

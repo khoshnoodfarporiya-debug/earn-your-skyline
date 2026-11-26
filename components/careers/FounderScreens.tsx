@@ -372,7 +372,7 @@ function TeamScreen({
                   type="button"
                   disabled={tooDear}
                   onClick={() => onCommand("hireVenture", r.id)}
-                  className="rounded-form border border-rule px-3 py-1.5 text-ink transition enabled:hover:border-clinical enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn btn-sm btn-secondary"
                 >
                   Take them on
                 </button>
@@ -441,7 +441,7 @@ function RaisingScreen({
                     type="button"
                     disabled={blocked !== null}
                     onClick={() => onCommand("startRaise", r.id)}
-                    className="rounded-form border border-rule px-3 py-1.5 text-ink transition enabled:hover:border-clinical enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-sm btn-secondary"
                   >
                     Go out and raise it
                   </button>
@@ -586,11 +586,7 @@ function ProductScreen({
                 aria-pressed={active}
                 title={def.blurb}
                 onClick={() => onCommand("setRoadmap", id)}
-                className={`min-h-[40px] rounded-form border px-3 py-1.5 text-center text-[13px] font-semibold transition ${
-                  active
-                    ? "border-clinical bg-clinical-tint text-clinical"
-                    : "border-rule bg-paper text-ink hover:border-clinical/40"
-                }`}
+                className={`choice ${active ? "is-on" : ""}`}
               >
                 {def.label}
               </button>

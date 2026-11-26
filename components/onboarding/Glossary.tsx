@@ -117,7 +117,7 @@ export function Glossary({
         <div
           role="tablist"
           aria-label="Reference"
-          className="flex gap-1 border-b border-rule px-5 py-2.5"
+          className="tab-row px-3"
         >
           {(
             [
@@ -130,11 +130,7 @@ export function Glossary({
               role="tab"
               aria-selected={tab === id}
               onClick={() => setTab(id)}
-              className={`sign min-h-[44px] rounded-form border px-4 text-[11.5px] transition ${
-                tab === id
-                  ? "border-clinical/60 bg-clinical-tint text-clinical"
-                  : "border-rule bg-card text-ink-soft hover:text-ink"
-              }`}
+              className={`tab ${tab === id ? "is-on" : ""}`}
             >
               {label}
             </button>
