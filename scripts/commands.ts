@@ -104,6 +104,7 @@ import {
   setAmbition,
 } from "../lib/game/ambitions";
 import {
+  careerGoalMet,
   grantFor,
   legacyFor,
   retire,
@@ -182,6 +183,7 @@ import {
   PRACTICE_STAGES,
   PRACTICE_VISUAL,
   SECTION_VISUALS,
+  VICTORY_VISUALS,
   careerVisual,
   cityVisual,
   eventVisual,
@@ -2196,6 +2198,46 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
     "every event visual carries a category",
     Object.values(EVENT_VISUALS).every((v) => v.category.length > 0),
   );
+  /* The end screen's victory scene: one per career, only for a met goal. */
+  check(
+    "every career has its own victory scene, served as WebP",
+    CAREERS.every((c) => VICTORY_VISUALS[c.id]?.src.endsWith(".webp")) &&
+      new Set(CAREERS.map((c) => VICTORY_VISUALS[c.id]?.src)).size ===
+        CAREERS.length,
+  );
+  {
+    const fresh = startRun(chef, 7001);
+    check("a new run has not met its career goal", !careerGoalMet(chef, fresh));
+    const rich = startRun(chef, 7001);
+    rich.r.cash = 1e9;
+    check(
+      "a Chef with a full bar and the loan still owed has not met the goal",
+      chef.objective(rich).progress >= 1 &&
+        rich.r.debt > 0 &&
+        !careerGoalMet(chef, rich),
+    );
+    rich.r.debt = 0;
+    check(
+      "and once the loan is cleared it has",
+      careerGoalMet(chef, rich),
+    );
+    const seat = startRun(politician, 7001);
+    for (let i = 0; i < 3; i++) {
+      campaign(seat).results.push({
+        week: 40 + i * 50,
+        office: "councillor",
+        share: 0.5,
+        threshold: 0.42,
+        won: true,
+      });
+    }
+    check(
+      "a Politician's goal does not wait on campaign debt",
+      seat.r.debt > 0 && careerGoalMet(politician, seat),
+      `debt ${seat.r.debt}`,
+    );
+  }
+
   /* The newer careers' events all have pictures now (Nov 2026). A new event
      for one of them without artwork should be a decision, not an accident. */
   const newerEvents = CAREERS.filter((c) =>

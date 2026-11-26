@@ -565,6 +565,35 @@ export const MILESTONE_VISUAL: Visual = {
   focus: "center 40%",
 };
 
+/**
+ * Each career's own victory scene, keyed by career id (docs/VISUALS.md batch
+ * 1). The Physician keeps the hospital. Served at the 1200px derivative: the
+ * end-screen frame is up to 672 CSS px wide.
+ */
+function victoryScene(file: string, focus: string): Visual {
+  const size = ART_SIZES[`milestones/${file}`] ?? { width: 720, height: 480 };
+  return {
+    src: `/visuals/milestones/${file}@2x.webp`,
+    width: 1200,
+    height: Math.round((1200 * size.height) / size.width),
+    alt: "",
+    focus,
+  };
+}
+
+export const VICTORY_VISUALS: Record<string, Visual> = {
+  doctor: MILESTONE_VISUAL,
+  chef: victoryScene("milestone-victory-chef", "center 42%"),
+  lawyer: victoryScene("milestone-victory-solicitor", "center 45%"),
+  founder: victoryScene("milestone-victory-founder", "center 48%"),
+  politician: victoryScene("milestone-victory-politician", "center 48%"),
+  architect: victoryScene("milestone-victory-architect", "center 45%"),
+  engineer: victoryScene("milestone-victory-engineer", "center 45%"),
+};
+
+export const victoryVisual = (careerId: string): Visual | null =>
+  VICTORY_VISUALS[careerId] ?? null;
+
 // --------------------------------------------------- practice progression
 
 export interface PracticeStage {

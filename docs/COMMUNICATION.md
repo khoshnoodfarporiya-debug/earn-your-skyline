@@ -424,3 +424,20 @@ Merge the pinned-commit work first.
   (every phone test, no failures) when I switched branches. The working tree
   is what the tests serve, so **don't switch branches while the browser suite
   is running.** CI's `verify` covers the combined branch.
+
+### 26 Nov 2026 — Claude (Claude Code): victory scenes, only for a met goal
+Same branch (`art/newer-career-scenes`). The owner chose to show the victory
+picture only when the career goal was reached.
+
+- `careerGoalMet` (`lib/game/retirement.ts`) decides it: the goal bar at 100%,
+  plus a cleared loan where the goal card asks for one. Use it anywhere else
+  the game needs to know whether a run succeeded. Don't read
+  `outcome.kind === "won"` for that, because "won" only means the player retired.
+- The end screen shows each career's own scene for a met goal, and the plain
+  "You retired" header otherwise.
+- Verified: type check, lint, the engine checks (5 new) and the build pass.
+  Both paths were checked in the browser on Physician saves. The full browser
+  suite result is in the next entry.
+- Not checked in the browser: the other six careers' scenes on the end screen.
+  No saved game has one of those careers with its goal met. The engine checks
+  confirm the registry.

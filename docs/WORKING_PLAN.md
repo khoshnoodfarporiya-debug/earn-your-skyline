@@ -222,8 +222,26 @@ Suggestions, highest value first:
     has artwork.
   - Checked in the game on phone and desktop. Both banners load with no
     console or network errors.
-- [ ] Choose whether the six career milestone scenes belong on retirement
-      or a career-goal celebration, then wire and verify the chosen surface.
+- [x] Choose where the victory scenes go, then wire them. **Owner's decision
+      (26 Nov 2026): only when the career goal was reached.**
+  - `careerGoalMet(career, s)` in `lib/game/retirement.ts`: objective progress
+    of at least 100%, plus a cleared loan for the Physician, Chef and
+    Solicitor, whose goal cards say to clear it. That matches how the balance
+    harness has always counted "reached".
+  - `VICTORY_VISUALS` in `lib/ui/visuals.ts` holds one scene per career, served
+    at the 1200px derivative. The Physician keeps the hospital.
+  - `components/Outcome.tsx` shows "Milestone reached" over the career's scene
+    only when the goal was met. Any other retirement gets the plain
+    "You retired" header. Before this, every retirement showed the Physician's
+    hospital, whatever the career and whether or not the goal was met.
+  - 5 new engine checks:
+    - every career has its own scene
+    - a fresh run hasn't met its goal
+    - a full bar with the loan owed doesn't count
+    - a cleared loan does
+    - the Politician's campaign debt doesn't block its goal
+  - Checked in the browser: the `midrun` save (goal at 0%) gets the plain
+    header; the `nearly-won` save after one week (goal at 100%) gets the scene.
 
 ## Dropped
 

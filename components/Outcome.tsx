@@ -2,7 +2,8 @@
 
 import type { CareerDef, RunState } from "@/lib/game/types";
 import { formatResource } from "@/lib/game/format";
-import { MILESTONE_VISUAL } from "@/lib/ui/visuals";
+import { careerGoalMet } from "@/lib/game/retirement";
+import { victoryVisual } from "@/lib/ui/visuals";
 import { ArtFrame } from "./visuals/ArtFrame";
 
 export function Outcome({
@@ -18,18 +19,26 @@ export function Outcome({
 }) {
   const outcome = state.outcome!;
   const won = outcome.kind === "won";
+  /*
+   * "Won" in the engine only means the run ended on the player's terms — and
+   * the only way it does is retiring, at any point, goal or no goal. The
+   * victory scene is for a run that met its career's goal; a retirement that
+   * fell short gets the plain stamped header instead (owner's decision,
+   * November 2026). Each career has its own scene; the Physician keeps the
+   * hospital.
+   */
+  const victory = won && careerGoalMet(career, state) ? victoryVisual(career.id) : null;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-5 py-14 sm:px-8">
       {/*
-       * The milestone artwork is shown for a WON run and nothing else. The
-       * doctor career grants that only when the student debt is cleared and
-       * net worth clears the goal — a timeout or a collapse gets the plain
-       * stamped header below, because it has not been earned.
+       * The milestone artwork is shown for a run that met its goal and
+       * nothing else — see `victory` above. Anything short of that gets the
+       * plain stamped header below, because it has not been earned.
        */}
-      {won && (
+      {victory && (
         <ArtFrame
-          visual={MILESTONE_VISUAL}
+          visual={victory}
           ratio="aspect-[21/9]"
           scrim="full"
           sizes="(min-width: 768px) 672px, 100vw"
@@ -63,13 +72,13 @@ export function Outcome({
           </span>
         </div>
 
-        {!won && (
+        {!victory && (
           <h1 className="display mt-6 text-5xl leading-[1.02] sm:text-6xl">
             {outcome.title}
           </h1>
         )}
         <p
-          className={`text-[15px] leading-relaxed text-ink-soft ${won ? "mt-4" : "mt-5"}`}
+          className={`text-[15px] leading-relaxed text-ink-soft ${victory ? "mt-4" : "mt-5"}`}
         >
           {outcome.body}
         </p>
