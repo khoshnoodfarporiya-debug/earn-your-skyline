@@ -243,6 +243,66 @@ Suggestions, highest value first:
   - Checked in the browser: the `midrun` save (goal at 0%) gets the plain
     header; the `nearly-won` save after one week (goal at 100%) gets the scene.
 
+### 7. Beta, iPhone and business features (proposal, 26 Nov 2026)
+
+The owner wants a phone-only app (iPhone first, Android later), developed as a
+beta until it ships, with a cookie/privacy policy, real login, paid careers and
+a reliable social feed. Nothing below is built yet; this is the suggested
+order. What exists today:
+- no manifest or home-screen icon
+- no cookies, network calls or server
+- local profiles only
+- no payments
+- a deterministic social feed per career on the in-game phone
+
+1. [ ] **Beta setup** (small, do first)
+   - a `beta` integration branch with a fixed Vercel beta URL; `main` becomes
+     "shipped"
+   - a version number and "Beta" badge in the app
+   - a "What's new" changelog
+   - a feedback button
+   - feature flags, so unfinished paid/social features can ship switched off
+2. [ ] **iPhone, stage A: installable web app (PWA)**
+   - a web manifest, apple-touch-icon, `appleWebApp` metadata, and a viewport
+     with `viewport-fit=cover` and a theme colour
+   - an offline service worker (the game has no server, so it can run offline
+     once fonts are self-hosted)
+   - a Playwright WebKit/iPhone project, and testing on a real iPhone
+   - phone-first layout: on desktop, show the phone layout centred rather
+     than blocking desktop
+3. [ ] **Privacy policy and cookies**
+   - Today nothing is tracked, so no cookie banner is legally needed yet.
+   - Write the privacy policy and terms before login and payments; the App
+     Store requires a privacy policy URL anyway.
+   - Prefer cookieless analytics, so no consent banner is needed.
+   - Have a lawyer check it.
+4. [ ] **Real login and cloud saves** (needs a backend: Supabase, or Clerk +
+   database)
+   - email magic link plus **Sign in with Apple**, which Apple requires if
+     any other social login is offered
+   - "play as guest" kept
+   - in-app account deletion, which Apple also requires
+5. [ ] **Paid careers** (needs login)
+   - **Inside an iOS app, unlocking careers must use Apple In-App Purchase**
+     (Google Play Billing on Android); Stripe only works on the web.
+   - RevenueCat can manage all three.
+   - Suggested model: 2–3 free careers, then a one-time "All careers" unlock;
+     no subscription at first.
+   - Everything stays unlocked in the beta behind a flag.
+6. [ ] **iPhone, stage B: App Store**
+   - a Capacitor wrapper
+   - an Apple Developer account
+   - TestFlight for beta testers
+   - App Review
+7. [ ] **Social feed you can rely on** (no backend needed, can run in parallel)
+   - Keep the bots deterministic and rule-driven, not live AI.
+   - Every reply should cite a real fact from the player's run, checked by
+     engine checks.
+   - A profile per bot says who they are.
+   - Label them clearly as in-game characters.
+   - Live AI or player-to-player social features come later: they need a
+     server, moderation and money per player.
+
 ## Dropped
 
 _Nothing yet._

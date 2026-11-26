@@ -436,8 +436,26 @@ picture only when the career goal was reached.
 - The end screen shows each career's own scene for a met goal, and the plain
   "You retired" header otherwise.
 - Verified: type check, lint, the engine checks (5 new) and the build pass.
-  Both paths were checked in the browser on Physician saves. The full browser
-  suite result is in the next entry.
+  Both paths were checked in the browser on Physician saves. All 404 browser
+  tests pass on the combined branch (pinned commit + art + victory), 7.1
+  minutes.
 - Not checked in the browser: the other six careers' scenes on the end screen.
   No saved game has one of those careers with its goal met. The engine checks
   confirm the registry.
+
+### 26 Nov 2026 — Claude (Claude Code): beta and phone direction
+The owner set a new direction:
+- phone-only, iPhone first and Android later
+- developed as a **beta** until it ships
+- a cookie/privacy policy
+- login
+- paid careers
+- a reliable social feed of bots
+
+The suggested order and the platform rules that constrain it are in
+`WORKING_PLAN.md` section 7. The key constraints:
+- An iOS app must sell career unlocks through Apple In-App Purchase.
+- Offering any social login requires Sign in with Apple.
+- An app with accounts must offer account deletion inside the app.
+
+Nothing is built yet; the owner chooses where to start.
