@@ -150,11 +150,10 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`beta` is ahead of `main`** with v0.9.0-beta.3, not yet released: the
-  new Week screen (session-log entry "the Week screen, built") and the
-  phone-news repeat fix.
-- **`main` = v0.9.0-beta.2, released 26 Nov 2026.** Everything
+- **`main` = `beta` = v0.9.0-beta.3, released 26 Nov 2026.** Everything
   below is in `main`:
+  - the new Week screen (session-log entry "the Week screen, built") and
+    the phone-news repeat fix (release 0.9.0-beta.3)
   - the redesign's design system: Fraunces and Inter, one button system,
     underlined tabs and pill choices, one spacing rhythm, and the 375px
     header fix (session-log entries "type and buttons" to "release
@@ -909,3 +908,16 @@ Branch `feature/week-screen`, merged into `beta` and pushed. The owner said
 - **Verified** on the merged code: type check, lint and engine checks
   pass, and all 404 browser tests pass. In the browser: the Week screen
   at 375px (no overflow) and at 1280px.
+
+### 26 Nov 2026 — Claude (Claude Code): release 0.9.0-beta.3
+
+The owner said "Release to main", then "Check and merge" once CI had run.
+
+- **[PR 10](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/10)**
+  merged 26 Nov 2026 with a merge commit (`68ca730`), after all four checks
+  passed: `verify` (14 min), `balance`, Vercel and Vercel Preview Comments.
+- It carries the Week screen and the Chef phone-news fix; the version was
+  already 0.9.0-beta.3 on `beta`, so nothing was bumped for the release.
+- Local `main` and `beta` were fast-forwarded to the merge commit. The
+  production deploy of `68ca730` was building at the time of this note.
+- This note is on `beta` and reaches `main` with the next release.
