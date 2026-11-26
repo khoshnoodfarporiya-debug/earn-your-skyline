@@ -57,7 +57,7 @@ export function CitiesPanel({
   }, [nodes, selected, m.homeCity]);
 
   return (
-    <div className="space-y-5">
+    <div className="stack">
       {/*
        * The intelligence column is fixed-width and the map takes the rest, so
        * the panel does not stretch to fill a 1440px screen. Below `xl` the two

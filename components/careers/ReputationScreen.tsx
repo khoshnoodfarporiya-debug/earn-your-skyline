@@ -71,7 +71,7 @@ export function ReputationScreen({
   const bar = expectationOf(k);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------ complaints */}
       {complaints.map((c) => (
         <section
@@ -118,7 +118,7 @@ export function ReputationScreen({
                     type="button"
                     disabled={c.answeredWeek === state.week}
                     onClick={() => onCommand("respondComplaint", `${c.id}|${r.id}`)}
-                    className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-sm btn-secondary"
                   >
                     {r.label}
                   </button>

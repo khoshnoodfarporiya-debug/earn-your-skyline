@@ -72,7 +72,7 @@ export function ArchitectScreens({
 
   const def = screenOf(screen);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <div>
         <h1 className="display text-[19px] leading-tight text-ink">{def.label}</h1>
         <p className="mt-0.5 text-xs text-ink-faint">{def.purpose}</p>
@@ -127,7 +127,7 @@ function BoardsScreen({
   const built = a.commissions.filter((c) => c.done);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ---------------------------------------------------- on the boards */}
       <section
         aria-labelledby="boards-h"
@@ -264,7 +264,7 @@ function BoardsScreen({
                             type="button"
                             title={BRIEFS[b].blurb}
                             onClick={() => onCommand("setBrief", `${c.id}:${b}`)}
-                            className="rounded border border-rule px-1.5 py-0.5 text-ink hover:border-clinical hover:text-clinical"
+                            className="btn btn-xs btn-secondary"
                           >
                             {BRIEFS[b].label}
                           </button>
@@ -311,7 +311,7 @@ function BoardsScreen({
                               onClick={() =>
                                 onCommand("chooseMaterial", `${c.id}:${m.id}`)
                               }
-                              className="rounded border border-rule px-1.5 py-0.5 text-ink hover:border-clinical hover:text-clinical"
+                              className="btn btn-xs btn-secondary"
                             >
                               {m.label}
                             </button>
@@ -339,7 +339,7 @@ function BoardsScreen({
                         title="A consented scheme is far harder to reinvent."
                         onClick={() => onCommand("lodgeConsent", c.id)}
                         disabled={state.r.cash < consentCost(a, kind)}
-                        className="rounded border border-rule px-1.5 py-0.5 text-ink transition hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40"
+                        className="btn btn-xs btn-secondary"
                       >
                         Lodge planning — {money(consentCost(a, kind))}
                       </button>
@@ -378,7 +378,7 @@ function BoardsScreen({
                             <button
                               type="button"
                               onClick={() => onCommand("valueEngineer", c.id)}
-                              className="rounded border border-rule px-1.5 py-0.5 text-ink hover:border-clinical hover:text-clinical"
+                              className="btn btn-xs btn-secondary"
                             >
                               Value-engineer it
                             </button>
@@ -392,7 +392,7 @@ function BoardsScreen({
                       <button
                         type="button"
                         onClick={() => onCommand("focusCommission", c.id)}
-                        className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                        className="btn btn-sm btn-secondary"
                       >
                         Put this on the board
                       </button>
@@ -400,7 +400,7 @@ function BoardsScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("resignCommission", c.id)}
-                      className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint hover:border-alarm hover:text-alarm"
+                      className="btn btn-sm btn-quiet btn-danger"
                     >
                       Resign the job
                     </button>
@@ -492,14 +492,14 @@ function OffersScreen({
                   <button
                     type="button"
                     onClick={() => onCommand("takeCommission", o.id)}
-                    className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                    className="btn btn-sm btn-secondary"
                   >
                     Take it on
                   </button>
                   <button
                     type="button"
                     onClick={() => onCommand("declineCommission", o.id)}
-                    className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint hover:border-alarm hover:text-alarm"
+                    className="btn btn-sm btn-quiet btn-danger"
                   >
                     Turn it down
                   </button>
@@ -576,7 +576,7 @@ function CompetitionsScreen({
           <button
             type="button"
             onClick={() => onCommand("withdrawCompetition", "")}
-            className="mt-2 rounded border border-rule-soft px-2.5 py-1 text-xs text-ink-faint hover:border-alarm hover:text-alarm"
+            className="btn btn-sm btn-quiet btn-danger mt-2"
           >
             Withdraw
           </button>
@@ -608,7 +608,7 @@ function CompetitionsScreen({
                     type="button"
                     disabled={tooDear}
                     onClick={() => onCommand("enterCompetition", k.id)}
-                    className="shrink-0 rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-sm btn-secondary shrink-0"
                   >
                     Enter
                   </button>
@@ -667,7 +667,7 @@ function StudioScreen({
                 <button
                   type="button"
                   onClick={() => onCommand("letGoStudio", h.id)}
-                  className="rounded border border-rule-soft px-2 py-0.5 text-ink-faint hover:border-alarm hover:text-alarm"
+                  className="btn btn-xs btn-quiet btn-danger"
                 >
                   Let go
                 </button>
@@ -698,7 +698,7 @@ function StudioScreen({
                   type="button"
                   disabled={tooDear}
                   onClick={() => onCommand("hireStudio", r.id)}
-                  className="rounded-form border border-rule px-3 py-1.5 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn btn-sm btn-secondary"
                 >
                   Take them on
                 </button>

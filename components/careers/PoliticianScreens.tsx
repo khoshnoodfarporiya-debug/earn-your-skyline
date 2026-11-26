@@ -75,7 +75,7 @@ export function PoliticianScreens({
 
   const def = screenOf(screen);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <div>
         <h1 className="display text-[19px] leading-tight text-ink">{def.label}</h1>
         <p className="mt-0.5 text-xs text-ink-faint">{def.purpose}</p>
@@ -150,7 +150,7 @@ function CountScreen({
   const holding = wouldHold(c);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* --------------------------------------------------- the only day */}
       <section
         aria-labelledby="poll-h"
@@ -176,7 +176,7 @@ function CountScreen({
             <button
               type="button"
               onClick={() => onCommand("standAgain", "")}
-              className="mt-3 rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+              className="btn btn-sm btn-secondary mt-3"
             >
               Stand again
             </button>
@@ -333,11 +333,7 @@ function ElectorateScreen({
               type="button"
               onClick={() => onCommand("targetBloc", bloc.id)}
               aria-pressed={BLOCS[target].id === bloc.id}
-              className={`mt-1.5 rounded-form border px-2.5 py-1 text-[11.5px] transition ${
-                BLOCS[target].id === bloc.id
-                  ? "border-clinical bg-clinical-tint text-clinical"
-                  : "border-rule text-ink-soft hover:border-clinical hover:text-clinical"
-              }`}
+              className={`choice mt-1.5 ${BLOCS[target].id === bloc.id ? "is-on" : ""}`}
             >
               {BLOCS[target].id === bloc.id
                 ? "Targeting this bloc"
@@ -502,7 +498,7 @@ function Ladder({
           type="button"
           disabled={blocked !== null || c.outOfOffice}
           onClick={() => onCommand("seekSelection", "")}
-          className="rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition enabled:hover:border-clinical enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+          className="btn btn-sm btn-secondary"
         >
           Ask to be selected
         </button>
@@ -543,7 +539,7 @@ function PostbagScreen({
   const band = pollBandOf(c, state.week);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ---------------------------------------------------- open cases */}
       <section aria-labelledby="postbag-h" className="rounded-lg border border-rule bg-card p-4">
         <h2 id="postbag-h" className="sign text-[11.5px] text-ink-faint">
@@ -643,7 +639,7 @@ function PostbagScreen({
             type="button"
             onClick={() => onCommand("focusGroup", "")}
             disabled={fund < FOCUS_GROUP_COST || focused}
-            className="min-h-[44px] shrink-0 rounded-form border border-rule bg-paper px-4 text-[13px] font-semibold text-ink transition hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn btn-secondary shrink-0"
           >
             {focused
               ? `Focus group read — count is ± ${band.toFixed(0)}`

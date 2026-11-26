@@ -293,7 +293,7 @@ export function WeekReview({
             </p>
             <button
               onClick={onClose}
-              className="mt-4 min-h-[52px] w-full rounded-form bg-clinical px-4 text-[15px] font-bold text-on-accent transition hover:brightness-110"
+              className="btn btn-primary btn-lg mt-4 w-full"
             >
               Continue
             </button>
@@ -337,7 +337,7 @@ function ChangeLine({
         <button
           type="button"
           onClick={() => onGo(change.go!.destination)}
-          className="mt-1 min-h-[44px] rounded-form bg-card-high px-3 text-[12.5px] text-clinical transition hover:text-clinical-hover"
+          className="btn btn-secondary mt-1"
         >
           {change.go.label}
         </button>

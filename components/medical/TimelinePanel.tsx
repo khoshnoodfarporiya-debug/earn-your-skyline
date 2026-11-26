@@ -59,7 +59,7 @@ export function TimelinePanel({ state }: { state: RunState }) {
   const ahead = upcoming(state);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {ahead.length > 0 && (
         <Panel
           title="Still to come"

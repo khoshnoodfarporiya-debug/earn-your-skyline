@@ -182,7 +182,7 @@ export function AgencyApp({
                     type="button"
                     disabled={tooDear}
                     onClick={() => dispatch("hireCandidate", c.id)}
-                    className="rounded-form border border-rule bg-card/60 px-3.5 py-2 text-[13px] font-medium text-ink transition enabled:hover:border-clinical enabled:hover:bg-card-high enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-secondary"
                   >
                     Take them on · {money(placement)}
                   </button>
@@ -260,7 +260,7 @@ function BriefList({
                 type="button"
                 disabled={tooDear}
                 onClick={() => dispatch("briefAgency", r.id)}
-                className="rounded-form border border-rule bg-card/60 px-3.5 py-2 text-[13px] font-medium text-ink transition enabled:hover:border-clinical enabled:hover:bg-card-high enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                className="btn btn-secondary"
               >
                 {again ? "Brief again" : "Find me one"} · {money(search)}
               </button>

@@ -101,7 +101,7 @@ export function ScreenHeader({
                 <button
                   type="button"
                   onClick={() => onNavigate(o.primary!.destination)}
-                  className="min-h-[44px] rounded-form bg-clinical px-4 text-[13px] font-semibold text-on-accent transition hover:bg-clinical-hover"
+                  className="btn btn-primary"
                 >
                   {o.primary.label}
                 </button>
@@ -114,7 +114,7 @@ export function ScreenHeader({
                   /* A real labelled control rather than a hover-only tooltip:
                      hover does not exist on a phone and is not reachable by
                      keyboard. */
-                  className="min-h-[44px] rounded-form bg-card-high px-4 text-[13px] text-ink-soft transition hover:text-ink"
+                  className="btn btn-secondary"
                 >
                   {/* The label does not change when it opens. `aria-expanded`
                       already announces the state, and a control that renames
@@ -144,7 +144,7 @@ export function ScreenHeader({
                       <button
                         type="button"
                         onClick={() => onNavigate(h.go!.destination)}
-                        className="min-h-[36px] rounded-form bg-paper px-3 text-[12.5px] text-clinical transition hover:text-clinical-hover"
+                        className="btn btn-sm btn-secondary"
                       >
                         {h.go.label}
                       </button>

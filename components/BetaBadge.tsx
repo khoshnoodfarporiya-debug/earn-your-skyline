@@ -12,7 +12,16 @@ import { APP_VERSION, CHANGELOG } from "@/lib/version";
  * `showModal()`: the browser traps focus, makes the page behind it inert and
  * closes it on Escape, with nothing hand-rolled to get wrong.
  */
-export function BetaBadge({ className = "" }: { className?: string }) {
+export function BetaBadge({
+  className = "",
+  compact = false,
+}: {
+  className?: string;
+  /** Phone-width game header: "Beta" only, the version from `sm` up. The
+      header has no room for the version beside a long career title and two
+      icon buttons — it pushed the phone button off a 375px screen. */
+  compact?: boolean;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   /*
    * The list is only in the page while it is open. A closed <dialog> is
@@ -36,7 +45,9 @@ export function BetaBadge({ className = "" }: { className?: string }) {
         className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-form border border-gold/40 bg-gold-tint px-2 text-[11px] text-gold transition hover:border-gold ${className}`}
       >
         <span className="sign font-semibold">Beta</span>
-        <span className="num text-gold/80">v{APP_VERSION}</span>
+        <span className={`num text-gold/80 ${compact ? "hidden sm:inline" : ""}`}>
+          v{APP_VERSION}
+        </span>
         <span className="sr-only">— what&apos;s new</span>
       </button>
 
@@ -82,7 +93,7 @@ export function BetaBadge({ className = "" }: { className?: string }) {
               <button
                 type="button"
                 onClick={() => dialog.current?.close()}
-                className="min-h-[44px] w-full rounded-form border border-rule text-[14px] font-medium transition hover:border-clinical hover:text-clinical"
+                className="btn btn-secondary w-full"
               >
                 Close
               </button>

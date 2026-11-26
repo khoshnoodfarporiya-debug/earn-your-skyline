@@ -44,14 +44,14 @@ export function NextStep({
             {step.destination && step.actionLabel && (
               <button
                 onClick={() => onNavigate(step.destination!)}
-                className="min-h-[40px] rounded-form bg-clinical px-4 text-[14px] font-semibold text-on-accent transition hover:brightness-110"
+                className="btn btn-primary"
               >
                 {step.actionLabel}
               </button>
             )}
             <button
               onClick={() => onDismiss(step.id)}
-              className="min-h-[40px] rounded-form border border-rule px-4 text-[14px] text-ink-soft transition hover:border-clinical hover:text-clinical"
+              className="btn btn-secondary"
             >
               Got it
             </button>

@@ -198,18 +198,18 @@ export function ActionBoard({
                       onClick={() => set(action.id, -1)}
                       disabled={units === 0}
                       aria-label={`Fewer blocks on ${action.label}`}
-                      className="h-8 w-8 rounded-l-form border border-rule bg-card text-ink-soft transition hover:bg-clinical-tint disabled:opacity-30"
+                      className="flex h-11 w-11 items-center justify-center rounded-l-[12px] border border-rule bg-card-high text-[20px] leading-none text-ink transition hover:border-clinical/70 hover:text-clinical-hover active:translate-y-px disabled:text-ink-faint disabled:opacity-40"
                     >
                       −
                     </button>
-                    <span className="num flex h-8 w-9 items-center justify-center border-y border-rule bg-card text-sm font-medium">
+                    <span className="num flex h-11 w-10 items-center justify-center border-y border-rule bg-paper text-[16px] font-semibold text-ink">
                       {units}
                     </span>
                     <button
                       onClick={() => set(action.id, +1)}
                       disabled={!canAdd}
                       aria-label={`More blocks on ${action.label}`}
-                      className="h-8 w-8 rounded-r-form border border-rule bg-card text-ink-soft transition hover:border-clinical hover:text-clinical disabled:opacity-30"
+                      className="flex h-11 w-11 items-center justify-center rounded-r-[12px] border border-rule bg-card-high text-[20px] leading-none text-ink transition hover:border-clinical/70 hover:text-clinical-hover active:translate-y-px disabled:text-ink-faint disabled:opacity-40"
                     >
                       +
                     </button>

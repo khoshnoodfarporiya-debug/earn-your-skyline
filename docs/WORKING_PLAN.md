@@ -4,7 +4,7 @@ Started 23 Nov 2026 on branch `docs/review-and-plan`. This is the live to-do
 list for the next stretch of work. Tick items off as they land; move anything
 abandoned to "Dropped" with a one-line reason instead of deleting it.
 
-## Where things stand (verified 26 Nov 2026, release of 0.9.0-beta.1 to `main`)
+## Where things stand (verified 26 Nov 2026, release of 0.9.0-beta.2 to `main`)
 
 | Gate | Result |
 | --- | --- |
@@ -383,7 +383,67 @@ screen at a time:
      - Open: the semantic "caution" orange `#F59E55` now sits close to
        lamplight and copper. It still carries an icon and a label, but it is
        worth separating during the design pass.
-   - [ ] two typefaces, the core components, and spacing
+   - [x] **Type** (branch `feature/type-and-buttons`, 26 Nov 2026)
+     - **Fraunces** (editorial serif, optical sizes, a little of its soft
+       axis) for headings, `.display` and the title.
+     - **Inter** for everything else.
+     - **Numbers** (`.num`, `.t-value`) use Inter's tabular figures instead
+       of IBM Plex Mono, which stays loaded but is barely used.
+   - [x] **Buttons:** one system in `app/globals.css` (`@layer components`)
+     - `.btn` plus `.btn-primary`, `.btn-secondary` and `.btn-quiet`
+     - `.btn-lg` (52px), default (44px), `.btn-sm` (36px)
+     - one focus ring
+     - disabled buttons keep their shape
+     - Applied to the shared `ActionButton` (every purchase card), all three
+       commit buttons, alerts, the next step, quick plan, the city picker,
+       begin, sign-in and the end screen.
+     - The planner's +/− grew from 32px to 44px, Apple's touch minimum.
+     - **The other ~170 buttons still have their own classes.** Move them
+       over screen by screen.
+   - [x] Before and after:
+         `art-source/branding/concepts/type-and-buttons-before-after.png`.
+   - [x] **Buttons, tabs and choices** (branch `feature/components`,
+         26 Nov 2026)
+     - 60 more buttons in 21 files moved to `.btn` (every career's Work
+       screens, the phone apps, the visuals). A new `.btn-xs` (32px) is for
+       inline choices in a dense row.
+     - **Three shapes, three meanings,** so a player can tell what a control
+       does before touching it: a rounded rectangle (`.btn`) does something;
+       a pill (`.choice` + `.is-on`) picks one of a set; an underlined word
+       (`.tab` in a `.tab-row`) shows another screen. Section tabs and the
+       glossary tabs are now `.tab`; the post picker, "Mine only", the
+       Founder's roadmap stance and the Chef's service nights are `.choice`.
+     - Chips on purchase cards are a little rounder and bolder; "Owned" is
+       a lit stamp with a tick.
+     - A survey of 124 screens (all seven careers, phone and desktop) finds
+       no horizontal overflow.
+   - [x] **Second pass** (branch `feature/components-2`, 26 Nov 2026)
+     - 45 more buttons moved, each picked by hand from a list of all the
+       rest: 41 plain actions to `.btn` (dialog actions, the purchase
+       sheet's Buy and Sell, week-review and empty-state actions, every
+       career's remaining small buttons) and 3 toggles to `.choice` (target
+       a bloc, assign staff to a contract, compare a market).
+     - The Life category tabs (Homes, Vehicles, …) are `.tab`, with their
+       icons, so all three tab rows in the game now look alike.
+     - `.choice:disabled` added (dim, not-allowed), for "compare" when
+       three markets are already chosen.
+     - Status strip: "Time left" shows the week as a row of dots, lit for
+       each block still free.
+     - 131 of 196 buttons now use the shared classes. **The other ~65 keep
+       their own shape on purpose:** whole-card rows (a market, a case, a
+       staff member), map pins, icon buttons in the header, the bottom nav,
+       the plan stepper, and inline text links. Leave them unless a screen
+       redesign touches them.
+   - [x] **Spacing** (branch `feature/spacing`, 26 Nov 2026)
+     - One gap between the panels of a screen: `.stack` in
+       `app/globals.css`, 20px on a phone and 24px from desktop. It was
+       16px on every Physician screen, 20px on the Week and 24px in the
+       other six careers. 50 screen wrappers in 33 files now use it.
+     - The page margin on a phone is 16px, the iOS standard (it was 12px).
+       The pinned commit bar and the week-plan bar match it.
+     - Inside panels the padding was already consistent (headers and rows
+       line up), so it was left alone.
+     - **New screens: wrap the panels in `<div className="stack">`.**
 4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,

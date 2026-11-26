@@ -136,7 +136,7 @@ export function WeeklyPlanRail({
       <button
         onClick={onCommit}
         disabled={spent === 0}
-        className="min-h-[48px] w-full rounded-form bg-clinical px-4 text-[14.5px] font-bold text-on-accent transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
+        className="btn btn-primary btn-lg w-full"
       >
         {spent === 0
           ? "Assign your time first"

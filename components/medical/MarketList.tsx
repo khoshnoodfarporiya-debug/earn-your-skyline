@@ -132,11 +132,7 @@ export function MarketList({
           type="button"
           onClick={() => setMinesOnly((v) => !v)}
           aria-pressed={minesOnly}
-          className={`rounded-form border px-2.5 py-1.5 text-[12.5px] transition ${
-            minesOnly
-              ? "border-clinical bg-clinical-tint text-clinical"
-              : "border-rule bg-card text-ink-soft hover:border-clinical hover:text-clinical"
-          }`}
+          className={`choice ${minesOnly ? "is-on" : ""}`}
         >
           Mine only
         </button>
@@ -254,11 +250,7 @@ export function MarketList({
                       ? "Three markets is the comparison's width"
                       : undefined
                   }
-                  className={`sign my-2 mr-3 shrink-0 self-center rounded-form border px-2.5 py-1.5 text-[11px] transition ${
-                    inCompare
-                      ? "border-clinical bg-clinical-tint text-clinical"
-                      : "border-rule bg-card text-ink-faint hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rule disabled:hover:text-ink-faint"
-                  }`}
+                  className={`choice my-2 mr-3 shrink-0 self-center ${inCompare ? "is-on" : ""}`}
                 >
                   {inCompare ? "comparing" : "compare"}
                   <span className="sr-only">{` ${n.name}`}</span>

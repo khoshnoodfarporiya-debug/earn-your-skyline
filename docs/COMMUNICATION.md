@@ -150,8 +150,12 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`main` = `beta` = v0.9.0-beta.1, released 26 Nov 2026.** Everything below is
-  in `main`:
+- **`main` = `beta` = v0.9.0-beta.2, released 26 Nov 2026.** Everything
+  below is in `main`:
+  - the redesign's design system: Fraunces and Inter, one button system,
+    underlined tabs and pill choices, one spacing rhythm, and the 375px
+    header fix (session-log entries "type and buttons" to "release
+    0.9.0-beta.2")
   - the lit-window logo and lamplight palette
   - the iPhone install (PWA), the version and "What's new", and feature flags
   - the compact planner and the pinned desktop commit
@@ -162,7 +166,8 @@ touched. Run the browser tests when you change a screen.
   - the README with screenshots, and the `LICENSE` (all rights reserved)
 - **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
   (Codex's, unmerged). Every merged branch has been deleted.
-- **What's still open:** the brand design system (type and components), the
+- **What's still open:** WORKING_PLAN section 8 steps 4–5 (prototype the
+  iPhone Week screen, then roll screens out one by one), the
   rest of the layout review, real login, payments, the App Store, Solicitor
   and Engineer balance, and the Founder's gap between cities. See
   `WORKING_PLAN.md`.
@@ -677,3 +682,118 @@ the game, not the portfolio or the owner's other repos.
   and every balance contract holding.
 - **Branches tidied:** every merged branch was deleted on GitHub after
   confirming each is inside `main`.
+
+### 26 Nov 2026 — Claude (Claude Code): type and buttons
+Branch `feature/type-and-buttons`, off `beta`. The owner asked to continue the
+redesign with fonts, components and buttons, made clearer, with beauty a
+priority. The owner offered Blender; it wasn't needed, because this is all
+interface work in code.
+
+- **Type:**
+  - Fraunces for headings, Inter for body text
+  - numbers in Inter's tabular figures instead of monospace
+  - see `app/layout.tsx` and the typography block in `app/globals.css`
+- **Buttons:** one system, `.btn` plus `-primary`, `-secondary` and `-quiet`,
+  at `-lg`, default and `-sm` sizes. It is applied to the most-pressed
+  buttons (`WORKING_PLAN.md` section 8, step 3, has the list). The planner
+  steppers are now 44px. **Use `.btn-*` for every new button.**
+- **Overflow found and fixed:** at 375px, the game header with the full BETA
+  badge pushed the phone button 5–8px off the screen on every Physician and
+  Politician screen. The badge added in the beta caused it, so it is likely
+  also in the release on `main`. `BetaBadge compact` shows just "Beta" on
+  phones. A survey of all 92 screens now finds no overflow.
+- **Verified:**
+  - type check, lint, engine checks and the build pass
+  - before and after screenshots compared
+  - all 404 browser tests pass (6.9 minutes)
+
+### 26 Nov 2026 — Claude (Claude Code): buttons, tabs and choices
+
+Branch `feature/components`, merged into `beta` and pushed. The owner asked
+to carry on the redesign and make the game easier to understand.
+
+- **Three shapes, three meanings** (`app/globals.css`, `@layer components`).
+  Before, all three were the same bordered box:
+  - `.btn` (rounded rectangle) does something
+  - `.choice` (pill, `.is-on` when picked) picks one of a set
+  - `.tab` in a `.tab-row` (underlined word) shows another screen
+- **60 more buttons** in 21 files moved to `.btn`, by exact class string
+  (each was checked to be a `<button>`). New size `.btn-xs` (32px) for
+  inline choices in dense rows, such as the Architect's brief and palette.
+- **Tabs:** the section tabs under every destination and the glossary tabs.
+  **Choices:** post picker, "Mine only", the Founder's roadmap stance, the
+  Chef's service nights.
+- **Purchase cards:** chips slightly rounder and bolder; "Owned" is a lit
+  stamp with a tick.
+- **Still to do:** about 110 one-off buttons (whole-card rows, map pins,
+  icon and text buttons; each needs a look), the Life category tabs,
+  spacing, the status strip. `WORKING_PLAN.md` section 8, step 3.
+- **Verified:**
+  - type check and lint pass
+  - a survey of 124 screens (all seven careers, phone and desktop) finds
+    no horizontal overflow; phone screenshots checked by eye
+  - engine checks pass, and all 404 browser tests pass (7.5 minutes)
+- **Slip, fixed:** this was staged with `git -c core.autocrlf=false add` for
+  every file, which stored 30 LF files as CRLF (a 12,000-line diff). Two
+  follow-up commits put them back. **Only the files git already stores as
+  CRLF (`scripts/commands.ts`, `lib/game/careers/chef.ts`) need that flag;
+  stage everything else with a plain `git add`,** and check
+  `git diff --cached --stat` before committing.
+
+### 26 Nov 2026 — Claude (Claude Code): buttons and tabs, second pass
+
+Branch `feature/components-2`, merged into `beta` and pushed. The owner said
+to carry on.
+
+- **45 more buttons**, picked by hand from a list of every button not yet
+  on the shared classes: 41 plain actions to `.btn`, 3 toggles to
+  `.choice` (target a bloc, assign staff to a contract, compare a market).
+- **Life category tabs** are now `.tab` with their icons, like the section
+  and glossary tabs.
+- **Status strip:** "Time left" shows the week as dots, lit for each free
+  block.
+- **131 of 196 buttons** use the shared classes. The ~65 left keep their own
+  shape on purpose (whole-card rows, map pins, header icon buttons, the
+  bottom nav, the plan stepper, text links). `WORKING_PLAN.md` section 8,
+  step 3 lists them. Spacing is the one open item there.
+- **Verified:**
+  - a survey of 124 screens (all seven careers, phone and desktop) finds
+    no horizontal overflow; changed screens checked by eye, and the Week
+    and Life screens in the browser at iPhone size
+  - type check, lint and engine checks pass, and all 404 browser tests
+    pass (7.5 minutes)
+- Staged with a plain `git add` (see the line-ending note above).
+
+### 26 Nov 2026 — Claude (Claude Code): spacing
+
+Branch `feature/spacing`, merged into `beta` and pushed. The owner chose the
+spacing pass, the last open item in the design system.
+
+- **One gap between panels:** `.stack` in `app/globals.css`, 20px on a
+  phone and 24px from desktop. It was 16px on Physician screens, 20px on
+  the Week and 24px in the other six careers. 50 screen wrappers in 33
+  files now use it. New screens should too.
+- **Phone margin 16px** (was 12px), matching the pinned commit bar and
+  week-plan bar.
+- Padding inside panels was already consistent, so it was left alone.
+- **Verified:**
+  - a survey of 124 screens (all seven careers, phone and desktop) finds
+    no horizontal overflow; phone screens compared by eye
+  - type check, lint and engine checks pass, and all 404 browser tests
+    pass (7.5 minutes)
+
+### 26 Nov 2026 — Claude (Claude Code): release 0.9.0-beta.2
+
+The owner said "Release to main".
+
+- **Version 0.9.0-beta.2** in `lib/version.ts`, `package.json` and
+  `package-lock.json`. beta.1 had already shipped, so the redesign lines
+  moved out of its "What's new" entry into a new one, written for players:
+  lettering and buttons, controls that look like what they do, the time
+  dots, calmer spacing, and the phone button no longer slipping off a small
+  iPhone.
+- **README:** the type section named the old fonts (Saira, Barlow, Plex
+  Mono); it now describes Fraunces and Inter, the three control shapes and
+  `.stack`. The beta badge says v0.9.0-beta.2.
+- Released by a pull request from `beta` into `main`, as with beta.1.
+  Its number and the deploy result are recorded below.

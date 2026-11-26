@@ -127,7 +127,7 @@ export function CareerSelect({
       {hasSave && (
         <button
           onClick={onContinue}
-          className="rise mt-7 w-fit rounded-form border border-clinical bg-clinical px-5 py-2.5 text-sm font-medium text-on-accent transition hover:brightness-110"
+          className="btn btn-primary btn-lg rise mt-7 w-fit"
         >
           Continue your run
         </button>

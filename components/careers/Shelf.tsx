@@ -77,7 +77,7 @@ export function Shelf({
                 type="button"
                 disabled={i.disabled}
                 onClick={() => onCommand(cmd, i.id)}
-                className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                className="btn btn-sm btn-secondary"
               >
                 {i.price > 0 ? money(i.price) : "Take it"}
               </button>

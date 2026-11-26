@@ -40,7 +40,7 @@ export function SuppliesPanel({
           : "Ample";
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/* --------------------------------------------------------- on hand */}
       <section className="form">
         <div className="form-head flex flex-wrap items-baseline justify-between gap-2 px-5 py-2.5">
@@ -82,7 +82,7 @@ export function SuppliesPanel({
             <button
               onClick={() => dispatch("toggleAutoOrder", "")}
               aria-pressed={s.autoOrder}
-              className="mt-2 min-h-[44px] w-full rounded-form border border-rule px-3 text-[13.5px] transition hover:border-clinical hover:text-clinical"
+              className="btn btn-secondary mt-2 w-full"
             >
               Turn {s.autoOrder ? "off" : "on"}
             </button>

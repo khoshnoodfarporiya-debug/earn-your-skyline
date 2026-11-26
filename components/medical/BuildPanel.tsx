@@ -25,7 +25,7 @@ export function BuildPanel({
   const techNeed = techniciansNeeded(m);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/* Environmental progression, directly above the premises it refers to. */}
       <PracticeEvolution m={m} cash={cash} />
 

@@ -66,7 +66,7 @@ function PracticePanel({
   const p = practice(state);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section aria-labelledby="live-h" className="rounded-lg border border-rule bg-card p-4">
         <h2 id="live-h" className="text-sm font-semibold text-ink">
           On the books in {legalCityOf(p).name}
@@ -129,14 +129,14 @@ function PracticePanel({
                       <button
                         type="button"
                         onClick={() => onCommand("settleCase", c.id)}
-                        className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                        className="btn btn-sm btn-secondary"
                       >
                         Settle for {money(offer)}
                       </button>
                       <button
                         type="button"
                         onClick={() => onCommand("dropCase", c.id)}
-                        className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint hover:border-alarm hover:text-alarm"
+                        className="btn btn-sm btn-quiet btn-danger"
                       >
                         Come off the record
                       </button>
@@ -177,7 +177,7 @@ function PracticePanel({
                   <button
                     type="button"
                     onClick={() => onCommand("takeCase", o.id)}
-                    className="shrink-0 rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                    className="btn btn-sm btn-secondary shrink-0"
                   >
                     Accept
                   </button>

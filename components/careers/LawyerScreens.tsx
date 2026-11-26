@@ -95,7 +95,7 @@ export function LawyerScreens({
   const def = screenOf(screen);
   const scene = solicitorScene(screen, state);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* The Physician's ScreenHeader reads medical state, so the Solicitor
           states where it is itself rather than borrowing a component that
           would be null for it. Same reason the Chef's does. */}
@@ -253,7 +253,7 @@ function InstructionsScreen({
     .sort((a, b) => a.prestige - b.prestige)[0];
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section
         aria-labelledby="market-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -416,7 +416,7 @@ function InstructionsScreen({
                       type="button"
                       disabled={retainersOf(p).length >= MAX_RETAINERS}
                       onClick={() => onCommand("takeRetainer", o.id)}
-                      className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                      className="btn btn-sm btn-secondary"
                     >
                       Take the retainer
                     </button>
@@ -531,7 +531,7 @@ function InstructionsScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("takeCase", o.id)}
-                      className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                      className="btn btn-sm btn-secondary"
                     >
                       Accept the instruction
                     </button>
@@ -562,7 +562,7 @@ function CaseworkScreen({
   const live = [...p.cases].sort((a, b) => a.dueWeek - b.dueWeek);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section
         aria-labelledby="live-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -663,14 +663,14 @@ function CaseworkScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("settleCase", c.id)}
-                      className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                      className="btn btn-sm btn-secondary"
                     >
                       Settle for {money(offer)}
                     </button>
                     <button
                       type="button"
                       onClick={() => onCommand("dropCase", c.id)}
-                      className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint hover:border-alarm hover:text-alarm"
+                      className="btn btn-sm btn-quiet btn-danger"
                     >
                       Come off the record
                     </button>
@@ -711,7 +711,7 @@ function CaseworkScreen({
         <button
           type="button"
           onClick={() => onCall("listings")}
-          className="mt-3 rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+          className="btn btn-sm btn-secondary mt-3"
         >
           Call the listings office
         </button>
@@ -742,7 +742,7 @@ function BooksScreen({
   const canPay = state.r.debt > 0 && state.r.cash > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section
         aria-labelledby="worth-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -815,7 +815,7 @@ function BooksScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("factorBill", b.id)}
-                      className="rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                      className="btn btn-sm btn-secondary"
                     >
                       Sell it today for {money(now)}
                     </button>
@@ -893,7 +893,7 @@ function BooksScreen({
                       <button
                         type="button"
                         onClick={() => onCommand("endRetainer", held.id)}
-                        className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint hover:border-alarm hover:text-alarm"
+                        className="btn btn-sm btn-quiet btn-danger"
                       >
                         Give notice
                       </button>
@@ -941,7 +941,7 @@ function BooksScreen({
             type="button"
             disabled={!canPay}
             onClick={() => onCommand("payLoan", "")}
-            className="rounded border border-rule px-2.5 py-1 text-xs text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+            className="btn btn-sm btn-secondary"
           >
             Pay down the loan
           </button>
@@ -979,7 +979,7 @@ function FirmScreen({
   const costs = record.reduce((n, v) => n + (v.costs ?? 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/*
        * WHERE THE FIRM SITS
        *
@@ -1048,7 +1048,7 @@ function FirmScreen({
                 type="button"
                 disabled={state.r.cash < chambersPrice(p, nextChambers(p)!)}
                 onClick={() => onCommand("takeChambers", nextChambers(p)!.id)}
-                className="rounded border border-rule px-2.5 py-1 text-xs text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                className="btn btn-sm btn-secondary"
               >
                 Take it · {money(chambersPrice(p, nextChambers(p)!))}
               </button>
@@ -1128,7 +1128,7 @@ function FirmScreen({
         <button
           type="button"
           onClick={() => onCall("roll")}
-          className="mt-3 rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+          className="btn btn-sm btn-secondary mt-3"
         >
           Ring round for a seat
         </button>

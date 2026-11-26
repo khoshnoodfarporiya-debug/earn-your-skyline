@@ -108,7 +108,7 @@ export function Glossary({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[44px] rounded-form px-3 text-[13px] text-ink-soft transition hover:text-ink"
+            className="btn btn-quiet"
           >
             Close
           </button>
@@ -117,7 +117,7 @@ export function Glossary({
         <div
           role="tablist"
           aria-label="Reference"
-          className="flex gap-1 border-b border-rule px-5 py-2.5"
+          className="tab-row px-3"
         >
           {(
             [
@@ -130,11 +130,7 @@ export function Glossary({
               role="tab"
               aria-selected={tab === id}
               onClick={() => setTab(id)}
-              className={`sign min-h-[44px] rounded-form border px-4 text-[11.5px] transition ${
-                tab === id
-                  ? "border-clinical/60 bg-clinical-tint text-clinical"
-                  : "border-rule bg-card text-ink-soft hover:text-ink"
-              }`}
+              className={`tab ${tab === id ? "is-on" : ""}`}
             >
               {label}
             </button>
@@ -187,7 +183,7 @@ export function Glossary({
                       onNavigate(lesson.screen);
                       onClose();
                     }}
-                    className="min-h-[44px] rounded-form bg-card-high px-3.5 text-[12.5px] text-clinical transition hover:text-clinical-hover"
+                    className="btn btn-secondary"
                   >
                     Show it again
                   </button>

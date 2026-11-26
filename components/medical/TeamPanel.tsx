@@ -51,7 +51,7 @@ export function TeamPanel({
   const gap = payGap(m);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/* Who covers what, before who is on the payroll. A staff list answers
           "who do I employ"; this answers "can Cardiology take Tuesday's
           case", which is the question that decides whether a department is

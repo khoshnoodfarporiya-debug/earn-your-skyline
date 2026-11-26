@@ -184,21 +184,21 @@ export function BurnoutBalance({
           <button
             type="button"
             onClick={() => onNavigate("staff")}
-            className="min-h-[44px] rounded-form bg-card-high px-3.5 text-[12.5px] text-ink-soft transition hover:text-ink"
+            className="btn btn-secondary"
           >
             Hire a nurse
           </button>
           <button
             type="button"
             onClick={() => onNavigate("life")}
-            className="min-h-[44px] rounded-form bg-card-high px-3.5 text-[12.5px] text-ink-soft transition hover:text-ink"
+            className="btn btn-secondary"
           >
             Look at how you live
           </button>
           <button
             type="button"
             onClick={() => onNavigate("overview")}
-            className="min-h-[44px] rounded-form bg-clinical px-3.5 text-[12.5px] font-semibold text-on-accent transition hover:bg-clinical-hover"
+            className="btn btn-primary"
           >
             Plan rest into the week
           </button>

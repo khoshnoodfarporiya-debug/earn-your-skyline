@@ -39,7 +39,7 @@ export function BeyondScreen({
   const rank = rankIndex(k, state.r.reputation);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------- what is running */}
       {active && ventures.active ? (
         <section
@@ -65,7 +65,7 @@ export function BeyondScreen({
           <button
             type="button"
             onClick={() => onCommand("dropVenture", "")}
-            className="mt-2.5 rounded border border-rule px-2.5 py-1 text-xs text-ink hover:border-alarm"
+            className="btn btn-sm btn-secondary btn-danger mt-2.5"
           >
             Pull out
           </button>
@@ -162,7 +162,7 @@ export function BeyondScreen({
                     type="button"
                     disabled={!!why}
                     onClick={() => onCommand("startVenture", v.id)}
-                    className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-sm btn-secondary"
                   >
                     {cost > 0 ? money(cost) : "Take it"}
                   </button>

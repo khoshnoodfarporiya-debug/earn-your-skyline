@@ -25,7 +25,7 @@ export function GrowthPanel({
   const fill = Math.max(0, Math.min(100, (state.r.panel / ceiling) * 100));
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       <section className="form">
         <div className="form-head px-5 py-2.5">
           <h3 className="sign text-[11.5px] text-ink-soft">Catchment</h3>

@@ -117,7 +117,7 @@ export function RollApp({
                   type="button"
                   disabled={tooDear || noRoom}
                   onClick={() => dispatch("hireLegal", r.id)}
-                  className="rounded-form border border-rule bg-card/60 px-3.5 py-2 text-[13px] font-medium text-ink transition enabled:hover:border-clinical enabled:hover:bg-card-high enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn btn-secondary"
                 >
                   Take them on · {money(hireCost)}
                 </button>

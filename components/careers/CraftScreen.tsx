@@ -47,7 +47,7 @@ export function CraftScreen({
   const done = k.stages ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------- the standing */}
       <ChefScene
         art={BRIGADE_ART}
@@ -177,7 +177,7 @@ export function CraftScreen({
                                 type="button"
                                 disabled={locked}
                                 onClick={() => onCommand("setPractice", t.id)}
-                                className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                                className="btn btn-sm btn-secondary"
                               >
                                 Practise this
                               </button>
@@ -241,7 +241,7 @@ export function CraftScreen({
                     type="button"
                     disabled={!!why || poor || staging}
                     onClick={() => onCommand("stage", stage.id)}
-                    className="rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-sm btn-secondary"
                   >
                     {money(price)}
                   </button>

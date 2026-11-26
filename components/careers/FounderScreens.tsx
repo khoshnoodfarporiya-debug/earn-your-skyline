@@ -81,7 +81,7 @@ export function FounderScreens({
 
   const def = screenOf(screen);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* The Physician's ScreenHeader reads medical state, which is null for a
           founder, so this career states where it is itself — the same reason
           the Chef's screens and the Solicitor's do. */}
@@ -154,7 +154,7 @@ function RunwayScreen({
   const organic = organicUsers(v);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------- the clock */}
       <section
         aria-labelledby="runway-h"
@@ -262,7 +262,7 @@ function RunwayScreen({
             <button
               type="button"
               onClick={() => onCommand("setPrice", String(v.price + 4))}
-              className="rounded-form border border-rule px-2.5 py-1 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+              className="btn btn-sm btn-secondary"
             >
               Raise to {money(v.price + 4)}
             </button>
@@ -270,7 +270,7 @@ function RunwayScreen({
               type="button"
               disabled={v.price <= 4}
               onClick={() => onCommand("setPrice", String(Math.max(4, v.price - 4)))}
-              className="rounded-form border border-rule px-2.5 py-1 text-xs text-ink transition enabled:hover:border-clinical enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+              className="btn btn-sm btn-secondary"
             >
               Drop to {money(Math.max(4, v.price - 4))}
             </button>
@@ -329,7 +329,7 @@ function TeamScreen({
                   <button
                     type="button"
                     onClick={() => onCommand("letGo", h.id)}
-                    className="rounded border border-rule-soft px-2 py-0.5 text-ink-faint transition hover:border-alarm hover:text-alarm"
+                    className="btn btn-xs btn-quiet btn-danger"
                   >
                     Let go
                   </button>
@@ -372,7 +372,7 @@ function TeamScreen({
                   type="button"
                   disabled={tooDear}
                   onClick={() => onCommand("hireVenture", r.id)}
-                  className="rounded-form border border-rule px-3 py-1.5 text-ink transition enabled:hover:border-clinical enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn btn-sm btn-secondary"
                 >
                   Take them on
                 </button>
@@ -441,7 +441,7 @@ function RaisingScreen({
                     type="button"
                     disabled={blocked !== null}
                     onClick={() => onCommand("startRaise", r.id)}
-                    className="rounded-form border border-rule px-3 py-1.5 text-ink transition enabled:hover:border-clinical enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-sm btn-secondary"
                   >
                     Go out and raise it
                   </button>
@@ -509,7 +509,7 @@ function RaiseInProgress({
       <button
         type="button"
         onClick={() => onCommand("stopRaise", "")}
-        className="mt-2 rounded border border-rule-soft px-2.5 py-1 text-ink-faint transition hover:border-alarm hover:text-alarm"
+        className="btn btn-sm btn-quiet btn-danger mt-2"
       >
         Stop raising
       </button>
@@ -542,7 +542,7 @@ function ProductScreen({
   const done = experimentsOf(v);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------ the product work */}
       <section aria-labelledby="discovery-h" className="rounded-lg border border-rule bg-card p-4">
         <h2 id="discovery-h" className="sign text-[11.5px] text-ink-faint">
@@ -586,11 +586,7 @@ function ProductScreen({
                 aria-pressed={active}
                 title={def.blurb}
                 onClick={() => onCommand("setRoadmap", id)}
-                className={`min-h-[40px] rounded-form border px-3 py-1.5 text-center text-[13px] font-semibold transition ${
-                  active
-                    ? "border-clinical bg-clinical-tint text-clinical"
-                    : "border-rule bg-paper text-ink hover:border-clinical/40"
-                }`}
+                className={`choice ${active ? "is-on" : ""}`}
               >
                 {def.label}
               </button>
@@ -701,7 +697,7 @@ function ProductScreen({
                     type="button"
                     onClick={() => onCommand("runExperiment", def.id)}
                     disabled={blocked}
-                    className="min-h-[40px] shrink-0 rounded-form border border-rule bg-paper px-3 text-[12.5px] font-semibold text-ink transition hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40"
+                    className="btn btn-secondary shrink-0"
                   >
                     Run — {money(cost)}
                   </button>

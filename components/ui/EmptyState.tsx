@@ -63,7 +63,7 @@ export function EmptyState({
           <button
             type="button"
             onClick={() => onNavigate(go.destination)}
-            className="mt-2.5 min-h-[44px] rounded-form bg-card-high px-3.5 text-[12.5px] text-clinical transition hover:text-clinical-hover"
+            className="btn btn-secondary mt-2.5"
           >
             {go.label}
           </button>

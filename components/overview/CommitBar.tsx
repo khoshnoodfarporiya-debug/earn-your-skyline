@@ -29,7 +29,7 @@ export function CommitBar({
     <div
       /* Hides at the same breakpoint the bottom nav does, or it would float
          above empty space on tablet. */
-      className="fixed inset-x-0 bottom-[56px] z-30 border-t border-rule bg-[#0d1729]/95 px-3 py-2.5 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-[56px] z-30 border-t border-rule bg-[#0d1729]/95 px-4 py-2.5 backdrop-blur lg:hidden"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto flex max-w-6xl items-center gap-3">
@@ -57,7 +57,7 @@ export function CommitBar({
         <button
           onClick={onCommit}
           disabled={!ready}
-          className="min-h-[48px] shrink-0 rounded-form bg-clinical px-6 text-[15px] font-bold text-on-accent transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
+          className="btn btn-primary btn-lg shrink-0"
         >
           {ready ? "Commit week" : "Assign time"}
         </button>

@@ -195,7 +195,7 @@ export function QuickPlan({
               ? `${warnLabel}. Repeat: ${describe(repeat)}`
               : `Repeat: ${describe(repeat)}`
           }
-          className="min-h-[36px] rounded-form bg-clinical px-3 text-[13px] font-semibold text-on-accent transition hover:bg-clinical-hover"
+          className="btn btn-primary btn-sm"
         >
           Repeat last week
           {risky(repeat) && (
@@ -215,10 +215,8 @@ export function QuickPlan({
             type="button"
             onClick={() => onApply(filled)}
             title={warn ? `${p.hint} — ${warnLabel}` : p.hint}
-            className={`min-h-[36px] rounded-form px-3 text-[13px] transition ${
-              warn
-                ? "bg-caution-tint text-caution hover:text-ink"
-                : "bg-card-high text-ink-soft hover:text-ink"
+            className={`btn btn-sm btn-secondary ${
+              warn ? "border-caution/50 text-caution" : ""
             }`}
           >
             {p.label}
@@ -238,7 +236,7 @@ export function QuickPlan({
         <button
           type="button"
           onClick={() => onApply({})}
-          className="ml-auto min-h-[36px] rounded-form px-3 text-[13px] text-ink-faint transition hover:text-alarm"
+          className="btn btn-quiet btn-sm btn-danger ml-auto"
         >
           Clear
         </button>

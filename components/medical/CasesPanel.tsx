@@ -57,7 +57,7 @@ export function CasesPanel({
   }, 0);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/*
        * The funnel first, then what limits it, then the policy that decides
        * who the limit falls on. That is the order the questions arrive in:

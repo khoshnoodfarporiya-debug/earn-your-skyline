@@ -110,11 +110,7 @@ export function PostComposer<C>({
               key={p.id}
               onClick={() => setSelected(active ? null : p.id)}
               aria-pressed={active}
-              className={`min-h-[38px] rounded-form border px-3 text-[13.5px] transition ${
-                active
-                  ? "border-clinical bg-clinical-tint text-clinical"
-                  : "border-rule bg-card text-ink-soft hover:border-clinical/50 hover:text-ink"
-              }`}
+              className={`choice ${active ? "is-on" : ""}`}
             >
               {p.label}
               {p.hazard !== undefined && (
@@ -161,7 +157,7 @@ export function PostComposer<C>({
               onPublish(chosen.id);
               setSelected(null);
             }}
-            className="mt-3 min-h-[46px] w-full rounded-form bg-clinical px-4 text-[14px] font-bold text-on-accent transition hover:brightness-110"
+            className="btn btn-primary mt-3 w-full"
           >
             Publish
           </button>

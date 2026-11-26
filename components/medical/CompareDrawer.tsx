@@ -127,7 +127,7 @@ export function CompareDrawer({
         <button
           type="button"
           onClick={onClear}
-          className="sign rounded-form border border-rule bg-card px-2.5 py-1 text-[11px] text-ink-soft transition hover:border-clinical hover:text-clinical"
+          className="btn btn-xs btn-secondary"
         >
           Clear comparison
         </button>

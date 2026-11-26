@@ -111,7 +111,7 @@ export function WeeklyPlanSheet({
           </div>
           <button
             onClick={onClose}
-            className="min-h-[44px] rounded-form border border-rule bg-card px-4 text-[13px] font-semibold text-ink transition hover:border-clinical/40"
+            className="btn btn-secondary"
           >
             Close
           </button>
@@ -147,7 +147,7 @@ export function WeeklyPlanSheet({
               onCommit();
             }}
             disabled={spent === 0}
-            className="min-h-[48px] w-full rounded-form bg-clinical px-4 text-[15px] font-bold text-on-accent transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
+            className="btn btn-primary btn-lg w-full"
           >
             {spent === 0
               ? "Assign your time first"
@@ -183,7 +183,7 @@ export function WeeklyPlanTrigger({
   const tone = cashTone(state);
   return (
     <div
-      className="fixed inset-x-0 bottom-[56px] z-30 border-t border-rule bg-[#0d1729]/95 px-3 py-2 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-[56px] z-30 border-t border-rule bg-[#0d1729]/95 px-4 py-2 backdrop-blur lg:hidden"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}
     >
       <button

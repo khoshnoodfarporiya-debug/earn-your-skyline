@@ -1,26 +1,34 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, IBM_Plex_Mono, Saira_Condensed } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
-/**
- * Console signage, a technical body face, and a clinical readout — the voice
- * of a management HUD rather than a document.
+/*
+ * TYPE (Nov 2026 redesign, docs/BRAND.md: earned, late-night, honest).
+ *
+ * The old faces — condensed signage, a technical body, a monospace readout
+ * for every number — made a game read like a hospital dashboard. Now:
+ *
+ *   display  Fraunces: a warm editorial serif with optical sizes, for names,
+ *            headings and the title. It is the voice of the brand.
+ *   body     Inter: calm and very legible at phone sizes, with true
+ *            tabular figures, so numbers line up without a monospace font.
+ *   mono     IBM Plex Mono stays loaded for the rare place that genuinely
+ *            wants a code-like face; nothing in the game's numbers uses it.
  */
-const display = Saira_Condensed({
+const display = Fraunces({
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  axes: ["opsz", "SOFT"],
   variable: "--font-display",
 });
 
-const body = Barlow({
+const body = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
   variable: "--font-body",
 });
 
 const mono = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500"],
   variable: "--font-mono",
 });
 

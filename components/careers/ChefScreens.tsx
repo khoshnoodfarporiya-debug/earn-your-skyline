@@ -115,7 +115,7 @@ export function ChefScreens({
 
   const def = screenOf(screen);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* The Physician's ScreenHeader reads medical state, so the Chef states
           where it is itself rather than borrowing a component that would be
           null for it. */}
@@ -145,7 +145,7 @@ function RoomScreen({
     .filter((x): x is NonNullable<typeof x> => Boolean(x));
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/*
        * The room you are actually in, photographed.
        *
@@ -315,7 +315,7 @@ function LarderScreen({
   }, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* The larder is the career. It leads with what is about to be thrown
           away rather than with what is in stock. */}
       {scene && (
@@ -459,7 +459,7 @@ function LarderScreen({
             <button
               type="button"
               onClick={() => onCall("market")}
-              className="mt-3 rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+              className="btn btn-sm btn-secondary mt-3"
             >
               Call your suppliers
             </button>
@@ -522,7 +522,7 @@ function PassScreen({
   const ran = ranLine ? SERVICE_BY_ID.get(ranLine.id) : null;
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/*
        * The night itself, ticket by ticket.
        *
@@ -805,7 +805,7 @@ function BrigadeScreen({
   const shaky = k.staff.some((x) => loyaltyOf(x) < 35 || moraleOf(x) < 30);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/*
        * The line-up before service — but only once there is a line-up. A
        * photograph of a brigade over a screen that says "nobody but you" is
@@ -872,7 +872,7 @@ function BrigadeScreen({
         <button
           type="button"
           onClick={() => onCall("agency")}
-          className="mt-3 rounded-form border border-rule px-3 py-1.5 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+          className="btn btn-sm btn-secondary mt-3"
         >
           Ring the agency
         </button>
@@ -897,7 +897,7 @@ function MoneyScreen({
   const interest = loanInterest(state.r.debt);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section
         aria-labelledby="cash-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -1070,7 +1070,7 @@ function MoneyScreen({
           type="button"
           disabled={pay <= 0}
           onClick={() => onCommand("payLoan", "")}
-          className="mt-3 rounded border border-rule px-3 py-1.5 text-xs text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+          className="btn btn-sm btn-secondary mt-3"
         >
           {state.r.debt <= 0
             ? "Nothing outstanding"

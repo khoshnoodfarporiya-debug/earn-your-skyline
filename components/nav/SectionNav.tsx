@@ -33,7 +33,7 @@ export function SectionNav({
         <div
           role="tablist"
           aria-label={`${section.label} screens`}
-          className="scroll-thin -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+          className="tab-row -mx-1 px-1"
         >
           {section.screens.map((screen) => {
             const isActive = screen.id === active;
@@ -43,11 +43,7 @@ export function SectionNav({
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => onNavigate(screen.id)}
-                className={`sign min-h-[44px] shrink-0 rounded-form border px-4 text-[11.5px] transition ${
-                  isActive
-                    ? "border-clinical/60 bg-clinical-tint text-clinical"
-                    : "border-rule bg-card text-ink-soft hover:border-clinical/40 hover:text-ink"
-                }`}
+                className={`tab shrink-0 ${isActive ? "is-on" : ""}`}
               >
                 {screen.label}
               </button>

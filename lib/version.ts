@@ -9,7 +9,7 @@
  * Numbering: each beta update bumps the last number — 0.9.0-beta.1,
  * 0.9.0-beta.2, and so on — until the owner calls a release, which is 1.0.0.
  */
-export const APP_VERSION = "0.9.0-beta.1";
+export const APP_VERSION = "0.9.0-beta.2";
 
 export interface ChangelogEntry {
   version: string;
@@ -19,6 +19,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.0-beta.2",
+    date: "2026-11-26",
+    changes: [
+      "New lettering: an editorial serif for headings and clearer numbers, plus bigger, clearer buttons. The planner's + and − are easier to tap.",
+      "Controls now look like what they do: buttons act, round pills pick an option, and underlined tabs switch screens.",
+      "The week's free time shows as a row of dots, lit for every block still to plan.",
+      "Calmer spacing: every screen has the same breathing room, and wider margins on a phone.",
+      "On a small iPhone the phone button no longer slips off the edge of the screen.",
+    ],
+  },
   {
     version: "0.9.0-beta.1",
     date: "2026-11-26",

@@ -53,7 +53,7 @@ export function MoneyPanel({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/* The shape of a normal week, before the balance-sheet figures — a
           player deciding whether to borrow needs the burn rate first. */}
       <FinanceWaterfall state={state} onNavigate={onNavigate} />

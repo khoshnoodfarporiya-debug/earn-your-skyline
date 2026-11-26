@@ -48,7 +48,7 @@ export function Chip({ text, tone = "neutral" }: ItemChip) {
             ? "bg-alarm-tint text-alarm"
             : "bg-paper text-ink-soft";
   return (
-    <li className={`num rounded-sm px-1.5 py-0.5 text-[12px] ${skin}`}>
+    <li className={`num rounded-md px-2 py-0.5 text-[12px] font-medium ${skin}`}>
       {text}
     </li>
   );
@@ -187,7 +187,8 @@ export function ItemCard({
 
         <div className="shrink-0 text-right">
           {owned ? (
-            <span className="sign text-[11.5px] text-clinical">
+            <span className="stamp inline-flex items-center gap-1 px-2 py-0.5 text-[12px] font-semibold">
+              <span aria-hidden>✓</span>
               {ownedLabel}
             </span>
           ) : price !== undefined ? (
@@ -316,19 +317,20 @@ export function ActionButton({
   variant?: "primary" | "quiet" | "danger";
   children: ReactNode;
 }) {
+  /* The shared button system in globals.css (`.btn-*`). */
   const skin =
     variant === "primary"
-      ? "bg-clinical text-on-accent hover:bg-clinical-hover disabled:bg-paper disabled:text-ink-faint"
+      ? "btn-primary"
       : variant === "danger"
-        ? "bg-paper text-ink-soft hover:text-alarm disabled:text-ink-faint"
-        : "bg-card-high text-ink-soft hover:text-ink disabled:text-ink-faint";
+        ? "btn-secondary btn-danger"
+        : "btn-secondary";
 
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`min-h-[44px] rounded-form px-4 text-[13px] font-semibold transition disabled:cursor-not-allowed ${skin}`}
+      className={`btn ${skin}`}
     >
       {children}
     </button>
