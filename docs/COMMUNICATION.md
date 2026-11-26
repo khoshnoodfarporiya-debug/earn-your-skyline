@@ -539,3 +539,28 @@ the "lit window" direction from `BRAND.md`.
 - **Next:** the owner picks one. Then refine it (proportions, optional
   window mullions at large sizes), design the wordmark lockup, and swap the
   icons in `build:art`.
+
+### 26 Nov 2026 — Claude (Claude Code): the new logo is in
+Same branch (`feature/logo-lit-window`). The owner picked concept E: the
+off-centre art-deco tower at dusk with one lit window.
+
+- **The master is `art-source/branding/lit-window-mark.svg`.** It is concept
+  E refined: a slimmer mast, a ledge at each setback, a window with a cross
+  bar, a warm horizon, and dim windows on the far tower. Edit this one file
+  to change the logo.
+- **`build:art` renders every icon from it**, at each size from vector:
+  - the tab icon (`app/icon.png`) and the iPhone icon (`app/apple-icon.png`)
+  - the manifest icons (`public/icons/`)
+  - the in-app marks (`logo-mark-64/128/256.webp`)
+  - the 1200×630 link-preview card, the dusk scene with no baked-in text
+- **The old raster lockup is gone.** `logo-lockup*.webp` was deleted from
+  `public/`. Its master PNG stays in `art-source/branding/` as history, and
+  the engine check now points at the SVG master.
+- **The title is real text now:** "Earn Your / Skyline" in the display face,
+  with Skyline in lamplight gold, beside the mark (`BrandLockup`). It's on
+  the sign-in and career screens, and it is the page's `<h1>`.
+- **Verified** at iPhone 13 size: both screens look right, there is no
+  overflow and no console errors. Type check, lint, engine checks and the
+  build pass, and all 404 browser tests pass (7.4 minutes).
+- **Still on the old palette:** the teal buttons and accents remain. That
+  is step 3 of the design refresh (`WORKING_PLAN.md` section 8).

@@ -10,6 +10,7 @@ import {
   type AccountStore,
   type Player,
 } from "@/lib/game/account";
+import { BrandLockup } from "./BrandLockup";
 
 /**
  * THE FRONT DOOR
@@ -113,10 +114,10 @@ export function AccountGate({
       <div className="w-full max-w-md">
         {/* ------------------------------------------------------ the name */}
         <header className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">
-            Earn Your Skyline
-          </h1>
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          <div className="flex justify-center text-left">
+            <BrandLockup size="md" />
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-ink-soft">
             Seven careers, each with a different way of going wrong. Take a
             name and pick one.
           </p>

@@ -2135,14 +2135,12 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
     /*
      * The brand collection is many crops of one master.
      *
-     * `logo-lockup`, `logo-mark-64` and the rest are all cut from a single
-     * `earn-your-skyline-logo-v1.png`, so there is no filename to derive — the
-     * guarantee is that the one master is present, which is checked directly.
+     * `logo-mark-64` and the rest are all rendered from one vector master,
+     * `lit-window-mark.svg` (Nov 2026), so there is no filename to derive —
+     * the guarantee is that the one master is present, checked directly.
      */
     if (rel.replace(/\\/g, "/").startsWith("brand/")) {
-      return existsSync(
-        join("art-source", "branding", "earn-your-skyline-logo-v1.png"),
-      );
+      return existsSync(join("art-source", "branding", "lit-window-mark.svg"));
     }
     const stem = rel.replace(/\.webp$/, "").replace(/@[a-z0-9]+$/i, "");
     const dir = join("art-source", "visuals", dirname(stem));

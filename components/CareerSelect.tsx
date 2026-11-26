@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import {
   CAREER_PREVIEWS,
@@ -13,6 +12,7 @@ import { CareerIcon } from "./Icons";
 import { ArtFrame } from "./visuals/ArtFrame";
 import { StartCityPicker } from "./StartCityPicker";
 import { BetaBadge } from "./BetaBadge";
+import { BrandLockup } from "./BrandLockup";
 
 /**
  * Career selection.
@@ -73,29 +73,11 @@ export function CareerSelect({
           <BetaBadge />
         </div>
 
-        {/*
-         * The wordmark is the heading, not a picture beside one.
-         *
-         * `alt` carries the name, so the <h1> has a real accessible name and a
-         * screen reader hears "Earn Your Skyline, heading level 1" — which is
-         * what a text heading would have given. An empty alt here would leave
-         * the document with an unnamed top-level heading.
-         *
-         * The box is reserved at its rendered ratio so the cards below do not
-         * jump when it decodes, and it is `priority` because it is the largest
-         * thing above the fold on the first screen anybody sees.
-         */}
-        <h1 className="mt-6">
-          <Image
-            src="/visuals/brand/logo-lockup.webp"
-            alt="Earn Your Skyline"
-            width={1607}
-            height={656}
-            sizes="(min-width: 640px) 480px, 88vw"
-            priority
-            className="h-auto w-[88vw] max-w-[420px] sm:max-w-[480px]"
-          />
-        </h1>
+        {/* The lit-window mark and the name, as the page heading. The name is
+            real text, so the <h1> reads "Earn Your Skyline" to everyone. */}
+        <div className="mt-6">
+          <BrandLockup />
+        </div>
         <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-ink-soft">
           Pick a life, not a business. Each career runs on its own rules — its
           own resources, its own ways of coming apart. Nothing here ends your

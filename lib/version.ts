@@ -24,6 +24,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-11-26",
     changes: [
       "The first beta. You can add the game to your iPhone home screen and it opens full screen, like an app.",
+      "A new logo: one lit window in a tower at dusk. Your place in the city.",
       "Every Founder, Politician, Architect and Engineer event now has its own picture.",
       "Reach your career's goal and retire, and the end screen shows your career's own victory scene.",
       "The week planner is a compact list; tap an action to see everything it does.",

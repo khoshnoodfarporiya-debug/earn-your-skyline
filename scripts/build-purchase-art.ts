@@ -36,6 +36,7 @@
 import {
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   statSync,
   writeFileSync,
@@ -61,7 +62,7 @@ const OUT_CAREER_ART = join("public", "visuals");
 const BRAND_MASTER = join(
   "art-source",
   "branding",
-  "earn-your-skyline-logo-v1.png",
+  "lit-window-mark.svg",
 );
 const OUT_BRAND = join("public", "visuals", "brand");
 
@@ -372,16 +373,21 @@ async function main() {
 }
 
 /**
- * The logo, cut into the two shapes the interface actually needs.
+ * THE LIT WINDOW — every icon the game ships, from one SVG master.
  *
- * The master is one wide lockup — emblem on the left, wordmark on the right —
- * and neither half works everywhere. The title screen wants the whole thing;
- * a favicon and a tab icon want the emblem alone, square, or the wordmark
- * shrinks to an illegible smear beside a 16px circle.
+ * The mark (Nov 2026, docs/BRAND.md) is a dusk scene: a stepped art-deco tower
+ * off-centre against a farther one, with one lit window. It is a square,
+ * full-bleed picture, so it is itself the app icon — iOS and Android round the
+ * corners, and the window sits well inside the central safe zone a "maskable"
+ * Android icon may crop to.
  *
- * Both are cut from measured bounding boxes rather than guessed percentages:
- * the emblem occupies x 86–624 of 1774, and hardcoding "the left third" would
- * clip the arrow the moment the logo is revised.
+ * Rendered from vector at every size rather than resized from one bitmap, so
+ * the 16px favicon is drawn at 16px, not shrunk from 512. The name is never
+ * baked into an image: the title screen sets "Earn Your Skyline" in the game's
+ * own display face beside the mark.
+ *
+ * The old raster lockup (`earn-your-skyline-logo-v1.png`) stays in
+ * art-source/branding as history and is no longer read.
  */
 async function buildBrand() {
   if (!existsSync(BRAND_MASTER)) {
@@ -389,131 +395,56 @@ async function buildBrand() {
     return;
   }
   mkdirSync(OUT_BRAND, { recursive: true });
+  const svg = readFileSync(BRAND_MASTER);
+  /* librsvg renders an SVG at its own size unless told the density, so the
+     master (512) is rasterised at the density that lands on each size. */
+  const render = (size: number) =>
+    sharp(svg, { density: Math.max(72, (72 * size) / 512) }).resize(size, size);
+  const rounded = async (size: number) => {
+    const mask = Buffer.from(
+      `<svg width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${Math.round(size * 0.22)}" fill="#fff"/></svg>`,
+    );
+    return sharp(await render(size).png().toBuffer()).composite([
+      { input: mask, blend: "dest-in" },
+    ]);
+  };
 
-  /* Measured from the alpha channel of the v1 master. */
-  const LOCKUP = { left: 86, top: 87, width: 1607, height: 656 };
-  const MARK = { left: 86, top: 87, width: 539, height: 656 };
-
-  /* The lockup, at the two widths the title screen uses. */
-  for (const [suffix, width] of [
-    ["", 640],
-    ["@2x", 1280],
-  ] as const) {
-    await sharp(BRAND_MASTER)
-      .extract(LOCKUP)
-      .resize({ width })
-      .webp({ quality: 88, effort: 6 })
-      .toFile(join(OUT_BRAND, `logo-lockup${suffix}.webp`));
-  }
-
-  /*
-   * The emblem, padded to a square rather than cropped to one.
-   *
-   * The arrow breaks the circle top and bottom, so a square crop centred on
-   * the ring would slice it. `fit: contain` on a transparent ground keeps the
-   * whole mark and centres it, which is what a favicon needs anyway.
-   */
+  /* The mark inside the interface, with the icon's own rounded corners. */
   for (const size of [64, 128, 256]) {
-    await sharp(BRAND_MASTER)
-      .extract(MARK)
-      .resize(size, size, {
-        fit: "contain",
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
-      })
+    await (await rounded(size))
       .webp({ quality: 90, effort: 6 })
       .toFile(join(OUT_BRAND, `logo-mark-${size}.webp`));
   }
 
-  /*
-   * The tab icon, as PNG in `app/`.
-   *
-   * Next's file convention — it is picked up automatically and never goes
-   * through `public/`, so the "no PNG in the bundle" rule is untouched. On the
-   * game's own navy, because a browser tab strip is usually light and a
-   * transparent navy mark on white loses its darkest strokes.
-   */
-  await sharp({
-    create: {
-      width: 256,
-      height: 256,
-      channels: 4,
-      background: { r: 8, g: 17, b: 31, alpha: 1 },
-    },
-  })
-    .composite([
-      {
-        input: await sharp(BRAND_MASTER)
-          .extract(MARK)
-          .resize(216, 216, {
-            fit: "contain",
-            background: { r: 0, g: 0, b: 0, alpha: 0 },
-          })
-          .png()
-          .toBuffer(),
-        gravity: "center",
-      },
-    ])
-    .png()
-    .toFile(join("app", "icon.png"));
-
-  /* And the card a shared link unfurls into: 1200×630, lockup on the void. */
-  await sharp({
-    create: {
-      width: 1200,
-      height: 630,
-      channels: 4,
-      background: { r: 8, g: 17, b: 31, alpha: 1 },
-    },
-  })
-    .composite([
-      {
-        input: await sharp(BRAND_MASTER)
-          .extract(LOCKUP)
-          .resize({ width: 860 })
-          .png()
-          .toBuffer(),
-        gravity: "center",
-      },
-    ])
-    .png()
-    .toFile(join("app", "opengraph-image.png"));
-
-  /*
-   * Home-screen icons (beta, Nov 2026: the game is phone-first).
-   *
-   * iOS fills any transparency with black and rounds the corners itself, so
-   * the touch icon is the mark on the game's navy, full-bleed, with no corner
-   * radius of its own. The manifest icons follow the same rule; the
-   * "maskable" one keeps the mark inside the central 80% safe zone Android
-   * may crop to a circle. PNG, because that is what every home screen reads.
-   */
-  const NAVY = { r: 8, g: 17, b: 31, alpha: 1 };
-  const markOnNavy = async (size: number, mark: number, out: string) =>
-    sharp({ create: { width: size, height: size, channels: 4, background: NAVY } })
-      .composite([
-        {
-          input: await sharp(BRAND_MASTER)
-            .extract(MARK)
-            .resize(mark, mark, {
-              fit: "contain",
-              background: { r: 0, g: 0, b: 0, alpha: 0 },
-            })
-            .png()
-            .toBuffer(),
-          gravity: "center",
-        },
-      ])
-      .png()
-      .toFile(out);
+  /* Tab icon, iPhone home-screen icon, and the manifest icons. Square and
+     full-bleed: the platforms round them. */
+  await render(256).png().toFile(join("app", "icon.png"));
+  await render(180).png().toFile(join("app", "apple-icon.png"));
   const OUT_ICONS = join("public", "icons");
   mkdirSync(OUT_ICONS, { recursive: true });
-  await markOnNavy(180, 136, join("app", "apple-icon.png"));
-  await markOnNavy(192, 152, join(OUT_ICONS, "icon-192.png"));
-  await markOnNavy(512, 404, join(OUT_ICONS, "icon-512.png"));
-  await markOnNavy(512, 320, join(OUT_ICONS, "icon-maskable-512.png"));
+  await render(192).png().toFile(join(OUT_ICONS, "icon-192.png"));
+  await render(512).png().toFile(join(OUT_ICONS, "icon-512.png"));
+  await render(512).png().toFile(join(OUT_ICONS, "icon-maskable-512.png"));
+
+  /* The link-preview card, 1200x630: the same dusk across the whole card and
+     the scene in the middle. The title travels as text in the card's own
+     metadata, so none is drawn here. */
+  const master = svg.toString("utf8");
+  const defs = master.match(/<defs>[\s\S]*<\/defs>/)?.[0] ?? "";
+  const scene = master
+    .replace(/^[\s\S]*<\/defs>/, "")
+    .replace(/<\/svg>\s*$/, "")
+    .replace(/<rect width="512" height="512"[^>]*\/>/g, "");
+  const card = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+    ${defs}
+    <rect width="1200" height="630" fill="url(#sky)"/>
+    <rect width="1200" height="630" fill="url(#horizon)"/>
+    <g transform="translate(285 0) scale(1.2305)">${scene}</g>
+  </svg>`;
+  await sharp(Buffer.from(card)).png().toFile(join("app", "opengraph-image.png"));
 
   console.log(
-    "  brand/logo-lockup, logo-mark, app/icon, app/apple-icon, app/opengraph-image, icons/",
+    "  brand: logo-mark 64/128/256, app/icon, app/apple-icon, icons/, app/opengraph-image",
   );
 }
 
