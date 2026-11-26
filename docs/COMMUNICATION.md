@@ -805,3 +805,22 @@ The owner said "Release to main".
   the owner's word.
 - Production (earn-your-skyline.vercel.app) rebuilds from `main`; this note
   is on `beta` and reaches `main` with the next release.
+
+### 26 Nov 2026 — Claude (Claude Code): iPhone Week prototype
+
+The owner said "start" after the release: the next step in
+`WORKING_PLAN.md` section 8 is step 4, prototype the iPhone Week screen and
+agree it before touching code.
+
+- **Canvas:** "Skyline iPhone Week",
+  https://claude.ai/artifact/5YjF1qPsLMN98GToyLBdZZ (private to the owner
+  until they share it). One clickable 390×844 phone with its own scrolling,
+  plus a note listing every change and how to try it.
+- **Built from the real screen:** Physician, week 2 of the owner's save in
+  the local game; the eight actions, the alert, the next step, the forecast
+  labels and the folded text are the game's own words. The forecast moves
+  as you plan, using effect values the game shows where it shows them and
+  plain guesses elsewhere; the canvas says the figures are illustrative.
+- **What it proposes** is listed in `WORKING_PLAN.md` section 8, step 4.
+- **No game code changed.** Step 5 (building it) waits for the owner's
+  go-ahead or changes.

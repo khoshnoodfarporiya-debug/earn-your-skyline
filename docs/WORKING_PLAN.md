@@ -446,6 +446,29 @@ screen at a time:
      - **New screens: wrap the panels in `<div className="stack">`.**
 4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
+   - **Drafted 26 Nov 2026, waiting on the owner:** a clickable canvas,
+     "Skyline iPhone Week", on claude.ai (private to the owner; the link is
+     in the session log). Physician, week 2, real figures from that save.
+   - What it proposes, against today's Week screen (4.5 phone screens;
+     the proposal is about 2, with the decision in the first):
+     - **One status source.** The hero stops repeating Week, Based in and
+       Practice; week and city go in the top bar, Time left becomes dots in
+       the commit bar, and the strip keeps Cash, Debt and Goal.
+     - **A shorter hero:** picture, practice name, one line (about 150px,
+       was about 330px).
+     - **"Needs you"** merges the alerts and the next step into one list,
+       one row each, action inline. The next step hides itself once a
+       block is assigned.
+     - **Your week** follows at once: quick-plan pills, then the actions
+       with 44px steppers.
+     - **"If you commit"** is a 2×2 grid that fills its row.
+     - **Folded rows** for the goal's paragraph, the loan, recent weeks,
+       how you are, and case notes.
+     - **The commit bar** shows the week as dots and names what the button
+       will do ("Commit · 2 unused").
+   - This covers four open items from section 5: one status source, merge
+     alerts and the next step, the forecast grid, and (by folding) much of
+     the onboarding weight.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,
    checking the browser suite each time.
 
