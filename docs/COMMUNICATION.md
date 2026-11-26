@@ -150,7 +150,10 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`main` = `beta` = v0.9.0-beta.2, released 26 Nov 2026.** Everything
+- **`beta` is ahead of `main`** with v0.9.0-beta.3, not yet released: the
+  new Week screen (session-log entry "the Week screen, built") and the
+  phone-news repeat fix.
+- **`main` = v0.9.0-beta.2, released 26 Nov 2026.** Everything
   below is in `main`:
   - the redesign's design system: Fraunces and Inter, one button system,
     underlined tabs and pill choices, one spacing rhythm, and the 375px
@@ -874,3 +877,35 @@ pushed on the owner's word ("Push beta").
   temporary, uncommitted Playwright config.
 - **Left:** the next release's "What's new" line (the version bump is the
   release's), and the Physician world-news question above.
+
+### 26 Nov 2026 — Claude (Claude Code): the Week screen, built
+
+Branch `feature/week-screen`, merged into `beta` and pushed. The owner said
+"Build it" to the iPhone Week prototype.
+
+- **What changed** is listed in `WORKING_PLAN.md` section 8, step 5. In
+  short: week and city in the header, a 150px hero, a Cash/Debt/Goal strip,
+  one "Needs you" card (new `NeedsYou`; `AlertStack` and `NextStep`
+  deleted), folded rows (new `components/ui/Fold.tsx`), and the week as
+  dots on the commit bar and the desktop commit card.
+- **Result:** Physician week 2 on a 375px phone, 3,646px to 2,441px (4.5 to
+  3.0 screens). The prototype promised about 2; the planner itself is
+  about 870px, so shortening it is the next lever.
+- **A bug the tests caught:** the header's longer line pushed the phone
+  button's unread badge 4px off a 375px screen when insolvent. The header
+  button now has `min-w-0` so the text truncates.
+- **Tests changed, not weakened:** `readWeek` reads "Week N" from the
+  header; a new `openFold` helper taps a folded row open before reading
+  Observations or the case log; the alerts keep their "Needs attention"
+  region. That region had gone missing in the first build, which also
+  made "every guidance destination is a screen that exists" pass by
+  returning early. It runs properly again.
+- **Version 0.9.0-beta.3:** a "What's new" entry for the Week screen, the
+  header line, and the phone-news fix from the other session, which had
+  left that line to the next release. `package.json`, the lock file and
+  the README badge match.
+- Merged `origin/beta` (the news fix) into the branch before the final
+  run, so the suite tested both together.
+- **Verified** on the merged code: type check, lint and engine checks
+  pass, and all 404 browser tests pass. In the browser: the Week screen
+  at 375px (no overflow) and at 1280px.

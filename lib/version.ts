@@ -9,7 +9,7 @@
  * Numbering: each beta update bumps the last number — 0.9.0-beta.1,
  * 0.9.0-beta.2, and so on — until the owner calls a release, which is 1.0.0.
  */
-export const APP_VERSION = "0.9.0-beta.2";
+export const APP_VERSION = "0.9.0-beta.3";
 
 export interface ChangelogEntry {
   version: string;
@@ -19,6 +19,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.0-beta.3",
+    date: "2026-11-26",
+    changes: [
+      "A calmer Week screen: what needs you is one short list, your week comes straight after it, and the goal, the loan and the history fold away until you want them.",
+      "The week and your city are under your name at the top of every screen.",
+      "Your phone's news no longer runs the same story week after week.",
+    ],
+  },
   {
     version: "0.9.0-beta.2",
     date: "2026-11-26",
