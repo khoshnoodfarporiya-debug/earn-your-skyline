@@ -110,7 +110,7 @@ export function OutbreakPanel({
   const containmentUnderway = m.outbreaks.some((o) => o.contained);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       <PressureStrip week={state.week} cities={m.cities.length} />
 
       <section className="form overflow-hidden">

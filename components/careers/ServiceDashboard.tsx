@@ -63,7 +63,7 @@ export function ServiceDashboard({
   const night = nights[Math.min(which, Math.max(0, nights.length - 1))];
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {night ? (
         <NightReport
           night={night}

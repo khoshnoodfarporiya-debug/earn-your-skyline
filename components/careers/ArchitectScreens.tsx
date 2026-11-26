@@ -72,7 +72,7 @@ export function ArchitectScreens({
 
   const def = screenOf(screen);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <div>
         <h1 className="display text-[19px] leading-tight text-ink">{def.label}</h1>
         <p className="mt-0.5 text-xs text-ink-faint">{def.purpose}</p>
@@ -127,7 +127,7 @@ function BoardsScreen({
   const built = a.commissions.filter((c) => c.done);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ---------------------------------------------------- on the boards */}
       <section
         aria-labelledby="boards-h"

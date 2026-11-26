@@ -434,7 +434,16 @@ screen at a time:
        staff member), map pins, icon buttons in the header, the bottom nav,
        the plan stepper, and inline text links. Leave them unless a screen
        redesign touches them.
-   - [ ] Spacing: one pass over the gaps between panels and inside cards.
+   - [x] **Spacing** (branch `feature/spacing`, 26 Nov 2026)
+     - One gap between the panels of a screen: `.stack` in
+       `app/globals.css`, 20px on a phone and 24px from desktop. It was
+       16px on every Physician screen, 20px on the Week and 24px in the
+       other six careers. 50 screen wrappers in 33 files now use it.
+     - The page margin on a phone is 16px, the iOS standard (it was 12px).
+       The pinned commit bar and the week-plan bar match it.
+     - Inside panels the padding was already consistent (headers and rows
+       line up), so it was left alone.
+     - **New screens: wrap the panels in `<div className="stack">`.**
 4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,

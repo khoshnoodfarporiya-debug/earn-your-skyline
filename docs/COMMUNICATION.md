@@ -152,8 +152,8 @@ touched. Run the browser tests when you change a screen.
 
 - **`beta` is ahead of `main`** with the redesign's first passes, not yet
   released: the new type (Fraunces and Inter), one button system, underlined
-  tabs and pill choices, and the 375px header fix. See the "type and buttons"
-  and "buttons, tabs and choices" entries in the session log.
+  tabs and pill choices, one spacing rhythm, and the 375px header fix. See
+  the session-log entries from "type and buttons" to "spacing".
 - **`main` = v0.9.0-beta.1, released 26 Nov 2026.** Everything below is
   in `main`:
   - the lit-window logo and lamplight palette
@@ -166,8 +166,8 @@ touched. Run the browser tests when you change a screen.
   - the README with screenshots, and the `LICENSE` (all rights reserved)
 - **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
   (Codex's, unmerged). Every merged branch has been deleted.
-- **What's still open:** the rest of the design system (a spacing pass, and
-  a look at the ~65 buttons that keep their own shape on purpose), the
+- **What's still open:** WORKING_PLAN section 8 steps 4–5 (prototype the
+  iPhone Week screen, then roll screens out one by one), the
   rest of the layout review, real login, payments, the App Store, Solicitor
   and Engineer balance, and the Founder's gap between cities. See
   `WORKING_PLAN.md`.
@@ -763,3 +763,21 @@ to carry on.
   - type check, lint and engine checks pass, and all 404 browser tests
     pass (7.5 minutes)
 - Staged with a plain `git add` (see the line-ending note above).
+
+### 26 Nov 2026 — Claude (Claude Code): spacing
+
+Branch `feature/spacing`, merged into `beta` and pushed. The owner chose the
+spacing pass, the last open item in the design system.
+
+- **One gap between panels:** `.stack` in `app/globals.css`, 20px on a
+  phone and 24px from desktop. It was 16px on Physician screens, 20px on
+  the Week and 24px in the other six careers. 50 screen wrappers in 33
+  files now use it. New screens should too.
+- **Phone margin 16px** (was 12px), matching the pinned commit bar and
+  week-plan bar.
+- Padding inside panels was already consistent, so it was left alone.
+- **Verified:**
+  - a survey of 124 screens (all seven careers, phone and desktop) finds
+    no horizontal overflow; phone screens compared by eye
+  - type check, lint and engine checks pass, and all 404 browser tests
+    pass (7.5 minutes)

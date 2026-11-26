@@ -343,7 +343,7 @@ export function Game({
          the `clinical` token reads it, so everything active, owned or
          pressable takes this career's colour from here down. */
       data-career={state.careerId}
-      className={`mx-auto px-3 pt-3 sm:px-6 sm:pt-6 md:pb-10 ${
+      className={`mx-auto px-4 pt-3 sm:px-6 sm:pt-6 md:pb-10 ${
         screen === "cities" ? "max-w-[1680px]" : "max-w-6xl"
       } ${screen === "overview" ? "pb-36" : "pb-24"}`}
     >

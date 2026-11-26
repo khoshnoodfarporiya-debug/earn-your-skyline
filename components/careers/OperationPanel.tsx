@@ -66,7 +66,7 @@ function PracticePanel({
   const p = practice(state);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section aria-labelledby="live-h" className="rounded-lg border border-rule bg-card p-4">
         <h2 id="live-h" className="text-sm font-semibold text-ink">
           On the books in {legalCityOf(p).name}

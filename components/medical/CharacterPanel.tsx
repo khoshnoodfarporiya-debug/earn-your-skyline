@@ -41,7 +41,7 @@ export function CharacterPanel({
   const ambition = currentAmbition(state);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {bg && (
         <Panel title="Where you came from" aside={bg.label} flush>
           <div className="px-5 py-4">

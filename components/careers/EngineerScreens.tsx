@@ -75,7 +75,7 @@ export function EngineerScreens({
 
   const def = screenOf(screen);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <div>
         <h1 className="display text-[19px] leading-tight text-ink">{def.label}</h1>
         <p className="mt-0.5 text-xs text-ink-faint">{def.purpose}</p>
@@ -128,7 +128,7 @@ function BenchScreen({
   const live = w.products.filter((p) => p.stage !== "withdrawn");
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
     <section
       aria-labelledby="bench-h"
       className="rounded-lg border border-rule bg-card p-4"

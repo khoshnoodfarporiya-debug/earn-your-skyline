@@ -34,7 +34,7 @@ export function SetbackPanel({
   const list = state.setbacks ?? [];
   if (list.length === 0) return null;
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {list.map((sb) => (
         <SetbackCard key={sb.kind} sb={sb} state={state} dispatch={dispatch} />
       ))}

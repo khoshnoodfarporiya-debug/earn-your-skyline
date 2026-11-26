@@ -31,7 +31,7 @@ export function StaffPanel({
   const payrollTotal = m.staff.reduce((sum, s) => sum + s.salary, 0);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/* ----------------------------------------------------------- hire */}
       <Panel
         title="Recruit"

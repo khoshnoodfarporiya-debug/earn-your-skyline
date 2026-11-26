@@ -75,7 +75,7 @@ export function PoliticianScreens({
 
   const def = screenOf(screen);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <div>
         <h1 className="display text-[19px] leading-tight text-ink">{def.label}</h1>
         <p className="mt-0.5 text-xs text-ink-faint">{def.purpose}</p>
@@ -150,7 +150,7 @@ function CountScreen({
   const holding = wouldHold(c);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* --------------------------------------------------- the only day */}
       <section
         aria-labelledby="poll-h"
@@ -539,7 +539,7 @@ function PostbagScreen({
   const band = pollBandOf(c, state.week);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ---------------------------------------------------- open cases */}
       <section aria-labelledby="postbag-h" className="rounded-lg border border-rule bg-card p-4">
         <h2 id="postbag-h" className="sign text-[11.5px] text-ink-faint">

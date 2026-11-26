@@ -34,7 +34,7 @@ export function LifePanel({
   const retained = lifestyleValue(m);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/* Burnout is the thing this screen exists to move, so the arithmetic
           of it comes before the shopping. */}
       <BurnoutBalance state={state} onNavigate={onNavigate} />

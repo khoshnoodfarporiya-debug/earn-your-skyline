@@ -95,7 +95,7 @@ export function LawyerScreens({
   const def = screenOf(screen);
   const scene = solicitorScene(screen, state);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* The Physician's ScreenHeader reads medical state, so the Solicitor
           states where it is itself rather than borrowing a component that
           would be null for it. Same reason the Chef's does. */}
@@ -253,7 +253,7 @@ function InstructionsScreen({
     .sort((a, b) => a.prestige - b.prestige)[0];
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section
         aria-labelledby="market-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -562,7 +562,7 @@ function CaseworkScreen({
   const live = [...p.cases].sort((a, b) => a.dueWeek - b.dueWeek);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section
         aria-labelledby="live-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -742,7 +742,7 @@ function BooksScreen({
   const canPay = state.r.debt > 0 && state.r.cash > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section
         aria-labelledby="worth-h"
         className="rounded-lg border border-rule bg-card p-4"
@@ -979,7 +979,7 @@ function FirmScreen({
   const costs = record.reduce((n, v) => n + (v.costs ?? 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/*
        * WHERE THE FIRM SITS
        *

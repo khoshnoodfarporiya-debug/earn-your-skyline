@@ -40,7 +40,7 @@ export function SuppliesPanel({
           : "Ample";
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/* --------------------------------------------------------- on hand */}
       <section className="form">
         <div className="form-head flex flex-wrap items-baseline justify-between gap-2 px-5 py-2.5">

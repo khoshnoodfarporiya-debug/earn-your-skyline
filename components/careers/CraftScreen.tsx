@@ -47,7 +47,7 @@ export function CraftScreen({
   const done = k.stages ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------- the standing */}
       <ChefScene
         art={BRIGADE_ART}

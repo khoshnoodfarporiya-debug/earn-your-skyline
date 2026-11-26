@@ -81,7 +81,7 @@ export function FounderScreens({
 
   const def = screenOf(screen);
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* The Physician's ScreenHeader reads medical state, which is null for a
           founder, so this career states where it is itself — the same reason
           the Chef's screens and the Solicitor's do. */}
@@ -154,7 +154,7 @@ function RunwayScreen({
   const organic = organicUsers(v);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------- the clock */}
       <section
         aria-labelledby="runway-h"
@@ -542,7 +542,7 @@ function ProductScreen({
   const done = experimentsOf(v);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------ the product work */}
       <section aria-labelledby="discovery-h" className="rounded-lg border border-rule bg-card p-4">
         <h2 id="discovery-h" className="sign text-[11.5px] text-ink-faint">

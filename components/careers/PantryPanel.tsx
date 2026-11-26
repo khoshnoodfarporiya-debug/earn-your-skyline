@@ -84,7 +84,7 @@ export function PantryPanel({
   const shortfalls = menuShortfalls(k, covers, week, state.r.skill);
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <section
         aria-labelledby="pantry-h"
         className="rounded-lg border border-rule bg-card p-4"

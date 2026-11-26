@@ -104,13 +104,13 @@ export function Overview({
      * major blocks, tighter inside them — which is what lets the nested card
      * outlines come out.
      */
-    <div className="space-y-5">
+    <div className="stack">
       <OverviewHero career={career} state={state} alerts={alerts} />
 
       <StatusStrip state={state} spent={spent} budget={budget} />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
-        <div className="min-w-0 space-y-5">
+        <div className="min-w-0 stack">
           {/* One primary recommendation and at most one secondary. Everything
               else stays reachable through the section badges — see
               `topAlerts`. Inside the left column rather than above the grid,
@@ -258,7 +258,7 @@ export function Overview({
         {/* ------------------------------------------------ supporting
             Secondary by construction: on desktop it sits beside the week, on
             mobile it falls below it, so the decision always comes first. */}
-        <div className="scroll-thin min-w-0 space-y-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto">
+        <div className="scroll-thin min-w-0 stack lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto">
           {/*
            * THE COMMIT, PINNED (desktop).
            *

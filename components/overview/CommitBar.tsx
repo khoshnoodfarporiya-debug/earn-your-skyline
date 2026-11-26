@@ -29,7 +29,7 @@ export function CommitBar({
     <div
       /* Hides at the same breakpoint the bottom nav does, or it would float
          above empty space on tablet. */
-      className="fixed inset-x-0 bottom-[56px] z-30 border-t border-rule bg-[#0d1729]/95 px-3 py-2.5 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-[56px] z-30 border-t border-rule bg-[#0d1729]/95 px-4 py-2.5 backdrop-blur lg:hidden"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto flex max-w-6xl items-center gap-3">

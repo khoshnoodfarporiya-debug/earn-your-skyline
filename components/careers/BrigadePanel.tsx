@@ -68,7 +68,7 @@ export function BrigadePanel({
   const menuIsOn = activeMenu(k).length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------ the sections */}
       <section
         aria-labelledby="stations-h"

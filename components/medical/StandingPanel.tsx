@@ -37,7 +37,7 @@ export function StandingPanel({
   const rows = standingRows(state, 12);
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       <Panel
         title="Overall"
         aside={`${Math.round(overall)} · ${repWord(overall)}`}

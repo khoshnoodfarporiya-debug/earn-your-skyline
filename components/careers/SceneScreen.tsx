@@ -43,7 +43,7 @@ export function SceneScreen({ state }: { state: RunState }) {
   const rank = cityRank(k, sceneScore(k, state.r.reputation));
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------ the city */}
       <section
         aria-labelledby="city-h"

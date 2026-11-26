@@ -39,7 +39,7 @@ export function CrisisPanel({
   if (crises.length === 0) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {crises.map((c) => (
         <CrisisCard key={c.id} crisis={c} state={state} dispatch={dispatch} />
       ))}

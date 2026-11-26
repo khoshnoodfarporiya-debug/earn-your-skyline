@@ -33,7 +33,7 @@ export function CareerPanel({
     m.departments.find((d) => d !== "general") ?? "general";
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       {/* The whole ladder first: where you are on it, what is one step away,
           and what each locked rung is waiting for. The enrolment controls
           below are the same rungs, with the buttons attached. */}

@@ -70,7 +70,7 @@ export function MenuScreen({
   const foodShare = totalPrice > 0 ? totalCost / totalPrice : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       {/* ------------------------------------------------------ the summary */}
       <section
         aria-labelledby="menu-h"

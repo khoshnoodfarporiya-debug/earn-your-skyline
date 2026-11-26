@@ -49,7 +49,7 @@ export function ContractsPanel({
   const culture = cultureScore(m, state.week).score;
 
   return (
-    <div className="space-y-4">
+    <div className="stack">
       <Panel
         title="On the table"
         aside={`${offers.length} offer${offers.length === 1 ? "" : "s"}`}
