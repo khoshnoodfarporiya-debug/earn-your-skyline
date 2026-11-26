@@ -733,3 +733,9 @@ to carry on the redesign and make the game easier to understand.
   - a survey of 124 screens (all seven careers, phone and desktop) finds
     no horizontal overflow; phone screenshots checked by eye
   - engine checks pass, and all 404 browser tests pass (7.5 minutes)
+- **Slip, fixed:** this was staged with `git -c core.autocrlf=false add` for
+  every file, which stored 30 LF files as CRLF (a 12,000-line diff). Two
+  follow-up commits put them back. **Only the files git already stores as
+  CRLF (`scripts/commands.ts`, `lib/game/careers/chef.ts`) need that flag;
+  stage everything else with a plain `git add`,** and check
+  `git diff --cached --stat` before committing.
