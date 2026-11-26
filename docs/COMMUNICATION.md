@@ -150,12 +150,12 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`beta` is ahead of `main`** with the redesign's first passes, not yet
-  released: the new type (Fraunces and Inter), one button system, underlined
-  tabs and pill choices, one spacing rhythm, and the 375px header fix. See
-  the session-log entries from "type and buttons" to "spacing".
-- **`main` = v0.9.0-beta.1, released 26 Nov 2026.** Everything below is
-  in `main`:
+- **`main` = `beta` = v0.9.0-beta.2, released 26 Nov 2026.** Everything
+  below is in `main`:
+  - the redesign's design system: Fraunces and Inter, one button system,
+    underlined tabs and pill choices, one spacing rhythm, and the 375px
+    header fix (session-log entries "type and buttons" to "release
+    0.9.0-beta.2")
   - the lit-window logo and lamplight palette
   - the iPhone install (PWA), the version and "What's new", and feature flags
   - the compact planner and the pinned desktop commit
@@ -781,3 +781,19 @@ spacing pass, the last open item in the design system.
     no horizontal overflow; phone screens compared by eye
   - type check, lint and engine checks pass, and all 404 browser tests
     pass (7.5 minutes)
+
+### 26 Nov 2026 — Claude (Claude Code): release 0.9.0-beta.2
+
+The owner said "Release to main".
+
+- **Version 0.9.0-beta.2** in `lib/version.ts`, `package.json` and
+  `package-lock.json`. beta.1 had already shipped, so the redesign lines
+  moved out of its "What's new" entry into a new one, written for players:
+  lettering and buttons, controls that look like what they do, the time
+  dots, calmer spacing, and the phone button no longer slipping off a small
+  iPhone.
+- **README:** the type section named the old fonts (Saira, Barlow, Plex
+  Mono); it now describes Fraunces and Inter, the three control shapes and
+  `.stack`. The beta badge says v0.9.0-beta.2.
+- Released by a pull request from `beta` into `main`, as with beta.1.
+  Its number and the deploy result are recorded below.

@@ -4,7 +4,7 @@ Started 23 Nov 2026 on branch `docs/review-and-plan`. This is the live to-do
 list for the next stretch of work. Tick items off as they land; move anything
 abandoned to "Dropped" with a one-line reason instead of deleting it.
 
-## Where things stand (verified 26 Nov 2026, release of 0.9.0-beta.1 to `main`)
+## Where things stand (verified 26 Nov 2026, release of 0.9.0-beta.2 to `main`)
 
 | Gate | Result |
 | --- | --- |

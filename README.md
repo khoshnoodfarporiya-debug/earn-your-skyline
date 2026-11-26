@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>A career sim for your phone. Start with almost nothing, and earn your place in the city one week at a time.</strong><br>
-  <em>In beta (v0.9.0-beta.1) · iPhone first, Android later</em>
+  <em>In beta (v0.9.0-beta.2) · iPhone first, Android later</em>
 </p>
 
 ## Quick tour
@@ -844,8 +844,15 @@ from three surface levels, not from lighting effects.
   is distinguished from its ground by *being lighter*, not by being outlined.
   Rules (`rule`, `rule-soft`) are hairlines between rows, not frames.
 - **Type scale** — `.t-page` / `.t-section` / `.t-card` / `.t-body` /
-  `.t-label` / `.t-value`, so size carries rank. Saira Condensed for signage,
-  Barlow for body, IBM Plex Mono with tabular figures for every number.
+  `.t-label` / `.t-value`, so size carries rank. Fraunces (an editorial
+  serif) for headings and the title, Inter for body text, and Inter's
+  tabular figures for every number, so columns line up.
+- **Controls** — three shapes, three meanings: `.btn` (rounded rectangle)
+  does something, `.choice` (pill) picks one of a set, `.tab` (underlined
+  word) shows another screen. Sizes `.btn-lg` 52px, default 44px, `.btn-sm`
+  36px, `.btn-xs` 32px for inline choices. All in `app/globals.css`.
+- **Spacing** — a screen's panels sit in a `.stack` (20px apart on a phone,
+  24px on desktop); the phone page margin is 16px.
 - **Accent economy.** The career accent (the `clinical` token) means *yours /
   active / do this*, and is spent sparingly. Since the November 2026 redesign
   it is **lamplight amber** by default and for the Physician, with a quiet
