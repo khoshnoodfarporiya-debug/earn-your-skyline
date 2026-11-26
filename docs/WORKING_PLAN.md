@@ -111,6 +111,36 @@ Balance snapshot (4 seeds, 120 weeks, so treat this as a signal, not a verdict):
 - [ ] Look into the Founder's gap between cities (Berlin 100%, London 0%)
 - [ ] Rerun at 40+ seeds before calling anything fixed
 
+### 1b. Bugs
+- [x] **The phone's news repeated itself** (branch `fix/news-repeats`, 26 Nov 2026).
+      A beta save showed The Pass's sous chef survey at weeks 4, 5 and 6, each
+      with a body that was its own headline again.
+  - Cause: filler stories were drawn blind from a pool of three each week
+    (45% chance), and the Chef's headline was the body cut at 60 characters.
+    The Founder, Politician, Architect and Engineer phones (`voicePack.ts`,
+    40%, pools of three) and the Physician's rival and regulator items had the
+    same blind draw
+  - Fix: `lib/game/phone/freshNews.ts`. A filler story is not re-run while it
+    ran in the last 10 weeks (`NEWS_REPEAT_WEEKS`) or is still the newest
+    item; if the whole pool is excluded, nothing is posted. No new save field:
+    the news list is the record. The phone streams draw the same numbers as
+    before
+  - The Chef's stories now have a short headline and a body that adds to it,
+    and the pools grew: six trade stories (was three) and two about a famous
+    kitchen (was one)
+  - Not changed: stories that report a real event (a critic's review, a
+    rival's move, a verdict, an outbreak) come back when the event does. The
+    check holds them to "never twice in a row"
+  - 9 new engine checks, including a 156-week Chef run on three seeds and
+    every other career on two
+- [ ] The next release's "What's new" should say the phone's news no longer
+      repeats the same story (not added on the fix branch, to leave the
+      version bump to the release)
+- [ ] The Physician's world news (`lib/game/news.ts`, `state.news`) can also
+      re-run its two always-available stories, but each one applies a real
+      effect (a contract boost), so de-duplicating it would change balance.
+      Left alone; worth a design look
+
 ### 2. Human playtest
 - [ ] Play one full run of each career to week 52, with notes on boring or confusing weeks
 - [ ] Get 3–5 outside players for a first session, and record where they get stuck

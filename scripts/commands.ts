@@ -427,7 +427,11 @@ import {
   CHEF_POST_BY_ID,
   chefPostContext,
   ensureChefPhone,
+  chefPressStories,
+  chefTradeStories,
 } from "../lib/game/careers/chefPhone";
+import { NEWS_REPEAT_WEEKS, pickFreshStory } from "../lib/game/phone/freshNews";
+import { phoneOf } from "../lib/ui/phoneAccess";
 import {
   KITCHEN_KIT,
   KIT_BY_ID,
@@ -17459,6 +17463,150 @@ console.log("\nEvery career is organised\n" + "─".repeat(52));
   );
 }
 
+console.log("\nThe phone's news does not repeat itself\n" + "────────────────────────────────────────────────────");
+{
+  /*
+   * A beta save showed The Pass's sous chef survey at weeks 4, 5 and 6, with
+   * a body that was its own headline again. Filler stories now skip anything
+   * that ran in the last NEWS_REPEAT_WEEKS weeks (`lib/game/phone/freshNews.ts`).
+   */
+  const pool = [{ headline: "A" }, { headline: "B" }];
+  check(
+    "a filler story that ran recently is not picked again",
+    pickFreshStory(pool, [{ headline: "A", week: 9 }], 10, 0)?.headline === "B",
+  );
+  check(
+    "when every filler story ran recently, nothing is picked",
+    pickFreshStory(
+      pool,
+      [
+        { headline: "A", week: 9 },
+        { headline: "B", week: 8 },
+      ],
+      10,
+      0.5,
+    ) === null,
+  );
+  check(
+    "a filler story can run again once the repeat window has passed",
+    pickFreshStory(
+      pool,
+      [
+        { headline: "B", week: 2 },
+        { headline: "A", week: 1 },
+      ],
+      2 + NEWS_REPEAT_WEEKS,
+      0,
+    )?.headline === "A",
+  );
+  check(
+    "but never straight after itself, however long ago that was",
+    pickFreshStory(pool, [{ headline: "A", week: 1 }], 50, 0)?.headline === "B",
+  );
+
+  /* Every story the phone ever showed in a run, in the order it was added
+     (the phone keeps its list newest first, so each week's new items are
+     read from the end). */
+  const newsOfRun = (
+    career: CareerDef,
+    seed: number,
+    weeks: number,
+    each?: (s: RunState) => void,
+  ) => {
+    let s = startRun(career, seed);
+    const seen = new Set<string>();
+    const out: { id: string; week: number; headline: string; body: string }[] = [];
+    for (let w = 0; w < weeks && !s.outcome; w++) {
+      each?.(s);
+      s = advanceWeek(career, s, {}).state;
+      const added = (phoneOf(s)?.news ?? []).filter((n) => !seen.has(n.id));
+      for (const n of added.reverse()) {
+        seen.add(n.id);
+        out.push(n);
+      }
+    }
+    return out;
+  };
+  /*
+   * Filler is the colour drawn at random (`news-<week>` on the Chef's and the
+   * voice-pack phones, the Physician's rival and regulator items). Stories
+   * that report a real event (a critic's review, a rival's move, an
+   * outbreak) can come back when the event does, so they are only held to
+   * "never twice in a row".
+   */
+  type Story = { id: string; week: number; headline: string };
+  const isFiller = (n: Story) =>
+    /^news-\d+$/.test(n.id) ||
+    n.id.startsWith("news.rival.") ||
+    n.id.startsWith("news.reg.");
+  /* Filler pairs with the same headline closer together than the window,
+     plus any two stories in a row with the same headline. */
+  const repeats = (news: Story[]) => {
+    const out: string[] = [];
+    news.forEach((n, i) => {
+      const next = news[i + 1];
+      if (next && next.headline === n.headline) {
+        out.push(`"${n.headline}" twice in a row, weeks ${n.week} and ${next.week}`);
+      }
+      if (!isFiller(n)) return;
+      const again = news
+        .slice(i + 1)
+        .find((m) => m.headline === n.headline && m.week - n.week < NEWS_REPEAT_WEEKS);
+      if (again) out.push(`"${n.headline}" at weeks ${n.week} and ${again.week}`);
+    });
+    return out;
+  };
+
+  const byRun = [
+    newsOfRun(chef, 8181, 156),
+    newsOfRun(chef, 4242, 156),
+    /* Famous enough for the food pages, whose pool is only two stories. */
+    newsOfRun(chef, 777, 156, (s) => {
+      s.r.reputation = 80;
+    }),
+  ];
+  const chefNews = byRun.flat();
+  const chefRepeats = byRun.flatMap(repeats);
+  check(
+    "a Chef run never shows the same headline twice in a row, nor a filler story twice within the repeat window",
+    chefRepeats.length === 0 && byRun.every((r) => r.length >= 10),
+    chefRepeats.slice(0, 3).join("; ") || byRun.map((r) => r.length).join("/"),
+  );
+  check(
+    "a Chef run's filler news includes the food pages once the kitchen is famous",
+    byRun[2].some((n) => chefPressStories("").some((p) => p.headline === n.headline)),
+  );
+  const echoes = chefNews.filter(
+    (n) => n.body === n.headline || n.body.startsWith(n.headline),
+  );
+  check(
+    "no Chef news item's body repeats its headline",
+    echoes.length === 0,
+    echoes[0]?.headline,
+  );
+  check(
+    "every Chef filler story has a short headline and a body that adds to it",
+    [...chefTradeStories("Lyon"), ...chefPressStories("Lyon")].every(
+      (st) =>
+        st.headline.length <= 60 &&
+        !st.headline.endsWith(".") &&
+        st.body.length > st.headline.length &&
+        !st.body.includes(st.headline),
+    ),
+  );
+
+  /* The same rule for every other career's phone. */
+  const others = CAREERS.filter((c) => c.id !== "chef").map((c) => ({
+    id: c.id,
+    found: [1, 2].flatMap((seed) => repeats(newsOfRun(c, seed, 120))),
+  }));
+  const loud = others.filter((o) => o.found.length > 0);
+  check(
+    "no other career's phone shows a headline twice in a row, nor a filler story within the repeat window",
+    loud.length === 0,
+    loud.map((o) => `${o.id}: ${o.found[0]}`).join("; "),
+  );
+}
 
 console.log(
   `\n${failures === 0 ? "all checks passed" : `${failures} FAILED`}\n`,

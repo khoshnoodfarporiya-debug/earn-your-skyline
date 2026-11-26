@@ -1,6 +1,7 @@
 import type { Rng, RunState } from "../types";
 import type { FeedPost, PhoneState } from "../medical/types";
 import { MAX_FEED, MAX_MESSAGES, MAX_NEWS } from "../medical/phone";
+import { pickFreshStory } from "./freshNews";
 
 /**
  * A PHONE, FROM A SMALL DESCRIPTION OF A WORLD
@@ -191,8 +192,12 @@ export function generateWeekFrom(
   }
 
   /* -------------------------------------------------------------- the news */
-  if (pack.news.length > 0 && rng.chance(0.4)) {
-    const item = pack.news[Math.floor(rng.next() * pack.news.length)];
+  /* Filler, so a story that ran recently is not run again (`freshNews.ts`). */
+  const item =
+    pack.news.length > 0 && rng.chance(0.4)
+      ? pickFreshStory(pack.news, phone.news, s.week, rng.next())
+      : null;
+  if (item) {
     phone.news = push(
       phone.news,
       {
