@@ -57,7 +57,7 @@ export function CommitBar({
         <button
           onClick={onCommit}
           disabled={!ready}
-          className="min-h-[48px] shrink-0 rounded-form bg-clinical px-6 text-[15px] font-bold text-on-accent transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
+          className="btn btn-primary btn-lg shrink-0"
         >
           {ready ? "Commit week" : "Assign time"}
         </button>

@@ -189,14 +189,14 @@ export function StartCityPicker({
         <button
           type="button"
           onClick={() => onBegin(chosen.id)}
-          className="rounded-form border border-clinical bg-clinical px-5 py-2.5 text-sm font-medium text-on-accent transition hover:brightness-110"
+          className="btn btn-primary btn-lg"
         >
           Begin in {chosen.name}
         </button>
         <button
           type="button"
           onClick={onBack}
-          className="rounded-form border border-rule px-4 py-2.5 text-sm text-ink-soft transition hover:border-clinical hover:text-ink"
+          className="btn btn-secondary btn-lg"
         >
           Choose another career
         </button>

@@ -383,7 +383,27 @@ screen at a time:
      - Open: the semantic "caution" orange `#F59E55` now sits close to
        lamplight and copper. It still carries an icon and a label, but it is
        worth separating during the design pass.
-   - [ ] two typefaces, the core components, and spacing
+   - [x] **Type** (branch `feature/type-and-buttons`, 26 Nov 2026)
+     - **Fraunces** (editorial serif, optical sizes, a little of its soft
+       axis) for headings, `.display` and the title.
+     - **Inter** for everything else.
+     - **Numbers** (`.num`, `.t-value`) use Inter's tabular figures instead
+       of IBM Plex Mono, which stays loaded but is barely used.
+   - [x] **Buttons:** one system in `app/globals.css` (`@layer components`)
+     - `.btn` plus `.btn-primary`, `.btn-secondary` and `.btn-quiet`
+     - `.btn-lg` (52px), default (44px), `.btn-sm` (36px)
+     - one focus ring
+     - disabled buttons keep their shape
+     - Applied to the shared `ActionButton` (every purchase card), all three
+       commit buttons, alerts, the next step, quick plan, the city picker,
+       begin, sign-in and the end screen.
+     - The planner's +/− grew from 32px to 44px, Apple's touch minimum.
+     - **The other ~170 buttons still have their own classes.** Move them
+       over screen by screen.
+   - [x] Before and after:
+         `art-source/branding/concepts/type-and-buttons-before-after.png`.
+   - [ ] Spacing and the remaining components: cards, chips, tabs, the
+         status strip
 4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,

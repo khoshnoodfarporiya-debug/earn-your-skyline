@@ -677,3 +677,27 @@ the game, not the portfolio or the owner's other repos.
   and every balance contract holding.
 - **Branches tidied:** every merged branch was deleted on GitHub after
   confirming each is inside `main`.
+
+### 26 Nov 2026 — Claude (Claude Code): type and buttons
+Branch `feature/type-and-buttons`, off `beta`. The owner asked to continue the
+redesign with fonts, components and buttons, made clearer, with beauty a
+priority. The owner offered Blender; it wasn't needed, because this is all
+interface work in code.
+
+- **Type:**
+  - Fraunces for headings, Inter for body text
+  - numbers in Inter's tabular figures instead of monospace
+  - see `app/layout.tsx` and the typography block in `app/globals.css`
+- **Buttons:** one system, `.btn` plus `-primary`, `-secondary` and `-quiet`,
+  at `-lg`, default and `-sm` sizes. It is applied to the most-pressed
+  buttons (`WORKING_PLAN.md` section 8, step 3, has the list). The planner
+  steppers are now 44px. **Use `.btn-*` for every new button.**
+- **Overflow found and fixed:** at 375px, the game header with the full BETA
+  badge pushed the phone button 5–8px off the screen on every Physician and
+  Politician screen. The badge added in the beta caused it, so it is likely
+  also in the release on `main`. `BetaBadge compact` shows just "Beta" on
+  phones. A survey of all 92 screens now finds no overflow.
+- **Verified:**
+  - type check, lint, engine checks and the build pass
+  - before and after screenshots compared
+  - all 404 browser tests pass (6.9 minutes)

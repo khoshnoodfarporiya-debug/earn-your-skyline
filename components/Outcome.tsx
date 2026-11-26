@@ -106,13 +106,13 @@ export function Outcome({
       >
         <button
           onClick={onRestart}
-          className="rounded-form bg-clinical px-5 py-2.5 text-sm font-medium text-on-accent transition hover:brightness-110"
+          className="btn btn-primary"
         >
           Run it again
         </button>
         <button
           onClick={onMenu}
-          className="rounded-form border border-rule bg-card px-5 py-2.5 text-sm font-medium transition hover:border-clinical hover:text-clinical"
+          className="btn btn-secondary"
         >
           Choose another career
         </button>

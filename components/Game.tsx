@@ -378,7 +378,7 @@ export function Game({
           <span className="sr-only">Back to career select</span>
         </button>
 
-        <BetaBadge className="shrink-0" />
+        <BetaBadge className="shrink-0" compact />
 
         <div className="ml-auto hidden lg:block">
           <PrimaryNav

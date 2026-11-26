@@ -245,7 +245,7 @@ export function Overview({
               <button
                 onClick={onPayLoan}
                 disabled={state.r.cash < 1_000}
-                className="min-h-[44px] shrink-0 rounded-form border border-rule px-4 text-[14px] font-medium transition hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn btn-secondary shrink-0"
               >
                 Pay {money(Math.min(10_000, state.r.debt, state.r.cash))}
               </button>
@@ -300,7 +300,7 @@ export function Overview({
             <button
               onClick={onCommit}
               disabled={spent === 0}
-              className="min-h-[52px] w-full rounded-form bg-clinical px-4 text-[15px] font-bold text-on-accent transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
+              className="btn btn-primary btn-lg w-full"
             >
               {spent === 0
                 ? "Assign your time first"

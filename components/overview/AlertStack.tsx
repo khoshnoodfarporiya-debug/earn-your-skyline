@@ -76,7 +76,7 @@ export function AlertStack({
             </div>
             <button
               onClick={() => onNavigate(alert.destination)}
-              className="min-h-[44px] w-full shrink-0 rounded-form border border-rule bg-card px-4 text-[14px] font-medium text-ink transition hover:border-clinical hover:text-clinical sm:w-auto"
+              className="btn btn-secondary w-full shrink-0 sm:w-auto"
             >
               {alert.actionLabel}
             </button>

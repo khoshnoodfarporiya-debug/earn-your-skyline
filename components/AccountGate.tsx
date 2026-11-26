@@ -157,7 +157,7 @@ export function AccountGate({
                 <button
                   type="submit"
                   disabled={busy}
-                  className="min-h-[44px] flex-1 rounded-form bg-clinical px-4 text-[14px] font-bold text-on-accent transition hover:brightness-110 disabled:opacity-50"
+                  className="btn btn-primary flex-1"
                 >
                   Play
                 </button>
@@ -168,7 +168,7 @@ export function AccountGate({
                     setUnlockCode("");
                     setError(null);
                   }}
-                  className="min-h-[44px] rounded-form border border-rule px-4 text-[14px] text-ink-soft transition hover:text-ink"
+                  className="btn btn-secondary"
                 >
                   Back
                 </button>
@@ -272,7 +272,7 @@ export function AccountGate({
               <button
                 type="submit"
                 disabled={busy}
-                className="mt-4 min-h-[46px] w-full rounded-form bg-clinical px-4 text-[14px] font-bold text-on-accent transition hover:brightness-110 disabled:opacity-50"
+                className="btn btn-primary btn-lg mt-4 w-full"
               >
                 Create account and play
               </button>
@@ -284,7 +284,7 @@ export function AccountGate({
                     setMode("choose");
                     setError(null);
                   }}
-                  className="mt-2 w-full rounded-form px-3 py-2 text-[13px] text-ink-soft transition hover:text-ink"
+                  className="btn btn-quiet btn-sm mt-2 w-full"
                 >
                   Back to the list
                 </button>
