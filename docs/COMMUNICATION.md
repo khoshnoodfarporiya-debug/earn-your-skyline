@@ -578,3 +578,25 @@ off-centre art-deco tower at dusk with one lit window.
 - **On an iPhone:** open the link in Safari, then Share → Add to Home Screen.
   If Vercel's deployment protection is on, the link asks for a Vercel login
   first.
+
+### 26 Nov 2026 — Claude (Claude Code): lamplight palette
+Branch `feature/lamplight-palette`, off `beta`. The owner asked to change the
+colours, following `BRAND.md`.
+
+- **The medical teal is gone.** The default accent is lamplight amber, the
+  colour of the logo's lit window. Each career's neon accent became a quiet
+  one that sits with the dusk art. The full list and contrast figures are in
+  `WORKING_PLAN.md` section 8, step 3.
+- **Where to change colours:** the `--accent` variables in
+  `app/globals.css`. Don't add hex colours to components. Use
+  `text-clinical`, `bg-clinical` and the rest, or `rgb(var(--accent))`, and
+  put SVG colours in `style`.
+- **Also changed:**
+  - `on-accent` ink is now `#14110C`
+  - the page's top glow is warm
+  - the error pages use lamplight
+  - the changelog notes the new colours
+- **Verified:**
+  - type check, lint and engine checks pass
+  - all seven careers screenshotted at iPhone size, with no console errors
+  - the build passes and all 404 browser tests pass (7.7 minutes)

@@ -80,7 +80,7 @@ export function HomeMap({ state }: { state: RunState }) {
                       cx={p.x}
                       cy={sy(p.y)}
                       r={2.6}
-                      fill={isHome ? "#35E0C0" : "#7C8CA6"}
+                      style={{ fill: isHome ? "rgb(var(--accent))" : "#7C8CA6" }}
                       opacity={0.14}
                     />
                   )}
@@ -90,7 +90,7 @@ export function HomeMap({ state }: { state: RunState }) {
                       cy={sy(p.y)}
                       r={1.5}
                       fill="none"
-                      stroke="#35E0C0"
+                      style={{ stroke: "rgb(var(--accent))" }}
                       strokeWidth={0.35}
                       opacity={0.65}
                       vectorEffect="non-scaling-stroke"
@@ -100,7 +100,7 @@ export function HomeMap({ state }: { state: RunState }) {
                     cx={p.x}
                     cy={sy(p.y)}
                     r={isHome ? 0.62 : 0.45}
-                    fill={isHome ? "#35E0C0" : "#7C8CA6"}
+                    style={{ fill: isHome ? "rgb(var(--accent))" : "#7C8CA6" }}
                   />
                 </g>
               );

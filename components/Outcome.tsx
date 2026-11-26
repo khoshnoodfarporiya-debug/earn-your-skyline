@@ -43,7 +43,7 @@ export function Outcome({
           scrim="full"
           sizes="(min-width: 768px) 672px, 100vw"
           priority
-          className="rise mb-8 rounded-form border border-clinical/40 shadow-[0_0_40px_-16px_rgba(53,224,192,0.55)]"
+          className="rise mb-8 rounded-form border border-clinical/40 shadow-[0_0_40px_-16px_rgb(var(--accent)/0.55)]"
         >
           <div className="absolute inset-0 flex flex-col justify-end p-5">
             <span className="sign text-[11.5px] text-clinical drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">

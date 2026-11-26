@@ -160,8 +160,8 @@ export function CareerSelect({
               className={`rise group flex flex-col overflow-hidden rounded-form border text-left outline-none transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none ${
                 c.available
                   ? selected
-                    ? "-translate-y-0.5 border-clinical shadow-[0_0_0_1px_rgba(53,224,192,0.5),0_10px_30px_-12px_rgba(53,224,192,0.45)]"
-                    : "border-rule hover:-translate-y-0.5 hover:border-clinical/70 focus-visible:border-clinical focus-visible:shadow-[0_0_0_2px_rgba(53,224,192,0.55)]"
+                    ? "-translate-y-0.5 border-clinical shadow-[0_0_0_1px_rgb(var(--accent)/0.5),0_10px_30px_-12px_rgb(var(--accent)/0.45)]"
+                    : "border-rule hover:-translate-y-0.5 hover:border-clinical/70 focus-visible:border-clinical focus-visible:shadow-[0_0_0_2px_rgb(var(--accent)/0.55)]"
                   : "cursor-not-allowed border-rule-soft opacity-70"
               }`}
             >

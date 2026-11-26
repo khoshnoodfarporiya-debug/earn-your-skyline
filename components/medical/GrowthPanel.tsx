@@ -106,7 +106,7 @@ export function GrowthPanel({
                 style={{
                   ["--dept" as string]: running
                     ? total >= 0
-                      ? "#35E0C0"
+                      ? "rgb(var(--accent))"
                       : "#FF6B6B"
                     : "transparent",
                 }}

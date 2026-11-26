@@ -64,8 +64,8 @@ export default {
         clinical: "rgb(var(--accent) / <alpha-value>)",
         "clinical-hover": "rgb(var(--accent-hover) / <alpha-value>)",
         "clinical-tint": "rgb(var(--accent-tint) / <alpha-value>)",
-        /** Dark ink for use ON teal or gold. */
-        "on-accent": "#042420",
+        /** Dark ink for use ON any career accent or gold (7:1 or better on all). */
+        "on-accent": "#14110C",
 
         /** Progression, wealth, achievement, opportunity. */
         gold: "#F4B860",

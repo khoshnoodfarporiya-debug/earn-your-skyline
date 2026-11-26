@@ -356,10 +356,24 @@ screen at a time:
    - a type-led "Skyline" wordmark
    - an "S" built from a building's stepped setbacks
 3. [ ] **Design system refresh:**
-   - a mood board taken from the existing art
-   - palette, with warm lamp-light as the primary colour instead of medical
-     teal, plus a quiet accent per career
-   - two typefaces, the core components, and spacing
+   - [ ] a mood board taken from the existing art
+   - [x] **Palette** (branch `feature/lamplight-palette`, 26 Nov 2026)
+     - Lamplight `#F4B860` is the default and the Physician's accent.
+     - The other careers have quiet accents: copper (Chef), ink-blue
+       (Solicitor), soft violet (Founder), rose (Politician), sage
+       (Architect), olive (Engineer).
+     - All are set as `--accent` in `app/globals.css`; the `clinical` token
+       just reads them.
+     - Contrast is 6.0–9.1:1 as text on cards and 7.0–10.7:1 under the new
+       dark `on-accent` ink.
+     - Hard-coded teal in components now uses the variable. SVG `fill` and
+       `stroke` moved into `style`, where `var()` works.
+     - Screenshots of all seven careers:
+       `art-source/branding/concepts/lamplight-palette-sheet.png`.
+     - Open: the semantic "caution" orange `#F59E55` now sits close to
+       lamplight and copper. It still carries an icon and a label, but it is
+       worth separating during the design pass.
+   - [ ] two typefaces, the core components, and spacing
 4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,
