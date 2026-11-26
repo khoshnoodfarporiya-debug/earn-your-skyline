@@ -22,10 +22,10 @@ body {
 body {
   background-color: #08111f;
   background-image:
-    /* One cool light from above, so the top of the screen has somewhere to
+    /* One warm lamplight glow from above, so the top of the screen has somewhere to
        come from. Deliberately weak — the old version tinted the whole page
        teal, which made every accent fight the background. */
-    radial-gradient(130% 78% at 50% -22%, rgba(45, 212, 191, 0.07), transparent 60%),
+    radial-gradient(130% 78% at 50% -22%, rgba(244, 184, 96, 0.06), transparent 60%),
     /* Depth at the bottom edge. */
     radial-gradient(120% 90% at 50% 46%, transparent 52%, rgba(0, 0, 0, 0.5));
   background-size: 100% 100%, 100% 100%;
@@ -33,6 +33,16 @@ body {
   color: #f4f7fb;
   font-family: var(--font-body), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /*
+   * Keep content clear of the notch, the status bar and the rounded corners
+   * when the game runs installed and full screen on an iPhone
+   * (`viewport-fit=cover`, `black-translucent`). In a normal browser tab every
+   * inset is 0 and nothing moves. The bottom is left to the fixed bars, which
+   * pad for the home indicator themselves.
+   */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* ------------------------------------------------------------ typography
@@ -143,6 +153,15 @@ body {
   border-bottom: 1px solid #1b2a40;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent);
 }
+/*
+ * A head that sticks while its panel scrolls (the end-of-week review, the
+ * retirement dialog, the glossary) needs a solid ground under the gradient,
+ * or the content scrolling beneath shows through it — "WEEK 57 CLOSED"
+ * printed over "Panel movement" (found Nov 2026). Same colour as `.form`.
+ */
+.form-head.sticky {
+  background-color: #122137;
+}
 
 /* A panel that needs to come forward — the selected thing, a dialog. */
 .form-high {
@@ -169,54 +188,59 @@ body {
 }
 
 /*
- * CAREER ACCENTS (Phase 4).
+ * CAREER ACCENTS — LAMPLIGHT (Nov 2026 redesign, docs/BRAND.md).
  *
  * One accent per career, carried as raw RGB components so Tailwind can
  * compose opacity onto them (`border-clinical/60` keeps working). The
- * `clinical` token in tailwind.config.ts reads these, so all four hundred
- * call sites re-skin from here — the same trick the light-to-dark swap used.
+ * `clinical` token in tailwind.config.ts reads these, so every call site
+ * re-skins from here. (The token keeps its old name only to avoid touching
+ * four hundred files; it no longer means teal or medicine.)
  *
- * The rule the audit set and this file enforces: the accent is *identity* —
- * the active destination, the primary action, the thing you own. Warning,
- * failure and success colours are semantic and never vary by career.
+ * The default is warm LAMPLIGHT — the lit window of the logo — used by the
+ * front door, career select and the Physician. Each other career has a quiet
+ * accent of its own that sits with the dusk artwork rather than a neon one:
+ * copper, ink-blue, soft violet, muted rose, sage, olive. Every value clears
+ * WCAG AA by a wide margin both as text on a card (6.0–9.1:1) and under the
+ * dark `on-accent` ink on a filled button (7.0–10.7:1).
  *
- * The default is the Physician's teal, which is also the shell's own colour
- * everywhere no career is signed in (the front door, career select).
+ * The rule is unchanged: the accent is *identity* — the active destination,
+ * the primary action, the thing you own. Warning, failure and success colours
+ * are semantic and never vary by career.
  */
 :root {
-  --accent: 45 212 191;
-  --accent-hover: 94 234 212;
-  --accent-tint: 14 43 44;
+  --accent: 244 184 96;
+  --accent-hover: 248 203 133;
+  --accent-tint: 46 36 21;
 }
 [data-career="chef"] {
-  --accent: 249 115 22;
-  --accent-hover: 251 146 60;
-  --accent-tint: 43 26 14;
+  --accent: 214 142 84;
+  --accent-hover: 228 167 116;
+  --accent-tint: 43 27 15;
 }
 [data-career="lawyer"] {
-  --accent: 214 169 77;
-  --accent-hover: 227 190 108;
-  --accent-tint: 42 34 18;
+  --accent: 130 166 222;
+  --accent-hover: 160 188 232;
+  --accent-tint: 20 30 48;
 }
 [data-career="founder"] {
-  --accent: 139 92 246;
-  --accent-hover: 167 139 250;
-  --accent-tint: 30 23 48;
+  --accent: 168 148 228;
+  --accent-hover: 190 174 238;
+  --accent-tint: 31 26 50;
 }
 [data-career="politician"] {
-  --accent: 129 140 248;
-  --accent-hover: 165 180 252;
-  --accent-tint: 23 27 51;
+  --accent: 222 140 150;
+  --accent-hover: 234 168 176;
+  --accent-tint: 46 24 29;
 }
 [data-career="architect"] {
-  --accent: 76 141 255;
-  --accent-hover: 122 170 255;
-  --accent-tint: 16 32 58;
+  --accent: 150 196 170;
+  --accent-hover: 176 214 192;
+  --accent-tint: 22 40 33;
 }
 [data-career="engineer"] {
-  --accent: 163 230 53;
-  --accent-hover: 190 242 100;
-  --accent-tint: 32 43 16;
+  --accent: 180 192 112;
+  --accent-hover: 200 210 144;
+  --accent-tint: 36 40 20;
 }
 
 /* Credential badge — your post-nominals, lit. */

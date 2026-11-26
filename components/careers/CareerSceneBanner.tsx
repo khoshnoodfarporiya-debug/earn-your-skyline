@@ -10,12 +10,14 @@ import { ArtFrame } from "../visuals/ArtFrame";
 const SCENE_LABELS: Record<IllustratedCareerId, Record<string, string>> = {
   founder: {
     runway: "The runway is the clock",
+    product: "What the users actually do",
     crew: "The company you are building",
     raising: "Across the table from capital",
   },
   politician: {
     polling: "The count moves every week",
     blocs: "Every constituency is a coalition",
+    constituents: "Every letter is somebody's week",
     positions: "A platform has consequences",
     office: "The next office is earned here",
   },

@@ -1,4 +1,6 @@
-# Artwork shot list — 14 pending items
+# Artwork shot list — complete
+
+> **All 14 items below have shipped** (`AWAITING_ART` in `lib/ui/purchaseArt.ts` is empty). Kept as the record of how they were briefed. New art is briefed in [`VISUALS.md`](VISUALS.md).
 
 Gameplay for these has shipped; the masters have not. Each one is listed in
 `AWAITING_ART` in `lib/ui/purchaseArt.ts`, so the coverage test reports them as

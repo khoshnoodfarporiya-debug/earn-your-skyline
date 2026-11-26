@@ -80,13 +80,13 @@ export function StartCityPicker({
               return (
                 <g key={c.id}>
                   {on && (
-                    <circle cx={p.x} cy={sy(p.y)} r={2.6} fill="#35E0C0" opacity={0.16} />
+                    <circle cx={p.x} cy={sy(p.y)} r={2.6} style={{ fill: "rgb(var(--accent))" }} opacity={0.16} />
                   )}
                   <circle
                     cx={p.x}
                     cy={sy(p.y)}
                     r={on ? 0.72 : 0.5}
-                    fill={on ? "#35E0C0" : "#7C8CA6"}
+                    style={{ fill: on ? "rgb(var(--accent))" : "#7C8CA6" }}
                   />
                 </g>
               );

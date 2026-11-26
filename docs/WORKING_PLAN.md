@@ -4,16 +4,21 @@ Started 23 Nov 2026 on branch `docs/review-and-plan`. This is the live to-do
 list for the next stretch of work. Tick items off as they land; move anything
 abandoned to "Dropped" with a one-line reason instead of deleting it.
 
-## Where things stand (verified 23 Nov 2026)
+## Where things stand (verified 26 Nov 2026, release of 0.9.0-beta.1 to `main`)
 
 | Gate | Result |
 | --- | --- |
 | `npm run typecheck` | pass |
 | `npm run lint` | pass |
-| `npm run check` | pass, 2,067 checks |
+| `npm run check` | pass, 2,092 checks |
 | `npm run build` | pass |
-| `npm run e2e` | not run in this pass |
-| `npx tsx scripts/cities.ts 4` | 11 contract violations, all on the ambitious Chef |
+| `npm run e2e` | pass, 404 tests (phone and desktop) |
+| `npx tsx scripts/cities.ts 12` (what CI runs) | all balance contracts hold, for every career |
+
+The balance snapshot below is from 23 Nov and is kept as history. The current
+figures are in the Politician and Chef items under "Next up": the Politician
+wins 8–98% of runs depending on the seat, and the ambitious Chef reaches
+27–48% of its goal.
 
 The August audit's P1 code defects are all fixed:
 
@@ -166,8 +171,22 @@ Suggestions, highest value first:
   - The Chef's Week page on a phone: 5,180 → 3,992px.
   - Rows came out at about 75px, not the 56px target, because the effect line
     was too useful to truncate to one line.
-- [ ] **Pin the planner and commit on desktop Week too.** Use the same sticky
-      right column the Work screens use.
+- [x] **Pin the commit on desktop Week** (`components/overview/Overview.tsx`).
+  - The inline commit button at the foot of the forecast card is gone.
+  - A commit card now leads the right column: blocks free, the key forecast
+    figure, and the button with the same labels as before.
+  - The whole right column is pinned under the status strip
+    (`lg:sticky lg:top-24`), and scrolls on its own if it is taller than the
+    window, like the Work rail. Pinning only the card let the meters slide
+    under it.
+  - The alerts and the next step moved from full width into the left column,
+    so the right column starts level with them.
+  - Result at 1280 and 1024 wide: the commit is on screen at the top (468px),
+    the middle and the bottom of every Week screen. Before, it was about
+    2,330px down on the Chef.
+  - On week 1 the "Learning the ropes" card still pushes it to 882px, just
+    below the fold, until that card is hidden.
+  - Phones keep their CommitBar unchanged.
 - [ ] **Build screen as a shop, not a gallery.**
   - Filters: Can buy now, Owned, Later.
   - Collapsible groups.
@@ -185,8 +204,190 @@ Suggestions, highest value first:
   - Politician: Count + Ladder.
   - Founder: Runway + Raising.
   - Fewer taps for the same information.
-- [ ] **Per-career Week hero art,** or no picture for careers without one. This
-      bug is listed above; the images can come from `VISUALS.md`.
+- [x] **End-of-week pop-up overlap** (found and fixed 26 Nov 2026). A
+      `.form-head` that is `sticky` now gets a solid background
+      (`app/globals.css`). This fixes `WeekReview`, `RetirementDialog` and the
+      glossary together.
+- [x] **Per-career Week hero art** (fixed 26 Nov 2026). `OverviewHero` uses each
+      career's own cover art (`careerVisual`); the Physician keeps its
+      overview picture.
+
+### 6. Artwork
+
+- [x] Generate the 24 PNG masters specified in [`VISUALS.md`](VISUALS.md).
+- [x] Convert the masters to WebP, wire the two banners and sixteen event
+      images, and check their crops in the game (branch `art/newer-career-scenes`)
+  - All 24 masters reviewed against the `VISUALS.md` rejection checklist on
+    contact sheets, with the 21:9 strip marked. Close-ups of the riskiest two
+    (hi-vis vests, a laptop chart) show no lettering. All 24 pass.
+  - `npm run build:art` converts all 24, including the six victory scenes,
+    which are converted but not used yet. Every existing WebP came out
+    byte-identical.
+  - The 16 events are in `EVENT_VISUALS`, each with a category and a
+    description over 30 characters, built by `eventScene` from the generated
+    sizes.
+  - New banners: the Politician's postbag (`constituents`) and the Founder's
+    `product`, with captions in `CareerSceneBanner`.
+  - New engine check: every Founder, Politician, Architect and Engineer event
+    has artwork.
+  - Checked in the game on phone and desktop. Both banners load with no
+    console or network errors.
+- [x] Choose where the victory scenes go, then wire them. **Owner's decision
+      (26 Nov 2026): only when the career goal was reached.**
+  - `careerGoalMet(career, s)` in `lib/game/retirement.ts`: objective progress
+    of at least 100%, plus a cleared loan for the Physician, Chef and
+    Solicitor, whose goal cards say to clear it. That matches how the balance
+    harness has always counted "reached".
+  - `VICTORY_VISUALS` in `lib/ui/visuals.ts` holds one scene per career, served
+    at the 1200px derivative. The Physician keeps the hospital.
+  - `components/Outcome.tsx` shows "Milestone reached" over the career's scene
+    only when the goal was met. Any other retirement gets the plain
+    "You retired" header. Before this, every retirement showed the Physician's
+    hospital, whatever the career and whether or not the goal was met.
+  - 5 new engine checks:
+    - every career has its own scene
+    - a fresh run hasn't met its goal
+    - a full bar with the loan owed doesn't count
+    - a cleared loan does
+    - the Politician's campaign debt doesn't block its goal
+  - Checked in the browser: the `midrun` save (goal at 0%) gets the plain
+    header; the `nearly-won` save after one week (goal at 100%) gets the scene.
+
+### 7. Beta, iPhone and business features (proposal, 26 Nov 2026)
+
+The owner wants a phone-only app (iPhone first, Android later), developed as a
+beta until it ships, with a cookie/privacy policy, real login, paid careers and
+a reliable social feed. Nothing below is built yet; this is the suggested
+order. What exists today:
+- no manifest or home-screen icon
+- no cookies, network calls or server
+- local profiles only
+- no payments
+- a deterministic social feed per career on the in-game phone
+
+1. **Beta setup** (branch `feature/iphone-install`, off `beta`)
+   - [x] A local `beta` branch exists, made from all the unmerged work. Feature
+         branches are named `feature/…`, because git can't have a branch
+         called `beta` alongside branches named `beta/…`. They merge into
+         `beta`.
+     - [x] `beta` pushed 26 Nov 2026. The beta link, which always serves the
+           latest beta:
+           https://earn-your-skyline-git-beta-khoshnoodfarporiya-debugs-projects.vercel.app
+   - [x] Version `0.9.0-beta.1` in `lib/version.ts` and `package.json`, kept
+         equal by an engine check.
+   - [x] "BETA vX" badge on the title screen and in the game header.
+   - [x] "What's new" changelog behind the badge (native `<dialog>`). Add an
+         entry for every update a player can notice.
+   - [x] Feature flags in `lib/flags.ts` (`paidCareers`, `cloudSaves`,
+         `feedback`), all off and locked by an engine check.
+   - [ ] Feedback button. **The owner must choose where feedback goes** (an
+         email address, a form, GitHub issues). It sits behind the `feedback`
+         flag.
+2. **iPhone, stage A: installable web app**
+   - [x] `app/manifest.ts`: standalone display, portrait, navy theme, and
+         192, 512 and maskable icons.
+   - [x] `app/apple-icon.png` (180px) plus the `public/icons/` PNGs, all made
+         by `npm run build:art` from the brand master. The no-PNG engine check
+         allows exactly these three files.
+   - [x] `appleWebApp` metadata (`black-translucent`, title "Skyline") and
+         `viewport` (`viewport-fit=cover`, theme colour, zoom still allowed).
+   - [x] Safe areas: the body pads top, left and right by the insets, and the
+         sticky status strip offsets by the top inset. The bottom was already
+         handled.
+   - [x] Checked at iPhone 13 size in Chromium:
+     - every install tag is present
+     - the manifest and all four icons load
+     - "What's new" opens, and closes with Escape
+     - no horizontal overflow
+     - no console errors
+   - [ ] Test in WebKit, the engine Safari uses. This needs Playwright's WebKit
+         download, plus testing on a real iPhone ("Add to Home Screen").
+   - [ ] Offline service worker. Self-host the fonts first.
+   - [ ] Phone-first desktop: show the phone layout centred on large screens.
+3. [ ] **Privacy policy and cookies**
+   - Today nothing is tracked, so no cookie banner is legally needed yet.
+   - Write the privacy policy and terms before login and payments; the App
+     Store requires a privacy policy URL anyway.
+   - Prefer cookieless analytics, so no consent banner is needed.
+   - Have a lawyer check it.
+4. [ ] **Real login and cloud saves** (needs a backend: Supabase, or Clerk +
+   database)
+   - email magic link plus **Sign in with Apple**, which Apple requires if
+     any other social login is offered
+   - "play as guest" kept
+   - in-app account deletion, which Apple also requires
+5. [ ] **Paid careers** (needs login)
+   - **Inside an iOS app, unlocking careers must use Apple In-App Purchase**
+     (Google Play Billing on Android); Stripe only works on the web.
+   - RevenueCat can manage all three.
+   - Suggested model: 2–3 free careers, then a one-time "All careers" unlock;
+     no subscription at first.
+   - Everything stays unlocked in the beta behind a flag.
+6. [ ] **iPhone, stage B: App Store**
+   - a Capacitor wrapper
+   - an Apple Developer account
+   - TestFlight for beta testers
+   - App Review
+7. [ ] **Social feed you can rely on** (no backend needed, can run in parallel)
+   - Keep the bots deterministic and rule-driven, not live AI.
+   - Every reply should cite a real fact from the player's run, checked by
+     engine checks.
+   - A profile per bot says who they are.
+   - Label them clearly as in-game characters.
+   - Live AI or player-to-player social features come later: they need a
+     server, moderation and money per player.
+
+### 8. Brand and design refresh (proposal, 26 Nov 2026)
+
+The owner feels the design isn't good and that the logo doesn't feel
+authentic. Honest read of what's there:
+
+- **The logo is an AI raster image built from stock clichés:** a skyline,
+  stairs and an upward arrow. Its edges are ragged ("EARN YOUR" is smudged),
+  there is no vector, and its sticker/esports look clashes with the moody,
+  photographic game art.
+- **The interface still looks like the medical dashboard it started as.** The
+  accent token is literally `clinical` (teal), every career shares it, and
+  there are many monospace figures and text walls. It reads like a finance
+  tool, not a game, while the art reads like a film.
+
+Suggested process. Agree on the brief first, then the logo, then the UI, one
+screen at a time:
+1. [x] **Brand brief (one page, `docs/BRAND.md`):** drafted 26 Nov 2026, waiting on the owner's answers in its section 9
+   - who it's for
+   - three feeling words
+   - what it must not be
+   - three reference apps or games
+   - one sentence on what "earning your skyline" means
+2. [x] **Logo.** Owner chose "the lit window", then concept E (26 Nov 2026). Master: `art-source/branding/lit-window-mark.svg`. Every icon is rendered from it by `build:art`. The name is real text beside the mark (`components/BrandLockup.tsx`). Explore 3 directions, generate rough options with an image
+   model, then rebuild the winner as a real SVG. Test it at 16px, as a 180px
+   app icon, and on dark and light backgrounds. Candidate directions:
+   - the lit window in a tower at night
+   - a type-led "Skyline" wordmark
+   - an "S" built from a building's stepped setbacks
+3. [ ] **Design system refresh:**
+   - [ ] a mood board taken from the existing art
+   - [x] **Palette** (branch `feature/lamplight-palette`, 26 Nov 2026)
+     - Lamplight `#F4B860` is the default and the Physician's accent.
+     - The other careers have quiet accents: copper (Chef), ink-blue
+       (Solicitor), soft violet (Founder), rose (Politician), sage
+       (Architect), olive (Engineer).
+     - All are set as `--accent` in `app/globals.css`; the `clinical` token
+       just reads them.
+     - Contrast is 6.0–9.1:1 as text on cards and 7.0–10.7:1 under the new
+       dark `on-accent` ink.
+     - Hard-coded teal in components now uses the variable. SVG `fill` and
+       `stroke` moved into `style`, where `var()` works.
+     - Screenshots of all seven careers:
+       `art-source/branding/concepts/lamplight-palette-sheet.png`.
+     - Open: the semantic "caution" orange `#F59E55` now sits close to
+       lamplight and copper. It still carries an icon and a label, but it is
+       worth separating during the design pass.
+   - [ ] two typefaces, the core components, and spacing
+4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
+   artifact, and agree it before touching code.
+5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,
+   checking the browser suite each time.
 
 ## Dropped
 

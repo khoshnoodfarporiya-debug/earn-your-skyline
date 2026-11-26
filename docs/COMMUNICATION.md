@@ -137,6 +137,8 @@ touched. Run the browser tests when you change a screen.
 - **The browser tests hang on Windows after passing.** Playwright workers
   don't shut down, the run takes about 12 minutes, and it exits with code 1
   even when every test passed. Read the `N passed` line, not the exit code.
+- **Don't switch branches while the browser suite runs.** It serves the live
+  working tree, so a checkout mid-run tests the wrong code.
 - **Git has no global name or email set.** Commits so far used the
   identity of the repository's earlier commits, passed per command with `-c`.
   Don't set global git config without asking.
@@ -146,7 +148,24 @@ touched. Run the browser tests when you change a screen.
 
 ---
 
-## 6. Where the work stands (25 Nov 2026)
+## 6. Where the work stands (26 Nov 2026)
+
+- **`main` = `beta` = v0.9.0-beta.1, released 26 Nov 2026.** Everything below is
+  in `main`:
+  - the lit-window logo and lamplight palette
+  - the iPhone install (PWA), the version and "What's new", and feature flags
+  - the compact planner and the pinned desktop commit
+  - the 24 images: 16 event pictures and 2 screen banners wired in, plus the
+    6 victory scenes, shown only for a met goal
+  - per-career Week banners, and the pop-up header fix
+  - the Chef and Politician rebalances
+  - the README with screenshots, and the `LICENSE` (all rights reserved)
+- **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
+  (Codex's, unmerged). Every merged branch has been deleted.
+- **What's still open:** the brand design system (type and components), the
+  rest of the layout review, real login, payments, the App Store, Solicitor
+  and Engineer balance, and the Founder's gap between cities. See
+  `WORKING_PLAN.md`.
 
 - **`main`** has the codebase review, `WORKING_PLAN.md`, and the Politician
   fix where you only climb a rung by winning an election
@@ -367,3 +386,294 @@ Branch `docs/layout-review`. Documentation only; no code changed.
 - **Artwork:** the owner has an image model (ChatGPT) producing the images from
   `docs/VISUALS.md`. When they land, follow that file's "For the coding AI"
   steps. The victory-screen fix waits on batch 1.
+
+### 26 Nov 2026 — Codex: artwork masters
+
+The checkout moved from `docs/layout-review` to `layout/pin-week-commit` during artwork generation.
+
+- Generated the 24 scene, banner and event PNGs from `VISUALS.md`, using the
+  existing game artwork as style references. Saved the masters in
+  `art-source/visuals/milestones/`, `careers/` and `events/`.
+- Verified all 24 files at 1536×1024 and reviewed the centre crops at 21:9
+  for milestones and events and 3:1 for the two screen banners.
+- The art still needs WebP conversion and game wiring. Browser checks belong
+  to that step. Decide where career-goal celebrations should show before
+  applying the victory artwork to the current retirement screen.
+
+### 26 Nov 2026 — Claude (Claude Code): pinned desktop commit
+Branch `layout/pin-week-commit`. This is the second item from the layout review.
+
+- On desktop, the Week screen's commit card now leads a pinned right column.
+  The button stays on screen everywhere instead of sitting about 2,330px down.
+- The details are in `WORKING_PLAN.md` section 5.
+- Type check, lint and the build pass.
+- The full browser suite was still running when this was committed. Its result
+  is recorded in a later entry.
+
+### 26 Nov 2026 — Claude (Claude Code): artwork wired in
+Branch `art/newer-career-scenes`, built on top of `layout/pin-week-commit`.
+Merge the pinned-commit work first.
+
+- **Reviewed Codex's 24 masters** against the rejection checklist. All pass:
+  no lettering, subjects inside the cropped strip, and a match with the house
+  style.
+- **Converted all 24 to WebP and wired 18 of them:**
+  - 16 event pictures: every Founder, Politician, Architect and Engineer event
+    now opens with one
+  - 2 screen banners: the Politician's postbag and the Founder's product
+  - A new engine check keeps that coverage. Details are in `WORKING_PLAN.md`,
+    section 6.
+- **The six victory scenes are converted but not shown yet.** As Codex found,
+  the game's only "won" outcome is retirement (`retire()` in
+  `lib/game/retirement.ts`). The end screen shows "Milestone reached" and
+  the Physician's hospital picture for every retirement, whether or not the
+  career goal was met. Where the victory pictures should go is the owner's
+  decision.
+- **Verified:** type check, lint, 2,084 engine checks and the build pass. All
+  404 browser tests pass on this work by itself.
+- **Pinned-commit branch:** its own suite run was cut short at 184 of 404
+  (every phone test, no failures) when I switched branches. The working tree
+  is what the tests serve, so **don't switch branches while the browser suite
+  is running.** CI's `verify` covers the combined branch.
+
+### 26 Nov 2026 — Claude (Claude Code): victory scenes, only for a met goal
+Same branch (`art/newer-career-scenes`). The owner chose to show the victory
+picture only when the career goal was reached.
+
+- `careerGoalMet` (`lib/game/retirement.ts`) decides it: the goal bar at 100%,
+  plus a cleared loan where the goal card asks for one. Use it anywhere else
+  the game needs to know whether a run succeeded. Don't read
+  `outcome.kind === "won"` for that, because "won" only means the player retired.
+- The end screen shows each career's own scene for a met goal, and the plain
+  "You retired" header otherwise.
+- Verified: type check, lint, the engine checks (5 new) and the build pass.
+  Both paths were checked in the browser on Physician saves. All 404 browser
+  tests pass on the combined branch (pinned commit + art + victory), 7.1
+  minutes.
+- Not checked in the browser: the other six careers' scenes on the end screen.
+  No saved game has one of those careers with its goal met. The engine checks
+  confirm the registry.
+
+### 26 Nov 2026 — Claude (Claude Code): beta and phone direction
+The owner set a new direction:
+- phone-only, iPhone first and Android later
+- developed as a **beta** until it ships
+- a cookie/privacy policy
+- login
+- paid careers
+- a reliable social feed of bots
+
+The suggested order and the platform rules that constrain it are in
+`WORKING_PLAN.md` section 7. The key constraints:
+- An iOS app must sell career unlocks through Apple In-App Purchase.
+- Offering any social login requires Sign in with Apple.
+- An app with accounts must offer account deletion inside the app.
+
+Nothing is built yet; the owner chooses where to start.
+
+### 26 Nov 2026 — Claude (Claude Code): beta setup and iPhone install
+Branch `feature/iphone-install`, off the new local `beta` branch. `beta` holds
+all the unmerged work so far. **New branch convention:** feature work goes on
+`feature/<name>` and merges into `beta`; `main` is what ships.
+
+- **Installable on iPhone:**
+  - `app/manifest.ts`
+  - `app/apple-icon.png`
+  - `public/icons/`, made by `npm run build:art`
+  - `appleWebApp` and `viewport` settings in `app/layout.tsx`
+  - safe-area padding in `app/globals.css` and `StatusStrip`
+- **The beta itself:**
+  - `lib/version.ts` (`APP_VERSION` and `CHANGELOG`). Add a changelog entry
+    for every update a player can notice.
+  - `lib/flags.ts` (feature flags, all off)
+  - `components/BetaBadge.tsx` (badge plus "What's new")
+- **Engine checks:** the version matches `package.json`, the changelog leads
+  with the current version, every flag is off, and only the three icon PNGs
+  are allowed in `public/`.
+- **Verified:**
+  - type check, lint, engine checks and the build pass
+  - at iPhone 13 size in Chromium, every install tag is present, the manifest
+    and icons load, the dialog works, and nothing overflows
+- **Open:**
+  - feedback destination (the owner's choice)
+  - WebKit (Safari engine) testing, which needs a download
+  - a real-iPhone check
+  - the offline service worker
+  - centring the phone layout on desktop
+- **A lesson from the first browser run:** 2 tests failed, because the closed
+  "What's new" dialog still had its text in the page. One changelog line said
+  kitchens can now "recover", which matched a test looking for a setback's
+  recovery routes. The fix: the dialog's content only exists while it is open.
+  **Don't leave hidden text in the page for anything closed.**
+
+### 26 Nov 2026 — Claude (Claude Code): design and logo direction (proposal)
+The owner wants a better design and a new, more authentic logo. My honest read
+of both, and the suggested process (brief, then logo, then design system, then
+one prototype screen, then rollout), is in `WORKING_PLAN.md` section 8. Nothing
+is built yet.
+- **The beta work passes the full browser suite after the fix: 404 of 404.**
+
+### 26 Nov 2026 — Claude (Claude Code): brand brief drafted
+Wrote `docs/BRAND.md`, a draft one-page brief for the redesign and the new
+logo.
+- **The idea:** "your one lit window in the city, paid for floor by floor".
+- **Three feeling words:** earned, late-night, honest.
+- **What it must not be:** a finance dashboard, a casino, stock success
+  imagery, an esports sticker or anything childish.
+- **The look:** warm lamplight as the primary colour, plus a quiet accent per
+  career.
+- **The logo:** what it has to do, and three directions, led by "the lit
+  window".
+
+Items marked **[owner?]** are guesses waiting for the owner's answers (section
+9). Nothing is designed yet; the logo work starts once the brief is agreed.
+
+### 26 Nov 2026 — Claude (Claude Code): lit-window logo concepts
+Branch `feature/logo-lit-window`, off `feature/iphone-install`. The owner chose
+the "lit window" direction from `BRAND.md`.
+
+- **Drawn directly as SVG**, not with an image model, so the chosen mark is
+  already clean vector. The script is
+  `art-source/branding/concepts/draw-lit-window.mjs`. Re-run it with Node,
+  passing the output folder and the sheet folder.
+- **Round 1 was discarded.** Navy towers on a navy ground disappeared, and the
+  window vanished at 32px.
+- **Round 2** uses black silhouettes against a dusk sky, a larger window with
+  a lamp glow, and towers that fill the icon:
+  - A2: one tower
+  - B2: a stepped art-deco skyscraper with a mast
+  - C2: three towers, only the near one lit
+  - E: B2 set off-centre against a far tower
+- **Tested:** each was rendered at 256, as a 180px iPhone icon, and at 64, 32
+  and 16px, on dark and light. The window reads down to 32px; at 16px it is
+  a warm dot. The sheet is `lit-window-round-2-sheet.png`.
+- **Next:** the owner picks one. Then refine it (proportions, optional
+  window mullions at large sizes), design the wordmark lockup, and swap the
+  icons in `build:art`.
+
+### 26 Nov 2026 — Claude (Claude Code): the new logo is in
+Same branch (`feature/logo-lit-window`). The owner picked concept E: the
+off-centre art-deco tower at dusk with one lit window.
+
+- **The master is `art-source/branding/lit-window-mark.svg`.** It is concept
+  E refined: a slimmer mast, a ledge at each setback, a window with a cross
+  bar, a warm horizon, and dim windows on the far tower. Edit this one file
+  to change the logo.
+- **`build:art` renders every icon from it**, at each size from vector:
+  - the tab icon (`app/icon.png`) and the iPhone icon (`app/apple-icon.png`)
+  - the manifest icons (`public/icons/`)
+  - the in-app marks (`logo-mark-64/128/256.webp`)
+  - the 1200×630 link-preview card, the dusk scene with no baked-in text
+- **The old raster lockup is gone.** `logo-lockup*.webp` was deleted from
+  `public/`. Its master PNG stays in `art-source/branding/` as history, and
+  the engine check now points at the SVG master.
+- **The title is real text now:** "Earn Your / Skyline" in the display face,
+  with Skyline in lamplight gold, beside the mark (`BrandLockup`). It's on
+  the sign-in and career screens, and it is the page's `<h1>`.
+- **Verified** at iPhone 13 size: both screens look right, there is no
+  overflow and no console errors. Type check, lint, engine checks and the
+  build pass, and all 404 browser tests pass (7.4 minutes).
+- **Still on the old palette:** the teal buttons and accents remain. That
+  is step 3 of the design refresh (`WORKING_PLAN.md` section 8).
+
+### 26 Nov 2026 — Claude (Claude Code): beta pushed
+- `beta` was fast-forwarded to `feature/logo-lit-window` and pushed. That's 8
+  commits beyond `main`: the pinned commit button, the artwork, the victory
+  scenes, the beta and iPhone install, the brand brief and the new logo.
+- **The beta link** always serves the latest `beta`:
+  https://earn-your-skyline-git-beta-khoshnoodfarporiya-debugs-projects.vercel.app
+- **Workflow from here:**
+  - feature work on `feature/<name>`
+  - merge into `beta`, then push, and Vercel redeploys the link
+  - merge `beta` into `main` only when the owner ships
+- **On an iPhone:** open the link in Safari, then Share → Add to Home Screen.
+  If Vercel's deployment protection is on, the link asks for a Vercel login
+  first.
+
+### 26 Nov 2026 — Claude (Claude Code): lamplight palette
+Branch `feature/lamplight-palette`, off `beta`. The owner asked to change the
+colours, following `BRAND.md`.
+
+- **The medical teal is gone.** The default accent is lamplight amber, the
+  colour of the logo's lit window. Each career's neon accent became a quiet
+  one that sits with the dusk art. The full list and contrast figures are in
+  `WORKING_PLAN.md` section 8, step 3.
+- **Where to change colours:** the `--accent` variables in
+  `app/globals.css`. Don't add hex colours to components. Use
+  `text-clinical`, `bg-clinical` and the rest, or `rgb(var(--accent))`, and
+  put SVG colours in `style`.
+- **Also changed:**
+  - `on-accent` ink is now `#14110C`
+  - the page's top glow is warm
+  - the error pages use lamplight
+  - the changelog notes the new colours
+- **Verified:**
+  - type check, lint and engine checks pass
+  - all seven careers screenshotted at iPhone size, with no console errors
+  - the build passes and all 404 browser tests pass (7.7 minutes)
+
+### 26 Nov 2026 — Claude (Claude Code): README screenshots and portfolio photos
+- **README:** a header with the lit-window mark and tagline, plus a
+  Screenshots section near the top. It has four phone shots (title, a Chef's
+  week, the Politician's postbag, an event with its picture) and one desktop
+  shot (the Founder's week with the pinned commit). The images are in
+  `docs/screenshots/`, as WebP under 90KB each. **GitHub's front page shows
+  `main`'s README,** so they appear there only once `beta` is merged into
+  `main`.
+- **Portfolio (`../khoshwork-portfolio`):**
+  - [PR 36](https://github.com/khoshnoodfarporiya-debug/khoshwork-portfolio/pull/36)
+    re-captures the Earn Your Skyline case study from the beta and adds two
+    phone shots
+  - captions are updated in English and French
+  - placeholders are regenerated
+  - typecheck, lint and tests pass
+  - not merged, because merging publishes the live portfolio
+- **A trick for the portfolio's capture script:** its own Playwright has no
+  browser on this machine. Copy the script into this repo and run it with
+  this repo's Playwright, from inside the portfolio folder:
+  `node ../earn-your-skyline/cap.tmp.mjs earn-your-skyline`.
+- **A bug spotted (pre-existing, not fixed):** in the end-of-week pop-up
+  (`WeekReview`), the sticky "WEEK N CLOSED" header overlaps the content
+  scrolling under it. It is added to `WORKING_PLAN.md`.
+- **Portfolio PR 36 merged** (owner's go-ahead) as `1c8a4ae` on the
+  portfolio's `master`. Vercel's production deploy was still running at the
+  time; check it finished. The previous live site stays up if the build
+  fails.
+
+### 26 Nov 2026 — Claude (Claude Code): two bug fixes
+Branch `feature/week-banner-and-review-header`, in this repo. Both bugs were in
+the game, not the portfolio or the owner's other repos.
+
+- **Doctor picture on every career's Week screen:** `OverviewHero` always used
+  the Physician's `sectionVisual("overview")`. It now uses each career's cover
+  art (`careerVisual(career.id)`); the Physician keeps its overview picture.
+  Checked on the Chef, Politician and Engineer.
+- **The end-of-week pop-up's header overlapped content:** the sticky
+  `.form-head` had a near-transparent gradient as its background. A new
+  `.form-head.sticky` rule in `app/globals.css` gives it a solid background
+  (`#122137`). That also fixes the same pattern in `RetirementDialog` and the
+  glossary.
+- **Follow-up:** the portfolio's `week-desktop.webp` (merged in portfolio PR
+  36) still shows the old doctor banner on the Chef's week. Re-capture it once
+  this is on `beta`.
+- **Verified:** type check, lint and engine checks pass, and both fixes were
+  checked in the browser at iPhone size. The full browser suite result is
+  recorded below.
+
+### 26 Nov 2026 — Claude (Claude Code): release to main, license, README
+- **The owner chose "all rights reserved".** `LICENSE` is a proprietary
+  notice: the code is readable but not reusable; forking to propose changes
+  is allowed; there is no warranty. `package.json` has
+  `"license": "UNLICENSED"`. The copyright line names the repo owner's GitHub
+  account, not a legal name; the owner can change it.
+- **README:**
+  - new "How it works", "Getting started", "Project layout",
+    "Documentation" and "License" sections near the top
+  - the accent description updated to lamplight
+  - "Honest gaps" updated: the art is complete for the catalogue, plus the
+    beta's limits and the current balance gaps
+- **Stale docs fixed:** `docs/artwork-shot-list.md` is marked complete, and the
+  `WORKING_PLAN.md` status table now shows 2,092 checks, 404 browser tests
+  and every balance contract holding.
+- **Branches tidied:** every merged branch was deleted on GitHub after
+  confirming each is inside `main`.

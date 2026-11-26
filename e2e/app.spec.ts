@@ -156,8 +156,9 @@ async function portraitsSettled(page: Page, scope = "main") {
 }
 
 /**
- * The commit control. Mobile has the sticky CommitBar; desktop has the inline
- * button in the forecast card, and only one of the two is ever in the DOM.
+ * The commit control. Mobile has the sticky CommitBar; desktop has the commit
+ * card pinned in the Week screen's right column. Only one of the two is ever
+ * visible, and role queries skip the hidden one.
  */
 const commitButton = (page: Page) =>
   page

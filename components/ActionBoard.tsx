@@ -149,7 +149,7 @@ export function ActionBoard({
                   units > 0 ? "bg-clinical-tint" : "bg-card"
                 }`}
                 style={{
-                  ["--dept" as string]: units > 0 ? "#35E0C0" : "transparent",
+                  ["--dept" as string]: units > 0 ? "rgb(var(--accent))" : "transparent",
                 }}
               >
                 <div className="flex items-center gap-3">

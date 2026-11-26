@@ -9,7 +9,7 @@ function tone(polarity: string, value: number, max: number) {
   const bad = polarity === "lower-better" ? pct : 1 - pct;
   if (bad > 0.75) return { bar: "#FF6B6B", text: "text-alarm" };
   if (bad > 0.5) return { bar: "#FFB020", text: "text-caution" };
-  return { bar: "#35E0C0", text: "text-ink" };
+  return { bar: "rgb(var(--accent))", text: "text-ink" };
 }
 
 export function Meters({

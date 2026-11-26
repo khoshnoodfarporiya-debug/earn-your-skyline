@@ -104,6 +104,7 @@ import {
   setAmbition,
 } from "../lib/game/ambitions";
 import {
+  careerGoalMet,
   grantFor,
   legacyFor,
   retire,
@@ -182,6 +183,7 @@ import {
   PRACTICE_STAGES,
   PRACTICE_VISUAL,
   SECTION_VISUALS,
+  VICTORY_VISUALS,
   careerVisual,
   cityVisual,
   eventVisual,
@@ -190,7 +192,9 @@ import {
   practiceStageIndex,
 } from "../lib/ui/visuals";
 import { CAREER_PREVIEWS, CAREERS } from "../lib/game/careers";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { APP_VERSION, CHANGELOG } from "../lib/version";
+import { FLAGS } from "../lib/flags";
 import { join } from "node:path";
 
 /** Every file under a directory, recursively. */
@@ -2090,8 +2094,13 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
    * The masters are 51MB and belong in `art-source/`, not in the deployed
    * bundle. This is the assertion that stops one creeping back in.
    */
-  const strays = walkFiles("public").filter((f) =>
-    f.toLowerCase().endsWith(".png"),
+  /* One exception: the home-screen icons in public/icons/ are PNG on
+     purpose (it is what every home screen reads), generated small by
+     build:art, and never artwork masters. */
+  const strays = walkFiles("public").filter(
+    (f) =>
+      f.toLowerCase().endsWith(".png") &&
+      !/^public[\\/]icons[\\/]icon-(192|512|maskable-512)\.png$/.test(f),
   );
   check(
     "no PNG master has crept back into public/",
@@ -2126,14 +2135,12 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
     /*
      * The brand collection is many crops of one master.
      *
-     * `logo-lockup`, `logo-mark-64` and the rest are all cut from a single
-     * `earn-your-skyline-logo-v1.png`, so there is no filename to derive — the
-     * guarantee is that the one master is present, which is checked directly.
+     * `logo-mark-64` and the rest are all rendered from one vector master,
+     * `lit-window-mark.svg` (Nov 2026), so there is no filename to derive —
+     * the guarantee is that the one master is present, checked directly.
      */
     if (rel.replace(/\\/g, "/").startsWith("brand/")) {
-      return existsSync(
-        join("art-source", "branding", "earn-your-skyline-logo-v1.png"),
-      );
+      return existsSync(join("art-source", "branding", "lit-window-mark.svg"));
     }
     const stem = rel.replace(/\.webp$/, "").replace(/@[a-z0-9]+$/i, "");
     const dir = join("art-source", "visuals", dirname(stem));
@@ -2195,6 +2202,78 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
   check(
     "every event visual carries a category",
     Object.values(EVENT_VISUALS).every((v) => v.category.length > 0),
+  );
+  /* The beta: one version everywhere, a changelog that leads with it, and
+     nothing half-built switched on by accident. */
+  {
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+      version: string;
+    };
+    check(
+      "the app version and package.json agree",
+      pkg.version === APP_VERSION,
+      `${pkg.version} vs ${APP_VERSION}`,
+    );
+    check(
+      "the newest changelog entry is the current version",
+      CHANGELOG[0]?.version === APP_VERSION &&
+        CHANGELOG[0].changes.length > 0,
+    );
+    check(
+      "every beta feature flag is off until somebody turns it on deliberately",
+      Object.values(FLAGS).every((on) => on === false),
+    );
+  }
+
+  /* The end screen's victory scene: one per career, only for a met goal. */
+  check(
+    "every career has its own victory scene, served as WebP",
+    CAREERS.every((c) => VICTORY_VISUALS[c.id]?.src.endsWith(".webp")) &&
+      new Set(CAREERS.map((c) => VICTORY_VISUALS[c.id]?.src)).size ===
+        CAREERS.length,
+  );
+  {
+    const fresh = startRun(chef, 7001);
+    check("a new run has not met its career goal", !careerGoalMet(chef, fresh));
+    const rich = startRun(chef, 7001);
+    rich.r.cash = 1e9;
+    check(
+      "a Chef with a full bar and the loan still owed has not met the goal",
+      chef.objective(rich).progress >= 1 &&
+        rich.r.debt > 0 &&
+        !careerGoalMet(chef, rich),
+    );
+    rich.r.debt = 0;
+    check(
+      "and once the loan is cleared it has",
+      careerGoalMet(chef, rich),
+    );
+    const seat = startRun(politician, 7001);
+    for (let i = 0; i < 3; i++) {
+      campaign(seat).results.push({
+        week: 40 + i * 50,
+        office: "councillor",
+        share: 0.5,
+        threshold: 0.42,
+        won: true,
+      });
+    }
+    check(
+      "a Politician's goal does not wait on campaign debt",
+      seat.r.debt > 0 && careerGoalMet(politician, seat),
+      `debt ${seat.r.debt}`,
+    );
+  }
+
+  /* The newer careers' events all have pictures now (Nov 2026). A new event
+     for one of them without artwork should be a decision, not an accident. */
+  const newerEvents = CAREERS.filter((c) =>
+    ["founder", "politician", "architect", "engineer"].includes(c.id),
+  ).flatMap((c) => c.events.map((e) => e.id));
+  check(
+    "every Founder, Politician, Architect and Engineer event has artwork",
+    newerEvents.length === 16 && newerEvents.every((id) => id in EVENT_VISUALS),
+    newerEvents.filter((id) => !(id in EVENT_VISUALS)).join(", "),
   );
 
   /*

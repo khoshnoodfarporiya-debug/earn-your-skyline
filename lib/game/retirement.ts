@@ -1,4 +1,22 @@
-import type { RunState } from "./types";
+import type { CareerDef, RunState } from "./types";
+
+/**
+ * Careers whose goal card says to clear the opening loan as well as reach a
+ * worth. For them a full progress bar is not enough while the loan stands;
+ * the balance harness has always judged "reached" the same way.
+ */
+const GOAL_CLEARS_DEBT: ReadonlySet<string> = new Set(["doctor", "chef", "lawyer"]);
+
+/**
+ * Whether the run met its career's own goal — the thing the goal card asks
+ * for. Retiring is always allowed and always ends the run as "won" in the
+ * engine's terms; this is the separate question of whether there is anything
+ * to celebrate. The end screen shows its victory artwork only when it is true.
+ */
+export function careerGoalMet(career: CareerDef, s: RunState): boolean {
+  if (career.objective(s).progress < 1) return false;
+  return !GOAL_CLEARS_DEBT.has(career.id) || (s.r.debt ?? 0) <= 0;
+}
 import { REPUTATIONS, overallReputation } from "./reputation";
 import { timelineOf } from "./timeline";
 import { AMBITION_BY_ID } from "./ambitions";

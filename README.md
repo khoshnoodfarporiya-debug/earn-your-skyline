@@ -1,8 +1,45 @@
 # Earn Your Skyline
 
+<p align="center">
+  <img src="art-source/branding/lit-window-mark.svg" width="96" alt="The Earn Your Skyline mark: one lit window in a tower at dusk">
+</p>
+
+<p align="center">
+  <strong>A career sim for your phone. Start with almost nothing, and earn your place in the city one week at a time.</strong><br>
+  <em>In beta (v0.9.0-beta.1) · iPhone first, Android later</em>
+</p>
+
 ## Quick tour
 
-Earn Your Skyline is a browser game about managing a career one week at a time. Each profession has its own constraints, from ingredient spoilage as a chef to cash runway as a founder. The physician path is the most developed and is a good first run.
+Earn Your Skyline is a game about managing a career one week at a time. Each profession has its own constraints, from ingredient spoilage as a chef to cash runway as a founder. It is built phone-first: on an iPhone, open it in Safari and choose **Add to Home Screen** to install it like an app. The physician path is the most developed and is a good first run.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="25%">
+      <img src="docs/screenshots/phone-title.webp" alt="The title screen: the lit-window logo, the beta badge and the career cards" width="220"><br>
+      <sub><b>Pick a life.</b> Seven careers, each with its own way of going wrong.</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="docs/screenshots/phone-week-chef.webp" alt="A Chef's week: cash, debt and time left, and the week planner with dinner, lunch and prep booked" width="220"><br>
+      <sub><b>Plan the week.</b> Six blocks of time, and every one costs something.</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="docs/screenshots/phone-politician-postbag.webp" alt="The Politician's postbag: a constituency office at night above the polling figures" width="220"><br>
+      <sub><b>Every career is its own game.</b> The Politician's postbag and polls.</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="docs/screenshots/phone-event.webp" alt="A regulatory inspection event: inspectors reading records at a clinic desk, with two choices below" width="220"><br>
+      <sub><b>Things happen to you.</b> Events arrive with a choice and a cost.</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/desktop-week-founder.webp" alt="The Founder's week on a computer: the planner on the left, and the pinned commit button and observations on the right" width="760"><br>
+  <sub>It also runs on a computer: the Founder's week, with the commit button pinned while you plan.</sub>
+</p>
 
 The game uses TypeScript, Next.js and React. Start with [simulation logic](lib/game), [interface components](components), or [Playwright tests and fixtures](e2e). See [Verification](#verification) for command checks and seeded balance simulations.
 
@@ -28,10 +65,89 @@ nouns — each is built around a different binding constraint:
 A run has **no forced ending**. Failure produces setbacks with recovery routes,
 never a game-over screen, and retirement is something you choose.
 
+## How it works
+
+**A week is the turn.** Every week you get six blocks of time. You spend them
+on your career's actions (a dinner service, casework, canvassing, a prototype),
+see a forecast of what the week will do, then press **Commit week**. The week
+resolves:
+- money comes in and goes out, line by line
+- the career's own model moves: stock spoils, support drifts, runway shrinks
+- sometimes an **event** arrives with a choice and a cost
+
+**Each career has one binding constraint** (the table above), and its screens
+are built around it. A Chef watches food age, a Politician watches support leak
+toward their positions, a Founder counts weeks of runway.
+
+**Between weeks you build.** You take premises, hire, buy equipment, take
+positions or raise money. Every purchase states its weekly cost before you
+commit to it.
+
+**There is a goal, not an ending.** Each career has an objective, for example
+"clear the fit-out loan and build a business worth $2,000,000 in Lyon". Reach
+it and retire, and the end screen shows your career's victory scene. Fall
+apart and you get a setback with routes back. Retiring is always your choice.
+
+**It is phone-first.** On an iPhone, open the game in Safari and choose **Add
+to Home Screen**: it installs with its own icon and opens full screen. It also
+runs in any desktop browser.
+
+**Saves stay on your device.** There is no server and no tracking. Profiles
+and runs live in the browser's local storage.
+
+## Getting started
+
 ```bash
 npm install
 npm run dev          # http://localhost:3500
 ```
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | The game at http://localhost:3500 |
+| `npm run typecheck` · `npm run lint` | TypeScript and ESLint |
+| `npm run check` | About 2,100 engine checks of the game rules |
+| `npm run build` | Production build |
+| `npm run e2e` | 404 Playwright browser tests, phone and desktop |
+| `npx tsx scripts/cities.ts 40 chef` | Balance harness: bots play a career in every city (drop the name for all) |
+| `npm run build:art` | Rebuild every game image and icon from the masters in `art-source/` |
+
+**The beta.** Work happens on `feature/…` branches, merges into `beta`, and is
+released to `main`. The current version and a player-facing changelog are in
+[`lib/version.ts`](lib/version.ts), shown in the game behind the **BETA**
+badge.
+
+## Project layout
+
+| Path | What it holds |
+| --- | --- |
+| `lib/game/` | The deterministic engine and every career's model (`careers/<career>.ts`), saves and validation |
+| `lib/ui/` | What the interface reads: navigation, help text, image registries |
+| `components/` | React screens, one `<Career>Screens.tsx` per career |
+| `app/` | Next.js app, the iPhone manifest and icons |
+| `scripts/` | Engine checks, the balance harness and the art build |
+| `e2e/` | Browser tests and saved-game fixtures |
+| `art-source/` | Image masters, including the logo (`branding/lit-window-mark.svg`) |
+| `public/` | The WebP images and icons the game serves |
+
+## Documentation
+
+| File | For |
+| --- | --- |
+| [`docs/COMMUNICATION.md`](docs/COMMUNICATION.md) | **Start here if you work on the code.** The rules, the traps and a log of every change |
+| [`docs/WORKING_PLAN.md`](docs/WORKING_PLAN.md) | The to-do list and what is done |
+| [`docs/BRAND.md`](docs/BRAND.md) | The brand brief: what the game should feel like |
+| [`docs/VISUALS.md`](docs/VISUALS.md) | The art style and the image prompts |
+| [`docs/asset-manifest.md`](docs/asset-manifest.md) | Every image and the job it does |
+
+The rest of this README is the design record: why each system works the way it
+does.
+
+## License
+
+**All rights reserved.** The code is public so it can be read, but it may not
+be copied, modified, published or used without permission. See
+[`LICENSE`](LICENSE).
 
 ---
 
@@ -730,8 +846,11 @@ from three surface levels, not from lighting effects.
 - **Type scale** — `.t-page` / `.t-section` / `.t-card` / `.t-body` /
   `.t-label` / `.t-value`, so size carries rank. Saira Condensed for signage,
   Barlow for body, IBM Plex Mono with tabular figures for every number.
-- **Accent economy** — mint (`clinical`) means *yours / active / do this*, and
-  is spent sparingly. Gold marks a market you can afford but have not entered.
+- **Accent economy.** The career accent (the `clinical` token) means *yours /
+  active / do this*, and is spent sparingly. Since the November 2026 redesign
+  it is **lamplight amber** by default and for the Physician, with a quiet
+  accent per career: copper, ink-blue, soft violet, rose, sage and olive (see
+  `docs/BRAND.md`). Gold marks a market you can afford but have not entered.
   Everything else is `good` / `caution` / `alarm` / `info`, each with a tint
   for backgrounds.
 - **Signature: the department colour system.** Twelve colours, one per
@@ -1659,14 +1778,20 @@ the least human playtesting.
 
 ### Honest gaps
 
-- **Two Chef catalogue entries are waiting for their masters** — the
-  destination dining room and the chef's counter, both named in
-  `AWAITING_CHEF_ART` and rendering the typographic fallback until the art
-  lands. **The Solicitor has no bespoke artwork** beyond its career cover and
-  a shared world map. Fourteen purchase images are also still outstanding —
-  they are listed by id in `AWAITING_ART` and briefed in
-  [`docs/artwork-shot-list.md`](docs/artwork-shot-list.md), and their cards
-  render a typographic fallback until the masters land.
+- **Artwork is complete for every catalogue item** (`AWAITING_ART` and
+  `AWAITING_CHEF_ART` are empty), and every Founder, Politician, Architect and
+  Engineer event has a picture. **The Chef and Solicitor events** (apart from
+  the critic) and **the newer careers' character portraits** have none yet.
+  The next batches are scoped in [`docs/VISUALS.md`](docs/VISUALS.md).
+- **This is a beta, built phone-first.** It installs on an iPhone from Safari,
+  but has only been tested at iPhone size in Chromium, not in WebKit or on a
+  real device. There is no offline mode, no server, no real login, no cloud
+  saves and no payments. The plan for those (and Apple's rules that shape it)
+  is in [`docs/WORKING_PLAN.md`](docs/WORKING_PLAN.md) section 7.
+- **Balance gaps the harness still shows:** the Solicitor and Engineer bots
+  never reach their objective; the Founder reaches it in Berlin but not
+  elsewhere; and a Politician who takes every well-placed position may find
+  the even seats easy.
 - **Browser coverage is no longer the gap it was**: every career has its own
   Playwright block (the Solicitor alone has over twenty tests across its
   casework, retainers, counsel, people and crises). What remains thin is

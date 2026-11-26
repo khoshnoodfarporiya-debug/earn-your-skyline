@@ -768,7 +768,7 @@ function ClusterMarker({
       )}
       <span
         aria-hidden
-        className={`relative flex h-7 w-7 items-center justify-center rounded-full border-2 text-[12px] font-semibold shadow-[0_0_12px_rgba(53,224,192,0.35)] transition-transform group-hover:scale-110 group-focus-visible:scale-110 motion-reduce:transition-none ${
+        className={`relative flex h-7 w-7 items-center justify-center rounded-full border-2 text-[12px] font-semibold shadow-[0_0_12px_rgb(var(--accent)/0.35)] transition-transform group-hover:scale-110 group-focus-visible:scale-110 motion-reduce:transition-none ${
           operating > 0 || hasHome
             ? "border-clinical bg-[#0C2A2A] text-clinical"
             : "border-rule bg-[#0A1220] text-ink-soft"
@@ -881,12 +881,12 @@ function Marker({
             className="pointer-events-none absolute h-24 w-24 rounded-full"
             style={{
               background:
-                "radial-gradient(circle, rgba(53,224,192,0.18) 0%, transparent 65%)",
+                "radial-gradient(circle, rgb(var(--accent)/0.18) 0%, transparent 65%)",
             }}
           />
           <span
             aria-hidden
-            className="absolute h-8 w-8 rounded-full border-2 border-ink shadow-[0_0_16px_rgba(53,224,192,0.65)]"
+            className="absolute h-8 w-8 rounded-full border-2 border-ink shadow-[0_0_16px_rgb(var(--accent)/0.65)]"
           />
         </>
       )}

@@ -93,6 +93,7 @@ import { GrowthPanel } from "./medical/GrowthPanel";
 import { LifePanel } from "./medical/LifePanel";
 import { phoneOf, unreadTotalIn } from "@/lib/ui/phoneAccess";
 import { Phone } from "./phone/Phone";
+import { BetaBadge } from "./BetaBadge";
 
 /** Handset glyph for the shell button. */
 function PhoneIcon() {
@@ -376,6 +377,8 @@ export function Game({
           </span>
           <span className="sr-only">Back to career select</span>
         </button>
+
+        <BetaBadge className="shrink-0" />
 
         <div className="ml-auto hidden lg:block">
           <PrimaryNav

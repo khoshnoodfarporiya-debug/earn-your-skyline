@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import {
   CAREER_PREVIEWS,
@@ -12,6 +11,8 @@ import { careerVisual } from "@/lib/ui/visuals";
 import { CareerIcon } from "./Icons";
 import { ArtFrame } from "./visuals/ArtFrame";
 import { StartCityPicker } from "./StartCityPicker";
+import { BetaBadge } from "./BetaBadge";
+import { BrandLockup } from "./BrandLockup";
 
 /**
  * Career selection.
@@ -69,32 +70,14 @@ export function CareerSelect({
             A career tycoon
           </span>
           <span className="h-px flex-1 bg-rule" />
-          <span className="num text-[12px] text-ink-faint">SELECT CAREER</span>
+          <BetaBadge />
         </div>
 
-        {/*
-         * The wordmark is the heading, not a picture beside one.
-         *
-         * `alt` carries the name, so the <h1> has a real accessible name and a
-         * screen reader hears "Earn Your Skyline, heading level 1" — which is
-         * what a text heading would have given. An empty alt here would leave
-         * the document with an unnamed top-level heading.
-         *
-         * The box is reserved at its rendered ratio so the cards below do not
-         * jump when it decodes, and it is `priority` because it is the largest
-         * thing above the fold on the first screen anybody sees.
-         */}
-        <h1 className="mt-6">
-          <Image
-            src="/visuals/brand/logo-lockup.webp"
-            alt="Earn Your Skyline"
-            width={1607}
-            height={656}
-            sizes="(min-width: 640px) 480px, 88vw"
-            priority
-            className="h-auto w-[88vw] max-w-[420px] sm:max-w-[480px]"
-          />
-        </h1>
+        {/* The lit-window mark and the name, as the page heading. The name is
+            real text, so the <h1> reads "Earn Your Skyline" to everyone. */}
+        <div className="mt-6">
+          <BrandLockup />
+        </div>
         <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-ink-soft">
           Pick a life, not a business. Each career runs on its own rules — its
           own resources, its own ways of coming apart. Nothing here ends your
@@ -177,8 +160,8 @@ export function CareerSelect({
               className={`rise group flex flex-col overflow-hidden rounded-form border text-left outline-none transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none ${
                 c.available
                   ? selected
-                    ? "-translate-y-0.5 border-clinical shadow-[0_0_0_1px_rgba(53,224,192,0.5),0_10px_30px_-12px_rgba(53,224,192,0.45)]"
-                    : "border-rule hover:-translate-y-0.5 hover:border-clinical/70 focus-visible:border-clinical focus-visible:shadow-[0_0_0_2px_rgba(53,224,192,0.55)]"
+                    ? "-translate-y-0.5 border-clinical shadow-[0_0_0_1px_rgb(var(--accent)/0.5),0_10px_30px_-12px_rgb(var(--accent)/0.45)]"
+                    : "border-rule hover:-translate-y-0.5 hover:border-clinical/70 focus-visible:border-clinical focus-visible:shadow-[0_0_0_2px_rgb(var(--accent)/0.55)]"
                   : "cursor-not-allowed border-rule-soft opacity-70"
               }`}
             >
