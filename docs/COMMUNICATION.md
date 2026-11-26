@@ -166,10 +166,10 @@ touched. Run the browser tests when you change a screen.
   - the README with screenshots, and the `LICENSE` (all rights reserved)
 - **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
   (Codex's, unmerged). Every merged branch has been deleted.
-- **`fix/news-repeats`** (local, off `beta`, not merged): the phone's news no
-  longer runs the same filler story week after week, and the Chef's stories
-  have real headlines and bodies. Waiting for the owner to merge it into
-  `beta`. See `WORKING_PLAN.md` section 1b.
+- **`fix/news-repeats`**, merged into local `beta` (fast-forward) on the
+  owner's word, 26 Nov 2026; not pushed: the phone's news no longer runs the
+  same filler story week after week, and the Chef's stories have real
+  headlines and bodies. See `WORKING_PLAN.md` section 1b.
 - **What's still open:** WORKING_PLAN section 8 steps 4–5 (prototype the
   iPhone Week screen, then roll screens out one by one), the
   rest of the layout review, real login, payments, the App Store, Solicitor
@@ -832,7 +832,9 @@ agree it before touching code.
 ### 26 Nov 2026 — Claude (Claude Code): the phone's news repeated itself
 
 Branch `fix/news-repeats`, off `beta`, in its own worktree (another session
-was building the Week screen in the main checkout). Not merged.
+was building the Week screen in the main checkout). The owner said "merge
+it": `beta` was fast-forwarded to it locally, without a checkout, and not
+pushed.
 
 - **The bug:** a Chef save at week 8 showed The Pass's "half the city's
   kitchens are a sous chef short" at weeks 4, 5 and 6, and each body was the

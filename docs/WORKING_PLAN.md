@@ -112,7 +112,8 @@ Balance snapshot (4 seeds, 120 weeks, so treat this as a signal, not a verdict):
 - [ ] Rerun at 40+ seeds before calling anything fixed
 
 ### 1b. Bugs
-- [x] **The phone's news repeated itself** (branch `fix/news-repeats`, 26 Nov 2026).
+- [x] **The phone's news repeated itself** (branch `fix/news-repeats`, merged into
+      local `beta` 26 Nov 2026, not pushed).
       A beta save showed The Pass's sous chef survey at weeks 4, 5 and 6, each
       with a body that was its own headline again.
   - Cause: filler stories were drawn blind from a pool of three each week
