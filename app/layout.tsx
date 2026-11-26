@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Barlow, IBM_Plex_Mono, Saira_Condensed } from "next/font/google";
 import "./globals.css";
 
@@ -84,6 +84,35 @@ export const metadata: Metadata = {
     title: TITLE,
     description: DESCRIPTION,
   },
+  /*
+   * Installed from Safari's "Add to Home Screen" it opens full screen with
+   * its own name under the icon. `black-translucent` lets the navy run under
+   * the status bar; the layout already pads for it with the safe-area insets
+   * (see `viewport` below). The touch icon is `app/apple-icon.png`.
+   */
+  appleWebApp: {
+    capable: true,
+    title: "Skyline",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: { telephone: false },
+};
+
+/**
+ * Phone-first viewport.
+ *
+ * `viewportFit: "cover"` lets the page run edge to edge on an iPhone with a
+ * notch or Dynamic Island, which is what makes `env(safe-area-inset-*)`
+ * report real values — the fixed CommitBar and nav already pad by them.
+ * Zoom stays allowed: pinch-to-zoom is an accessibility feature, and
+ * removing it would fail WCAG 1.4.4.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#08111F",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

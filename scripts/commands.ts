@@ -192,7 +192,9 @@ import {
   practiceStageIndex,
 } from "../lib/ui/visuals";
 import { CAREER_PREVIEWS, CAREERS } from "../lib/game/careers";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { APP_VERSION, CHANGELOG } from "../lib/version";
+import { FLAGS } from "../lib/flags";
 import { join } from "node:path";
 
 /** Every file under a directory, recursively. */
@@ -2092,8 +2094,13 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
    * The masters are 51MB and belong in `art-source/`, not in the deployed
    * bundle. This is the assertion that stops one creeping back in.
    */
-  const strays = walkFiles("public").filter((f) =>
-    f.toLowerCase().endsWith(".png"),
+  /* One exception: the home-screen icons in public/icons/ are PNG on
+     purpose (it is what every home screen reads), generated small by
+     build:art, and never artwork masters. */
+  const strays = walkFiles("public").filter(
+    (f) =>
+      f.toLowerCase().endsWith(".png") &&
+      !/^public[\\/]icons[\\/]icon-(192|512|maskable-512)\.png$/.test(f),
   );
   check(
     "no PNG master has crept back into public/",
@@ -2198,6 +2205,28 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
     "every event visual carries a category",
     Object.values(EVENT_VISUALS).every((v) => v.category.length > 0),
   );
+  /* The beta: one version everywhere, a changelog that leads with it, and
+     nothing half-built switched on by accident. */
+  {
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+      version: string;
+    };
+    check(
+      "the app version and package.json agree",
+      pkg.version === APP_VERSION,
+      `${pkg.version} vs ${APP_VERSION}`,
+    );
+    check(
+      "the newest changelog entry is the current version",
+      CHANGELOG[0]?.version === APP_VERSION &&
+        CHANGELOG[0].changes.length > 0,
+    );
+    check(
+      "every beta feature flag is off until somebody turns it on deliberately",
+      Object.values(FLAGS).every((on) => on === false),
+    );
+  }
+
   /* The end screen's victory scene: one per career, only for a met goal. */
   check(
     "every career has its own victory scene, served as WebP",

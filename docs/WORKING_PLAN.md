@@ -255,21 +255,43 @@ order. What exists today:
 - no payments
 - a deterministic social feed per career on the in-game phone
 
-1. [ ] **Beta setup** (small, do first)
-   - a `beta` integration branch with a fixed Vercel beta URL; `main` becomes
-     "shipped"
-   - a version number and "Beta" badge in the app
-   - a "What's new" changelog
-   - a feedback button
-   - feature flags, so unfinished paid/social features can ship switched off
-2. [ ] **iPhone, stage A: installable web app (PWA)**
-   - a web manifest, apple-touch-icon, `appleWebApp` metadata, and a viewport
-     with `viewport-fit=cover` and a theme colour
-   - an offline service worker (the game has no server, so it can run offline
-     once fonts are self-hosted)
-   - a Playwright WebKit/iPhone project, and testing on a real iPhone
-   - phone-first layout: on desktop, show the phone layout centred rather
-     than blocking desktop
+1. **Beta setup** (branch `feature/iphone-install`, off `beta`)
+   - [x] A local `beta` branch exists, made from all the unmerged work. Feature
+         branches are named `feature/…`, because git can't have a branch
+         called `beta` alongside branches named `beta/…`. They merge into
+         `beta`.
+     - [ ] Push `beta`. Vercel's preview URL for it becomes the beta link.
+   - [x] Version `0.9.0-beta.1` in `lib/version.ts` and `package.json`, kept
+         equal by an engine check.
+   - [x] "BETA vX" badge on the title screen and in the game header.
+   - [x] "What's new" changelog behind the badge (native `<dialog>`). Add an
+         entry for every update a player can notice.
+   - [x] Feature flags in `lib/flags.ts` (`paidCareers`, `cloudSaves`,
+         `feedback`), all off and locked by an engine check.
+   - [ ] Feedback button. **The owner must choose where feedback goes** (an
+         email address, a form, GitHub issues). It sits behind the `feedback`
+         flag.
+2. **iPhone, stage A: installable web app**
+   - [x] `app/manifest.ts`: standalone display, portrait, navy theme, and
+         192, 512 and maskable icons.
+   - [x] `app/apple-icon.png` (180px) plus the `public/icons/` PNGs, all made
+         by `npm run build:art` from the brand master. The no-PNG engine check
+         allows exactly these three files.
+   - [x] `appleWebApp` metadata (`black-translucent`, title "Skyline") and
+         `viewport` (`viewport-fit=cover`, theme colour, zoom still allowed).
+   - [x] Safe areas: the body pads top, left and right by the insets, and the
+         sticky status strip offsets by the top inset. The bottom was already
+         handled.
+   - [x] Checked at iPhone 13 size in Chromium:
+     - every install tag is present
+     - the manifest and all four icons load
+     - "What's new" opens, and closes with Escape
+     - no horizontal overflow
+     - no console errors
+   - [ ] Test in WebKit, the engine Safari uses. This needs Playwright's WebKit
+         download, plus testing on a real iPhone ("Add to Home Screen").
+   - [ ] Offline service worker. Self-host the fonts first.
+   - [ ] Phone-first desktop: show the phone layout centred on large screens.
 3. [ ] **Privacy policy and cookies**
    - Today nothing is tracked, so no cookie banner is legally needed yet.
    - Write the privacy policy and terms before login and payments; the App
@@ -302,6 +324,44 @@ order. What exists today:
    - Label them clearly as in-game characters.
    - Live AI or player-to-player social features come later: they need a
      server, moderation and money per player.
+
+### 8. Brand and design refresh (proposal, 26 Nov 2026)
+
+The owner feels the design isn't good and that the logo doesn't feel
+authentic. Honest read of what's there:
+
+- **The logo is an AI raster image built from stock clichés:** a skyline,
+  stairs and an upward arrow. Its edges are ragged ("EARN YOUR" is smudged),
+  there is no vector, and its sticker/esports look clashes with the moody,
+  photographic game art.
+- **The interface still looks like the medical dashboard it started as.** The
+  accent token is literally `clinical` (teal), every career shares it, and
+  there are many monospace figures and text walls. It reads like a finance
+  tool, not a game, while the art reads like a film.
+
+Suggested process. Agree on the brief first, then the logo, then the UI, one
+screen at a time:
+1. [x] **Brand brief (one page, `docs/BRAND.md`):** drafted 26 Nov 2026, waiting on the owner's answers in its section 9
+   - who it's for
+   - three feeling words
+   - what it must not be
+   - three reference apps or games
+   - one sentence on what "earning your skyline" means
+2. [ ] **Logo.** Explore 3 directions, generate rough options with an image
+   model, then rebuild the winner as a real SVG. Test it at 16px, as a 180px
+   app icon, and on dark and light backgrounds. Candidate directions:
+   - the lit window in a tower at night
+   - a type-led "Skyline" wordmark
+   - an "S" built from a building's stepped setbacks
+3. [ ] **Design system refresh:**
+   - a mood board taken from the existing art
+   - palette, with warm lamp-light as the primary colour instead of medical
+     teal, plus a quiet accent per career
+   - two typefaces, the core components, and spacing
+4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
+   artifact, and agree it before touching code.
+5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,
+   checking the browser suite each time.
 
 ## Dropped
 

@@ -71,7 +71,7 @@ export function StatusStrip({
   };
 
   return (
-    <div className="form sticky top-2 z-30 overflow-hidden">
+    <div className="form sticky top-[calc(env(safe-area-inset-top)+0.5rem)] z-30 overflow-hidden">
       {/* A definition list, because that is what these are: four labelled
           values. It also gives each number an accessible name of its own,
           rather than a bare digit floating under a caption. */}

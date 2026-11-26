@@ -12,6 +12,7 @@ import { careerVisual } from "@/lib/ui/visuals";
 import { CareerIcon } from "./Icons";
 import { ArtFrame } from "./visuals/ArtFrame";
 import { StartCityPicker } from "./StartCityPicker";
+import { BetaBadge } from "./BetaBadge";
 
 /**
  * Career selection.
@@ -69,7 +70,7 @@ export function CareerSelect({
             A career tycoon
           </span>
           <span className="h-px flex-1 bg-rule" />
-          <span className="num text-[12px] text-ink-faint">SELECT CAREER</span>
+          <BetaBadge />
         </div>
 
         {/*

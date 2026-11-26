@@ -478,7 +478,43 @@ async function buildBrand() {
     .png()
     .toFile(join("app", "opengraph-image.png"));
 
-  console.log("  brand/logo-lockup, logo-mark, app/icon, app/opengraph-image");
+  /*
+   * Home-screen icons (beta, Nov 2026: the game is phone-first).
+   *
+   * iOS fills any transparency with black and rounds the corners itself, so
+   * the touch icon is the mark on the game's navy, full-bleed, with no corner
+   * radius of its own. The manifest icons follow the same rule; the
+   * "maskable" one keeps the mark inside the central 80% safe zone Android
+   * may crop to a circle. PNG, because that is what every home screen reads.
+   */
+  const NAVY = { r: 8, g: 17, b: 31, alpha: 1 };
+  const markOnNavy = async (size: number, mark: number, out: string) =>
+    sharp({ create: { width: size, height: size, channels: 4, background: NAVY } })
+      .composite([
+        {
+          input: await sharp(BRAND_MASTER)
+            .extract(MARK)
+            .resize(mark, mark, {
+              fit: "contain",
+              background: { r: 0, g: 0, b: 0, alpha: 0 },
+            })
+            .png()
+            .toBuffer(),
+          gravity: "center",
+        },
+      ])
+      .png()
+      .toFile(out);
+  const OUT_ICONS = join("public", "icons");
+  mkdirSync(OUT_ICONS, { recursive: true });
+  await markOnNavy(180, 136, join("app", "apple-icon.png"));
+  await markOnNavy(192, 152, join(OUT_ICONS, "icon-192.png"));
+  await markOnNavy(512, 404, join(OUT_ICONS, "icon-512.png"));
+  await markOnNavy(512, 320, join(OUT_ICONS, "icon-maskable-512.png"));
+
+  console.log(
+    "  brand/logo-lockup, logo-mark, app/icon, app/apple-icon, app/opengraph-image, icons/",
+  );
 }
 
 main().catch((err) => {

@@ -459,3 +459,60 @@ The suggested order and the platform rules that constrain it are in
 - An app with accounts must offer account deletion inside the app.
 
 Nothing is built yet; the owner chooses where to start.
+
+### 26 Nov 2026 — Claude (Claude Code): beta setup and iPhone install
+Branch `feature/iphone-install`, off the new local `beta` branch. `beta` holds
+all the unmerged work so far. **New branch convention:** feature work goes on
+`feature/<name>` and merges into `beta`; `main` is what ships.
+
+- **Installable on iPhone:**
+  - `app/manifest.ts`
+  - `app/apple-icon.png`
+  - `public/icons/`, made by `npm run build:art`
+  - `appleWebApp` and `viewport` settings in `app/layout.tsx`
+  - safe-area padding in `app/globals.css` and `StatusStrip`
+- **The beta itself:**
+  - `lib/version.ts` (`APP_VERSION` and `CHANGELOG`). Add a changelog entry
+    for every update a player can notice.
+  - `lib/flags.ts` (feature flags, all off)
+  - `components/BetaBadge.tsx` (badge plus "What's new")
+- **Engine checks:** the version matches `package.json`, the changelog leads
+  with the current version, every flag is off, and only the three icon PNGs
+  are allowed in `public/`.
+- **Verified:**
+  - type check, lint, engine checks and the build pass
+  - at iPhone 13 size in Chromium, every install tag is present, the manifest
+    and icons load, the dialog works, and nothing overflows
+- **Open:**
+  - feedback destination (the owner's choice)
+  - WebKit (Safari engine) testing, which needs a download
+  - a real-iPhone check
+  - the offline service worker
+  - centring the phone layout on desktop
+- **A lesson from the first browser run:** 2 tests failed, because the closed
+  "What's new" dialog still had its text in the page. One changelog line said
+  kitchens can now "recover", which matched a test looking for a setback's
+  recovery routes. The fix: the dialog's content only exists while it is open.
+  **Don't leave hidden text in the page for anything closed.**
+
+### 26 Nov 2026 — Claude (Claude Code): design and logo direction (proposal)
+The owner wants a better design and a new, more authentic logo. My honest read
+of both, and the suggested process (brief, then logo, then design system, then
+one prototype screen, then rollout), is in `WORKING_PLAN.md` section 8. Nothing
+is built yet.
+- **The beta work passes the full browser suite after the fix: 404 of 404.**
+
+### 26 Nov 2026 — Claude (Claude Code): brand brief drafted
+Wrote `docs/BRAND.md`, a draft one-page brief for the redesign and the new
+logo.
+- **The idea:** "your one lit window in the city, paid for floor by floor".
+- **Three feeling words:** earned, late-night, honest.
+- **What it must not be:** a finance dashboard, a casino, stock success
+  imagery, an esports sticker or anything childish.
+- **The look:** warm lamplight as the primary colour, plus a quiet accent per
+  career.
+- **The logo:** what it has to do, and three directions, led by "the lit
+  window".
+
+Items marked **[owner?]** are guesses waiting for the owner's answers (section
+9). Nothing is designed yet; the logo work starts once the brief is agreed.
