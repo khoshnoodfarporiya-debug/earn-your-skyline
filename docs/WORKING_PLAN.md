@@ -347,7 +347,7 @@ screen at a time:
    - what it must not be
    - three reference apps or games
    - one sentence on what "earning your skyline" means
-2. [ ] **Logo.** Explore 3 directions, generate rough options with an image
+2. [ ] **Logo.** Owner chose "the lit window" (26 Nov 2026). Round 2 of SVG concepts is in `art-source/branding/concepts/` (A2, B2, C2, E, each in dark and light, plus a test sheet at 256, 180, 64, 32 and 16px). Waiting on the owner to pick one; then refine it, add the wordmark, and replace the icons through `build:art`. Explore 3 directions, generate rough options with an image
    model, then rebuild the winner as a real SVG. Test it at 16px, as a 180px
    app icon, and on dark and light backgrounds. Candidate directions:
    - the lit window in a tower at night

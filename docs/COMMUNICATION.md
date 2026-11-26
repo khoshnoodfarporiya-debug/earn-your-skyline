@@ -516,3 +516,26 @@ logo.
 
 Items marked **[owner?]** are guesses waiting for the owner's answers (section
 9). Nothing is designed yet; the logo work starts once the brief is agreed.
+
+### 26 Nov 2026 — Claude (Claude Code): lit-window logo concepts
+Branch `feature/logo-lit-window`, off `feature/iphone-install`. The owner chose
+the "lit window" direction from `BRAND.md`.
+
+- **Drawn directly as SVG**, not with an image model, so the chosen mark is
+  already clean vector. The script is
+  `art-source/branding/concepts/draw-lit-window.mjs`. Re-run it with Node,
+  passing the output folder and the sheet folder.
+- **Round 1 was discarded.** Navy towers on a navy ground disappeared, and the
+  window vanished at 32px.
+- **Round 2** uses black silhouettes against a dusk sky, a larger window with
+  a lamp glow, and towers that fill the icon:
+  - A2: one tower
+  - B2: a stepped art-deco skyscraper with a mast
+  - C2: three towers, only the near one lit
+  - E: B2 set off-centre against a far tower
+- **Tested:** each was rendered at 256, as a 180px iPhone icon, and at 64, 32
+  and 16px, on dark and light. The window reads down to 32px; at 16px it is
+  a warm dot. The sheet is `lit-window-round-2-sheet.png`.
+- **Next:** the owner picks one. Then refine it (proportions, optional
+  window mullions at large sizes), design the wordmark lockup, and swap the
+  icons in `build:art`.
