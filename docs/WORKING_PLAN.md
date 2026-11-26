@@ -199,6 +199,9 @@ Suggestions, highest value first:
   - Politician: Count + Ladder.
   - Founder: Runway + Raising.
   - Fewer taps for the same information.
+- [ ] **End-of-week pop-up overlap** (found 26 Nov 2026). In `WeekReview`, the
+      sticky "WEEK N CLOSED / RESULTS" header overlaps the content scrolling
+      under it. The header needs an opaque background and a z-index.
 - [ ] **Per-career Week hero art,** or no picture for careers without one. This
       bug is listed above; the images can come from `VISUALS.md`.
 

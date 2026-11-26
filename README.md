@@ -1,8 +1,45 @@
 # Earn Your Skyline
 
+<p align="center">
+  <img src="art-source/branding/lit-window-mark.svg" width="96" alt="The Earn Your Skyline mark: one lit window in a tower at dusk">
+</p>
+
+<p align="center">
+  <strong>A career sim for your phone. Start with almost nothing, and earn your place in the city one week at a time.</strong><br>
+  <em>In beta (v0.9.0-beta.1) · iPhone first, Android later</em>
+</p>
+
 ## Quick tour
 
-Earn Your Skyline is a browser game about managing a career one week at a time. Each profession has its own constraints, from ingredient spoilage as a chef to cash runway as a founder. The physician path is the most developed and is a good first run.
+Earn Your Skyline is a game about managing a career one week at a time. Each profession has its own constraints, from ingredient spoilage as a chef to cash runway as a founder. It is built phone-first: on an iPhone, open it in Safari and choose **Add to Home Screen** to install it like an app. The physician path is the most developed and is a good first run.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="25%">
+      <img src="docs/screenshots/phone-title.webp" alt="The title screen: the lit-window logo, the beta badge and the career cards" width="220"><br>
+      <sub><b>Pick a life.</b> Seven careers, each with its own way of going wrong.</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="docs/screenshots/phone-week-chef.webp" alt="A Chef's week: cash, debt and time left, and the week planner with dinner, lunch and prep booked" width="220"><br>
+      <sub><b>Plan the week.</b> Six blocks of time, and every one costs something.</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="docs/screenshots/phone-politician-postbag.webp" alt="The Politician's postbag: a constituency office at night above the polling figures" width="220"><br>
+      <sub><b>Every career is its own game.</b> The Politician's postbag and polls.</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="docs/screenshots/phone-event.webp" alt="A regulatory inspection event: inspectors reading records at a clinic desk, with two choices below" width="220"><br>
+      <sub><b>Things happen to you.</b> Events arrive with a choice and a cost.</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/desktop-week-founder.webp" alt="The Founder's week on a computer: the planner on the left, and the pinned commit button and observations on the right" width="760"><br>
+  <sub>It also runs on a computer: the Founder's week, with the commit button pinned while you plan.</sub>
+</p>
 
 The game uses TypeScript, Next.js and React. Start with [simulation logic](lib/game), [interface components](components), or [Playwright tests and fixtures](e2e). See [Verification](#verification) for command checks and seeded balance simulations.
 

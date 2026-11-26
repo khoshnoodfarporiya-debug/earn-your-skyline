@@ -600,3 +600,27 @@ colours, following `BRAND.md`.
   - type check, lint and engine checks pass
   - all seven careers screenshotted at iPhone size, with no console errors
   - the build passes and all 404 browser tests pass (7.7 minutes)
+
+### 26 Nov 2026 — Claude (Claude Code): README screenshots and portfolio photos
+- **README:** a header with the lit-window mark and tagline, plus a
+  Screenshots section near the top. It has four phone shots (title, a Chef's
+  week, the Politician's postbag, an event with its picture) and one desktop
+  shot (the Founder's week with the pinned commit). The images are in
+  `docs/screenshots/`, as WebP under 90KB each. **GitHub's front page shows
+  `main`'s README,** so they appear there only once `beta` is merged into
+  `main`.
+- **Portfolio (`../khoshwork-portfolio`):**
+  - [PR 36](https://github.com/khoshnoodfarporiya-debug/khoshwork-portfolio/pull/36)
+    re-captures the Earn Your Skyline case study from the beta and adds two
+    phone shots
+  - captions are updated in English and French
+  - placeholders are regenerated
+  - typecheck, lint and tests pass
+  - not merged, because merging publishes the live portfolio
+- **A trick for the portfolio's capture script:** its own Playwright has no
+  browser on this machine. Copy the script into this repo and run it with
+  this repo's Playwright, from inside the portfolio folder:
+  `node ../earn-your-skyline/cap.tmp.mjs earn-your-skyline`.
+- **A bug spotted (pre-existing, not fixed):** in the end-of-week pop-up
+  (`WeekReview`), the sticky "WEEK N CLOSED" header overlaps the content
+  scrolling under it. It is added to `WORKING_PLAN.md`.
