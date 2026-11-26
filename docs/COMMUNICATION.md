@@ -564,3 +564,17 @@ off-centre art-deco tower at dusk with one lit window.
   build pass, and all 404 browser tests pass (7.4 minutes).
 - **Still on the old palette:** the teal buttons and accents remain. That
   is step 3 of the design refresh (`WORKING_PLAN.md` section 8).
+
+### 26 Nov 2026 — Claude (Claude Code): beta pushed
+- `beta` was fast-forwarded to `feature/logo-lit-window` and pushed. That's 8
+  commits beyond `main`: the pinned commit button, the artwork, the victory
+  scenes, the beta and iPhone install, the brand brief and the new logo.
+- **The beta link** always serves the latest `beta`:
+  https://earn-your-skyline-git-beta-khoshnoodfarporiya-debugs-projects.vercel.app
+- **Workflow from here:**
+  - feature work on `feature/<name>`
+  - merge into `beta`, then push, and Vercel redeploys the link
+  - merge `beta` into `main` only when the owner ships
+- **On an iPhone:** open the link in Safari, then Share → Add to Home Screen.
+  If Vercel's deployment protection is on, the link asks for a Vercel login
+  first.
