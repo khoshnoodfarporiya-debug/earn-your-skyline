@@ -4,7 +4,12 @@ import type { CareerDef, RunState } from "@/lib/game/types";
 import type { Alert } from "@/lib/ui/alerts";
 import { med } from "@/lib/game/careers/doctor";
 import { cityOf } from "@/lib/game/medical/cities";
-import { PRACTICE_STAGES, practiceStageIndex, sectionVisual } from "@/lib/ui/visuals";
+import {
+  PRACTICE_STAGES,
+  careerVisual,
+  practiceStageIndex,
+  sectionVisual,
+} from "@/lib/ui/visuals";
 import { ArtFrame } from "../visuals/ArtFrame";
 
 /**
@@ -82,7 +87,18 @@ export function OverviewHero({
   return (
     <section aria-labelledby="overview-hero-title" className="form overflow-hidden">
       <ArtFrame
-        visual={sectionVisual("overview")}
+        /*
+         * Each career's own picture. This used to be the Physician's overview
+         * art for everyone, so a Chef or a Politician opened their week on a
+         * doctor in a white coat. Every career already has a cover (its
+         * career-select card), so that is the banner; the Physician keeps the
+         * practice overview it was drawn for.
+         */
+        visual={
+          career.id === "doctor"
+            ? sectionVisual("overview")
+            : (careerVisual(career.id) ?? sectionVisual("overview"))
+        }
         /*
          * A fixed height rather than a ratio. The ratio alone gave a 370px
          * hero on a wide screen, which pushed the week's controls off the

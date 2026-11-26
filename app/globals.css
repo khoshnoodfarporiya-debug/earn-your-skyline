@@ -153,6 +153,15 @@ body {
   border-bottom: 1px solid #1b2a40;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent);
 }
+/*
+ * A head that sticks while its panel scrolls (the end-of-week review, the
+ * retirement dialog, the glossary) needs a solid ground under the gradient,
+ * or the content scrolling beneath shows through it — "WEEK 57 CLOSED"
+ * printed over "Panel movement" (found Nov 2026). Same colour as `.form`.
+ */
+.form-head.sticky {
+  background-color: #122137;
+}
 
 /* A panel that needs to come forward — the selected thing, a dialog. */
 .form-high {

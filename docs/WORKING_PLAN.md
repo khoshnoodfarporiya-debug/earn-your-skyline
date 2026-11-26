@@ -4,16 +4,21 @@ Started 23 Nov 2026 on branch `docs/review-and-plan`. This is the live to-do
 list for the next stretch of work. Tick items off as they land; move anything
 abandoned to "Dropped" with a one-line reason instead of deleting it.
 
-## Where things stand (verified 23 Nov 2026)
+## Where things stand (verified 26 Nov 2026, release of 0.9.0-beta.1 to `main`)
 
 | Gate | Result |
 | --- | --- |
 | `npm run typecheck` | pass |
 | `npm run lint` | pass |
-| `npm run check` | pass, 2,067 checks |
+| `npm run check` | pass, 2,092 checks |
 | `npm run build` | pass |
-| `npm run e2e` | not run in this pass |
-| `npx tsx scripts/cities.ts 4` | 11 contract violations, all on the ambitious Chef |
+| `npm run e2e` | pass, 404 tests (phone and desktop) |
+| `npx tsx scripts/cities.ts 12` (what CI runs) | all balance contracts hold, for every career |
+
+The balance snapshot below is from 23 Nov and is kept as history. The current
+figures are in the Politician and Chef items under "Next up": the Politician
+wins 8–98% of runs depending on the seat, and the ambitious Chef reaches
+27–48% of its goal.
 
 The August audit's P1 code defects are all fixed:
 
@@ -199,11 +204,13 @@ Suggestions, highest value first:
   - Politician: Count + Ladder.
   - Founder: Runway + Raising.
   - Fewer taps for the same information.
-- [ ] **End-of-week pop-up overlap** (found 26 Nov 2026). In `WeekReview`, the
-      sticky "WEEK N CLOSED / RESULTS" header overlaps the content scrolling
-      under it. The header needs an opaque background and a z-index.
-- [ ] **Per-career Week hero art,** or no picture for careers without one. This
-      bug is listed above; the images can come from `VISUALS.md`.
+- [x] **End-of-week pop-up overlap** (found and fixed 26 Nov 2026). A
+      `.form-head` that is `sticky` now gets a solid background
+      (`app/globals.css`). This fixes `WeekReview`, `RetirementDialog` and the
+      glossary together.
+- [x] **Per-career Week hero art** (fixed 26 Nov 2026). `OverviewHero` uses each
+      career's own cover art (`careerVisual`); the Physician keeps its
+      overview picture.
 
 ### 6. Artwork
 

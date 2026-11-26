@@ -25,6 +25,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       "The first beta. You can add the game to your iPhone home screen and it opens full screen, like an app.",
       "A new logo: one lit window in a tower at dusk. Your place in the city.",
+      "Every career now opens its week on its own picture, not a doctor's.",
       "New colours: warm lamplight instead of hospital teal, and a quieter colour of its own for every career.",
       "Every Founder, Politician, Architect and Engineer event now has its own picture.",
       "Reach your career's goal and retire, and the end screen shows your career's own victory scene.",

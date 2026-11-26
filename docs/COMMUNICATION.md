@@ -150,11 +150,22 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- All 24 PNG masters from the three written batches in [`VISUALS.md`](VISUALS.md)
-  are in `art-source/visuals/`: six career milestone scenes, two screen
-  banners and sixteen event illustrations. Runtime conversion and wiring are
-  open. The current end screen shows on retirement, so choose the milestone
-  artwork's display trigger before wiring batch 1.
+- **`main` = `beta` = v0.9.0-beta.1, released 26 Nov 2026.** Everything below is
+  in `main`:
+  - the lit-window logo and lamplight palette
+  - the iPhone install (PWA), the version and "What's new", and feature flags
+  - the compact planner and the pinned desktop commit
+  - the 24 images: 16 event pictures and 2 screen banners wired in, plus the
+    6 victory scenes, shown only for a met goal
+  - per-career Week banners, and the pop-up header fix
+  - the Chef and Politician rebalances
+  - the README with screenshots, and the `LICENSE` (all rights reserved)
+- **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
+  (Codex's, unmerged). Every merged branch has been deleted.
+- **What's still open:** the brand design system (type and components), the
+  rest of the layout review, real login, payments, the App Store, Solicitor
+  and Engineer balance, and the Founder's gap between cities. See
+  `WORKING_PLAN.md`.
 
 - **`main`** has the codebase review, `WORKING_PLAN.md`, and the Politician
   fix where you only climb a rung by winning an election
@@ -628,3 +639,41 @@ colours, following `BRAND.md`.
   portfolio's `master`. Vercel's production deploy was still running at the
   time; check it finished. The previous live site stays up if the build
   fails.
+
+### 26 Nov 2026 — Claude (Claude Code): two bug fixes
+Branch `feature/week-banner-and-review-header`, in this repo. Both bugs were in
+the game, not the portfolio or the owner's other repos.
+
+- **Doctor picture on every career's Week screen:** `OverviewHero` always used
+  the Physician's `sectionVisual("overview")`. It now uses each career's cover
+  art (`careerVisual(career.id)`); the Physician keeps its overview picture.
+  Checked on the Chef, Politician and Engineer.
+- **The end-of-week pop-up's header overlapped content:** the sticky
+  `.form-head` had a near-transparent gradient as its background. A new
+  `.form-head.sticky` rule in `app/globals.css` gives it a solid background
+  (`#122137`). That also fixes the same pattern in `RetirementDialog` and the
+  glossary.
+- **Follow-up:** the portfolio's `week-desktop.webp` (merged in portfolio PR
+  36) still shows the old doctor banner on the Chef's week. Re-capture it once
+  this is on `beta`.
+- **Verified:** type check, lint and engine checks pass, and both fixes were
+  checked in the browser at iPhone size. The full browser suite result is
+  recorded below.
+
+### 26 Nov 2026 — Claude (Claude Code): release to main, license, README
+- **The owner chose "all rights reserved".** `LICENSE` is a proprietary
+  notice: the code is readable but not reusable; forking to propose changes
+  is allowed; there is no warranty. `package.json` has
+  `"license": "UNLICENSED"`. The copyright line names the repo owner's GitHub
+  account, not a legal name; the owner can change it.
+- **README:**
+  - new "How it works", "Getting started", "Project layout",
+    "Documentation" and "License" sections near the top
+  - the accent description updated to lamplight
+  - "Honest gaps" updated: the art is complete for the catalogue, plus the
+    beta's limits and the current balance gaps
+- **Stale docs fixed:** `docs/artwork-shot-list.md` is marked complete, and the
+  `WORKING_PLAN.md` status table now shows 2,092 checks, 404 browser tests
+  and every balance contract holding.
+- **Branches tidied:** every merged branch was deleted on GitHub after
+  confirming each is inside `main`.
