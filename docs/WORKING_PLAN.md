@@ -193,13 +193,15 @@ Suggestions, highest value first:
   - Compact rows with thumbnails on phones instead of full image cards.
   - Default to what is affordable now; locked items collapse into one "Saving
     toward" line.
-- [ ] **One status source.** Keep the sticky strip. Drop the duplicated figures
+- [x] **One status source.** Keep the sticky strip. Drop the duplicated figures
       from the hero, or shrink the hero to a slim title bar after week 1.
+      (Done with the Week screen build, section 8 step 5.)
 - [ ] **Collapse onboarding after first read** to a single line that reopens it,
       or move its content into the glossary.
-- [ ] **Merge alerts and the next step** into one compact list, one row each,
-      with the action button inline.
-- [ ] **Fix the forecast grid** so the tiles fill their row.
+- [x] **Merge alerts and the next step** into one compact list, one row each,
+      with the action button inline. (`NeedsYou`, section 8 step 5.)
+- [x] **Fix the forecast grid** so the tiles fill their row. (Columns follow
+      the tile count on desktop; an odd last tile spans both on a phone.)
 - [ ] **Merge thin tabs.**
   - Politician: Count + Ladder.
   - Founder: Runway + Raising.
@@ -444,9 +446,9 @@ screen at a time:
      - Inside panels the padding was already consistent (headers and rows
        line up), so it was left alone.
      - **New screens: wrap the panels in `<div className="stack">`.**
-4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
+4. [x] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
-   - **Drafted 26 Nov 2026, waiting on the owner:** a clickable canvas,
+   - **Agreed 26 Nov 2026** (the owner said "Build it"): a clickable canvas,
      "Skyline iPhone Week", on claude.ai (private to the owner; the link is
      in the session log). Physician, week 2, real figures from that save.
    - What it proposes, against today's Week screen (4.5 phone screens;
@@ -471,6 +473,32 @@ screen at a time:
      the onboarding weight.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,
    checking the browser suite each time.
+   - [x] **The Week screen** (branch `feature/week-screen`, 26 Nov 2026),
+     built from the prototype:
+     - **Header:** "Week N · City" under the career name, on every screen
+       (`Game.tsx`). The Physician's title stays in front of it.
+     - **Hero** (`OverviewHero`): picture, name and one line, 150px on a
+       phone (200px from `sm`). The Week / Based in / Practice facts and
+       the warning badge are gone.
+     - **Status strip:** Cash, Debt, Goal (with a small bar). Week and Time
+       left left it.
+     - **Needs you** (`components/overview/NeedsYou.tsx`): the top alerts
+       and the next step in one card, one row each, action inline. It
+       replaces `AlertStack` and `NextStep`, which are deleted. The
+       "N blocks still unassigned" step is not shown, because the commit
+       bar says it beside the button.
+     - **Forecast:** fills its row at any tile count.
+     - **Folded rows** (`components/ui/Fold.tsx`, native `<details>`): the
+       goal, the loan with its Pay button, recent weeks, Observations and
+       the case notes. Observations starts open from 1024px, where it sits
+       beside the week; the rest start closed everywhere.
+     - **Commit bar and the desktop commit card:** the week as dots.
+       The button labels are unchanged ("Commit week", "Assign time").
+     - **Result:** the Physician's week-2 Week screen on a 375px phone went
+       from 3,646px (4.5 screens) to 2,441px (3.0). The prototype's "about
+       2" was optimistic: the eight-action planner alone is about 870px.
+       Making the planner shorter is the next lever.
+   - [ ] The other screens, one at a time.
 
 ## Dropped
 

@@ -942,7 +942,7 @@ lib/ui/
 components/
   Game.tsx            shell only: routing, the week transaction, the header
   nav/                PrimaryNav (mobile bar / desktop rail), SectionNav
-  overview/           StatusStrip, AlertStack, NextStep, CommitBar, TrendCard
+  overview/           StatusStrip, NeedsYou, CommitBar, TrendCard
   phone/              Phone (dialog), PhoneShell, PulseApp, PostComposer,
                       MessagesApp, NewsApp, Avatar
   visuals/            ArtFrame (the shared image+scrim frame), PracticeEvolution,

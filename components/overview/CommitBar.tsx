@@ -9,6 +9,11 @@
  * two numbers needed to decide whether to press it. On desktop this is hidden,
  * and the Week screen pins its own commit card at the top of the right column
  * (see `Overview`).
+ *
+ * The time left is drawn as the week itself: one dot per block, lit while it
+ * is still free (iPhone Week prototype, Nov 2026). It used to be a number in
+ * the status strip at the top of the screen, far from the button that spends
+ * it.
  */
 export function CommitBar({
   spent,
@@ -34,9 +39,21 @@ export function CommitBar({
     >
       <div className="mx-auto flex max-w-6xl items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="sign text-[11.5px] text-ink-faint">
-            {remaining === 0 ? "Week planned" : `${remaining} of ${budget} free`}
-          </p>
+          <div className="flex items-center gap-2">
+            {budget > 0 && budget <= 12 && (
+              <span aria-hidden className="flex gap-[4px]">
+                {Array.from({ length: budget }, (_, i) => (
+                  <span
+                    key={i}
+                    className={`h-2 w-2 rounded-full ${i < remaining ? "bg-clinical" : "bg-rule"}`}
+                  />
+                ))}
+              </span>
+            )}
+            <p className="sign text-[11.5px] text-ink-faint">
+              {remaining === 0 ? "Week planned" : `${remaining} of ${budget} free`}
+            </p>
+          </div>
           {headline && (
             <p
               className={`num truncate text-[15px] font-semibold leading-tight ${

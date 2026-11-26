@@ -15,10 +15,14 @@ import { money } from "@/lib/game/format";
 export function TrendCard({
   history,
   treatedShare,
+  bare = false,
 }: {
   history: WeekSummary[];
   /** Share of last week's arrivals actually treated, if the career tracks it. */
   treatedShare?: number;
+  /** Inside the Week screen's folded "Recent weeks" row, which already
+      names it: no card and no heading of its own. */
+  bare?: boolean;
 }) {
   // Defensive: a save that predates weekly history should degrade to the
   // empty state rather than take the whole screen down with it.
@@ -26,10 +30,12 @@ export function TrendCard({
 
   if (recent.length < 2) {
     return (
-      <section className="form">
-        <h3 className="form-head sign px-4 py-2.5 text-[11.5px] text-ink-soft">
-          Recent weeks
-        </h3>
+      <section className={bare ? "" : "form"}>
+        {!bare && (
+          <h3 className="form-head sign px-4 py-2.5 text-[11.5px] text-ink-soft">
+            Recent weeks
+          </h3>
+        )}
         <p className="px-4 py-5 text-[14px] leading-relaxed text-ink-soft">
           Commit a few weeks and the trend in takings appears here.
         </p>
@@ -43,10 +49,12 @@ export function TrendCard({
   const delta = latest.net - previous.net;
 
   return (
-    <section className="form">
-      <h3 className="form-head sign px-4 py-2.5 text-[11.5px] text-ink-soft">
-        Recent weeks
-      </h3>
+    <section className={bare ? "" : "form"}>
+      {!bare && (
+        <h3 className="form-head sign px-4 py-2.5 text-[11.5px] text-ink-soft">
+          Recent weeks
+        </h3>
+      )}
 
       <div className="px-4 py-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
