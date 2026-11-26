@@ -624,3 +624,7 @@ colours, following `BRAND.md`.
 - **A bug spotted (pre-existing, not fixed):** in the end-of-week pop-up
   (`WeekReview`), the sticky "WEEK N CLOSED" header overlaps the content
   scrolling under it. It is added to `WORKING_PLAN.md`.
+- **Portfolio PR 36 merged** (owner's go-ahead) as `1c8a4ae` on the
+  portfolio's `master`. Vercel's production deploy was still running at the
+  time; check it finished. The previous live site stays up if the build
+  fails.
