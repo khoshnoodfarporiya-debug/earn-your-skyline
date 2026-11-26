@@ -301,6 +301,12 @@ export function Game({
   }
 
   const m = state.careerId === "doctor" ? med(state) : null;
+  /* The Physician can move cities, so read where the practice is now; every
+     other career stays where its run began. */
+  const homeCityName = m
+    ? cityOf(m.homeCity).name
+    : (career.startCities?.find((c) => c.id === state.startCity) ??
+        career.startCities?.[0])?.name;
   const activeSection = sectionOf(screen, state.careerId).id;
   /* The phone is career-aware now: any career that carries one gets the
      button, the badge and the handset. One without one gets nothing, which
@@ -360,7 +366,9 @@ export function Game({
       <header className="mb-3 flex items-center gap-3">
         <button
           onClick={onMenu}
-          className="flex min-h-[44px] items-center gap-2.5 rounded-form px-1 text-left transition hover:opacity-75"
+          /* `min-w-0` lets the name and the "Week · City" line truncate
+             instead of pushing the phone button off a 375px screen. */
+          className="flex min-h-[44px] min-w-0 items-center gap-2.5 rounded-form px-1 text-left transition hover:opacity-75"
         >
           <span className="text-clinical">
             <CareerIcon name={career.icon} className="h-7 w-7" />
@@ -369,11 +377,14 @@ export function Game({
             <span className="display block truncate text-[15px] leading-tight">
               {career.label}
             </span>
-            {m && (
-              <span className="num block truncate text-[12px] text-clinical">
-                {titleFor(m)}
-              </span>
-            )}
+            {/* Where and when, in one line under the name. The Week screen's
+                hero used to repeat both; this is now the one place they live,
+                and it is on every screen, not only the Week. */}
+            <span className="num block truncate text-[12px] text-ink-soft">
+              {m && <span className="text-clinical">{titleFor(m)} · </span>}
+              Week {state.week}
+              {homeCityName ? ` · ${homeCityName}` : ""}
+            </span>
           </span>
           <span className="sr-only">Back to career select</span>
         </button>

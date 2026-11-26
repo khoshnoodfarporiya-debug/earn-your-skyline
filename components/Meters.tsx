@@ -15,18 +15,23 @@ function tone(polarity: string, value: number, max: number) {
 export function Meters({
   career,
   state,
+  bare = false,
 }: {
   career: CareerDef;
   state: RunState;
+  /** Inside a fold that already says "Observations": no card, no heading. */
+  bare?: boolean;
 }) {
   const meters = career.resources.filter((r) => r.display === "meter");
   const stats = career.resources.filter((r) => r.display === "stat");
 
   return (
-    <div className="form">
-      <h3 className="form-head sign px-5 py-2.5 text-[11.5px] text-ink-soft">
-        Observations
-      </h3>
+    <div className={bare ? "" : "form"}>
+      {!bare && (
+        <h3 className="form-head sign px-5 py-2.5 text-[11.5px] text-ink-soft">
+          Observations
+        </h3>
+      )}
 
       <div className="divide-y divide-rule-soft">
         {meters.map((def) => {

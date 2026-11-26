@@ -111,6 +111,37 @@ Balance snapshot (4 seeds, 120 weeks, so treat this as a signal, not a verdict):
 - [ ] Look into the Founder's gap between cities (Berlin 100%, London 0%)
 - [ ] Rerun at 40+ seeds before calling anything fixed
 
+### 1b. Bugs
+- [x] **The phone's news repeated itself** (branch `fix/news-repeats`, merged into
+      local `beta` 26 Nov 2026, pushed).
+      A beta save showed The Pass's sous chef survey at weeks 4, 5 and 6, each
+      with a body that was its own headline again.
+  - Cause: filler stories were drawn blind from a pool of three each week
+    (45% chance), and the Chef's headline was the body cut at 60 characters.
+    The Founder, Politician, Architect and Engineer phones (`voicePack.ts`,
+    40%, pools of three) and the Physician's rival and regulator items had the
+    same blind draw
+  - Fix: `lib/game/phone/freshNews.ts`. A filler story is not re-run while it
+    ran in the last 10 weeks (`NEWS_REPEAT_WEEKS`) or is still the newest
+    item; if the whole pool is excluded, nothing is posted. No new save field:
+    the news list is the record. The phone streams draw the same numbers as
+    before
+  - The Chef's stories now have a short headline and a body that adds to it,
+    and the pools grew: six trade stories (was three) and two about a famous
+    kitchen (was one)
+  - Not changed: stories that report a real event (a critic's review, a
+    rival's move, a verdict, an outbreak) come back when the event does. The
+    check holds them to "never twice in a row"
+  - 9 new engine checks, including a 156-week Chef run on three seeds and
+    every other career on two
+- [ ] The next release's "What's new" should say the phone's news no longer
+      repeats the same story (not added on the fix branch, to leave the
+      version bump to the release)
+- [ ] The Physician's world news (`lib/game/news.ts`, `state.news`) can also
+      re-run its two always-available stories, but each one applies a real
+      effect (a contract boost), so de-duplicating it would change balance.
+      Left alone; worth a design look
+
 ### 2. Human playtest
 - [ ] Play one full run of each career to week 52, with notes on boring or confusing weeks
 - [ ] Get 3–5 outside players for a first session, and record where they get stuck
@@ -193,13 +224,15 @@ Suggestions, highest value first:
   - Compact rows with thumbnails on phones instead of full image cards.
   - Default to what is affordable now; locked items collapse into one "Saving
     toward" line.
-- [ ] **One status source.** Keep the sticky strip. Drop the duplicated figures
+- [x] **One status source.** Keep the sticky strip. Drop the duplicated figures
       from the hero, or shrink the hero to a slim title bar after week 1.
+      (Done with the Week screen build, section 8 step 5.)
 - [ ] **Collapse onboarding after first read** to a single line that reopens it,
       or move its content into the glossary.
-- [ ] **Merge alerts and the next step** into one compact list, one row each,
-      with the action button inline.
-- [ ] **Fix the forecast grid** so the tiles fill their row.
+- [x] **Merge alerts and the next step** into one compact list, one row each,
+      with the action button inline. (`NeedsYou`, section 8 step 5.)
+- [x] **Fix the forecast grid** so the tiles fill their row. (Columns follow
+      the tile count on desktop; an odd last tile spans both on a phone.)
 - [ ] **Merge thin tabs.**
   - Politician: Count + Ladder.
   - Founder: Runway + Raising.
@@ -444,10 +477,59 @@ screen at a time:
      - Inside panels the padding was already consistent (headers and rows
        line up), so it was left alone.
      - **New screens: wrap the panels in `<div className="stack">`.**
-4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
+4. [x] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
+   - **Agreed 26 Nov 2026** (the owner said "Build it"): a clickable canvas,
+     "Skyline iPhone Week", on claude.ai (private to the owner; the link is
+     in the session log). Physician, week 2, real figures from that save.
+   - What it proposes, against today's Week screen (4.5 phone screens;
+     the proposal is about 2, with the decision in the first):
+     - **One status source.** The hero stops repeating Week, Based in and
+       Practice; week and city go in the top bar, Time left becomes dots in
+       the commit bar, and the strip keeps Cash, Debt and Goal.
+     - **A shorter hero:** picture, practice name, one line (about 150px,
+       was about 330px).
+     - **"Needs you"** merges the alerts and the next step into one list,
+       one row each, action inline. The next step hides itself once a
+       block is assigned.
+     - **Your week** follows at once: quick-plan pills, then the actions
+       with 44px steppers.
+     - **"If you commit"** is a 2×2 grid that fills its row.
+     - **Folded rows** for the goal's paragraph, the loan, recent weeks,
+       how you are, and case notes.
+     - **The commit bar** shows the week as dots and names what the button
+       will do ("Commit · 2 unused").
+   - This covers four open items from section 5: one status source, merge
+     alerts and the next step, the forecast grid, and (by folding) much of
+     the onboarding weight.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,
    checking the browser suite each time.
+   - [x] **The Week screen** (branch `feature/week-screen`, 26 Nov 2026),
+     built from the prototype:
+     - **Header:** "Week N · City" under the career name, on every screen
+       (`Game.tsx`). The Physician's title stays in front of it.
+     - **Hero** (`OverviewHero`): picture, name and one line, 150px on a
+       phone (200px from `sm`). The Week / Based in / Practice facts and
+       the warning badge are gone.
+     - **Status strip:** Cash, Debt, Goal (with a small bar). Week and Time
+       left left it.
+     - **Needs you** (`components/overview/NeedsYou.tsx`): the top alerts
+       and the next step in one card, one row each, action inline. It
+       replaces `AlertStack` and `NextStep`, which are deleted. The
+       "N blocks still unassigned" step is not shown, because the commit
+       bar says it beside the button.
+     - **Forecast:** fills its row at any tile count.
+     - **Folded rows** (`components/ui/Fold.tsx`, native `<details>`): the
+       goal, the loan with its Pay button, recent weeks, Observations and
+       the case notes. Observations starts open from 1024px, where it sits
+       beside the week; the rest start closed everywhere.
+     - **Commit bar and the desktop commit card:** the week as dots.
+       The button labels are unchanged ("Commit week", "Assign time").
+     - **Result:** the Physician's week-2 Week screen on a 375px phone went
+       from 3,646px (4.5 screens) to 2,441px (3.0). The prototype's "about
+       2" was optimistic: the eight-action planner alone is about 870px.
+       Making the planner shorter is the next lever.
+   - [ ] The other screens, one at a time.
 
 ## Dropped
 

@@ -9,9 +9,9 @@ import { money } from "@/lib/game/format";
 import { med } from "@/lib/game/careers/doctor";
 import { ActionBoard } from "../ActionBoard";
 import { Meters } from "../Meters";
-import { AlertStack } from "./AlertStack";
 import { topAlerts } from "@/lib/ui/alerts";
-import { NextStep } from "./NextStep";
+import { NeedsYou } from "./NeedsYou";
+import { Fold } from "../ui/Fold";
 import { StatusStrip } from "./StatusStrip";
 import { OverviewHero } from "./OverviewHero";
 import { QuickPlan } from "./QuickPlan";
@@ -35,6 +35,18 @@ const LOG_HEADING: Record<string, string> = {
   doctor: "Case notes",
   chef: "The service book",
   lawyer: "Attendance notes",
+};
+
+/* The forecast fills its row on a wide screen whatever the career sends: a
+   fixed four columns left a 5-tile forecast with three empty cells. On a
+   phone it is two columns, and an odd last tile spans both. */
+const LG_COLS: Record<number, string> = {
+  1: "lg:grid-cols-1",
+  2: "lg:grid-cols-2",
+  3: "lg:grid-cols-3",
+  4: "lg:grid-cols-4",
+  5: "lg:grid-cols-5",
+  6: "lg:grid-cols-3",
 };
 
 export function Overview({
@@ -71,6 +83,10 @@ export function Overview({
 }) {
   const objective = career.objective(state);
   const score = career.scoreboard(state);
+  const meterDef = career.resources.find((r) => r.display === "meter");
+  const firstMeter = meterDef
+    ? `${meterDef.label} ${Math.round(state.r[meterDef.id] ?? 0)}`
+    : undefined;
   const m = state.careerId === "doctor" ? med(state) : null;
   /**
    * One figure for the sticky bar. A warning outranks everything — if the
@@ -95,19 +111,21 @@ export function Overview({
 
   return (
     /*
-     * The reading order is the decision order: who and where you are, the four
-     * numbers that constrain the week, what to do about it, then the week
-     * itself. Secondary history and observations sit below the fold on the
-     * right, where they inform without competing.
+     * The reading order is the decision order: what you have built, the three
+     * numbers that constrain the week, what needs you, then the week itself
+     * and what committing it will do. The goal's paragraph, the loan and the
+     * recent weeks fold into one card of rows below it (iPhone Week
+     * prototype, Nov 2026): on a phone the screen went from about 4.5 screens
+     * to about 2, and the plan starts on the first one.
      *
      * Spacing carries the grouping rather than borders — `space-y-5` between
      * major blocks, tighter inside them — which is what lets the nested card
      * outlines come out.
      */
     <div className="stack">
-      <OverviewHero career={career} state={state} alerts={alerts} />
+      <OverviewHero career={career} state={state} />
 
-      <StatusStrip state={state} spent={spent} budget={budget} />
+      <StatusStrip state={state} goal={objective.progress} />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <div className="min-w-0 stack">
@@ -116,46 +134,13 @@ export function Overview({
               `topAlerts`. Inside the left column rather than above the grid,
               so the pinned commit card beside it starts level with them
               instead of a screen further down. */}
-          <AlertStack
+          <NeedsYou
             alerts={topAlerts(alerts)}
             remaining={Math.max(0, alerts.length - topAlerts(alerts).length)}
+            step={step}
             onNavigate={onNavigate}
+            onDismissStep={onDismissStep}
           />
-
-          {step && (
-            <NextStep
-              step={step}
-              onDismiss={onDismissStep}
-              onNavigate={onNavigate}
-            />
-          )}
-
-          {/* -------------------------------------------------- objective */}
-          <section className="form p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <h2 className="sign text-[11.5px] text-ink-faint">Objective</h2>
-              <span className="num text-[13px] font-semibold text-clinical">
-                {Math.round(objective.progress * 100)}%
-              </span>
-            </div>
-            <p className="mt-1.5 text-[14.5px] leading-relaxed text-ink">
-              {objective.text}
-            </p>
-            <div
-              className="gauge mt-2.5"
-              style={{
-                ["--fill" as string]: `${Math.max(0, Math.min(1, objective.progress)) * 100}%`,
-              }}
-              role="progressbar"
-              aria-label="Objective progress"
-              aria-valuenow={Math.round(objective.progress * 100)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            />
-            <p className="num mt-2 text-[12px] text-ink-faint">
-              {score.label} {score.value} · {score.sub}
-            </p>
-          </section>
 
           {/* ------------------------------------------------- the week */}
           <section className="form overflow-hidden">
@@ -189,11 +174,11 @@ export function Overview({
              * forecast into a spreadsheet; the numbers separate perfectly
              * well on background alone.
              */}
-            <div className="grid grid-cols-2 gap-px bg-rule-soft lg:grid-cols-4">
+            <div className={`grid grid-cols-2 gap-px bg-rule-soft ${LG_COLS[briefing.length] ?? "lg:grid-cols-3"}`}>
               {briefing.map((b) => (
                 <div
                   key={b.label}
-                  className={`px-4 py-3.5 ${
+                  className={`px-4 py-3.5 odd:last:col-span-2 lg:odd:last:col-span-1 ${
                     b.tone === "bad"
                       ? "bg-alarm-tint"
                       : b.tone === "good"
@@ -226,33 +211,58 @@ export function Overview({
                 top of the right column (below), on mobile in the CommitBar. */}
           </section>
 
-          {/* ------------------------------------------------------- debt */}
-          {state.r.debt > 0 && (
-            <section className="form flex flex-wrap items-center justify-between gap-3 p-4">
-              <div className="min-w-0">
-                <h2 className="text-[14px] font-semibold text-ink">
-                  {/* The career's own word for what it owes. Hardcoding
-                      "Student debt" put a Physician's loan on a Chef's
-                      overview, where it is a fit-out loan and nothing to do
-                      with medical school. */}
-                  {career.resources.find((r) => r.id === "debt")?.label ??
-                    "Outstanding loan"}
-                </h2>
-                <p className="num mt-0.5 text-[13px] text-ink-soft">
-                  {money(state.r.debt)} outstanding
-                </p>
-              </div>
-              <button
-                onClick={onPayLoan}
-                disabled={state.r.cash < 1_000}
-                className="btn btn-secondary shrink-0"
-              >
-                Pay {money(Math.min(10_000, state.r.debt, state.r.cash))}
-              </button>
-            </section>
-          )}
+          {/* ------------------------------------------------ more, folded */}
+          <section aria-label="More this week" className="form overflow-hidden">
+            <Fold label="The goal" hint={`${Math.round(objective.progress * 100)}%`} hintClass="text-clinical">
+              <p className="text-[14.5px] leading-relaxed text-ink">
+                {objective.text}
+              </p>
+              <div
+                className="gauge mt-2.5"
+                style={{
+                  ["--fill" as string]: `${Math.max(0, Math.min(1, objective.progress)) * 100}%`,
+                }}
+                role="progressbar"
+                aria-label="Objective progress"
+                aria-valuenow={Math.round(objective.progress * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              />
+              <p className="num mt-2 text-[12px] text-ink-faint">
+                {score.label} {score.value} · {score.sub}
+              </p>
+            </Fold>
 
-          <TrendCard history={state.history} treatedShare={treatedShare} />
+            {state.r.debt > 0 && (
+              <Fold
+                /* The career's own word for what it owes: a Chef's is a
+                   fit-out loan, not student debt. */
+                label={
+                  career.resources.find((r) => r.id === "debt")?.label ??
+                  "Outstanding loan"
+                }
+                hint={money(state.r.debt)}
+              >
+                <p className="num text-[13.5px] text-ink-soft">
+                  {money(state.r.debt)} outstanding. Paying it down early
+                  saves interest and moves the goal.
+                </p>
+                <button
+                  onClick={onPayLoan}
+                  disabled={state.r.cash < 1_000}
+                  className="btn btn-secondary mt-3"
+                >
+                  Pay {money(Math.min(10_000, state.r.debt, state.r.cash))}
+                </button>
+              </Fold>
+            )}
+
+            <Fold label="Recent weeks">
+              <div className="-mx-4 -mb-4">
+                <TrendCard history={state.history} treatedShare={treatedShare} bare />
+              </div>
+            </Fold>
+          </section>
         </div>
 
         {/* ------------------------------------------------ supporting
@@ -277,7 +287,19 @@ export function Overview({
             className="form hidden p-3 lg:block"
           >
             <div className="mb-2.5 flex items-baseline justify-between gap-3 px-1">
-              <p className="sign text-[11.5px] text-ink-faint">
+              <p className="sign flex items-center gap-2 text-[11.5px] text-ink-faint">
+                {/* The week as dots, lit while a block is still free — the
+                    same picture as the phone's commit bar. */}
+                {budget > 0 && budget <= 12 && (
+                  <span aria-hidden className="flex gap-[4px]">
+                    {Array.from({ length: budget }, (_, i) => (
+                      <span
+                        key={i}
+                        className={`h-2 w-2 rounded-full ${i < budget - spent ? "bg-clinical" : "bg-rule"}`}
+                      />
+                    ))}
+                  </span>
+                )}
                 {budget - spent === 0
                   ? "Week planned"
                   : `${budget - spent} of ${budget} blocks free`}
@@ -310,7 +332,16 @@ export function Overview({
             </button>
           </section>
 
-          <Meters career={career} state={state} />
+          {/* Folded on a phone, where it was 670px between the week and the
+              rest; open from 1024px, where it sits beside the week. The
+              closed row still names the first meter and its value. */}
+          <section className="form overflow-hidden">
+            <Fold label="Observations" hint={firstMeter} openOnDesktop>
+              <div className="-mx-4 -mb-4">
+                <Meters career={career} state={state} bare />
+              </div>
+            </Fold>
+          </section>
 
           {m && (
             <section className="form">
@@ -340,15 +371,14 @@ export function Overview({
             </section>
           )}
 
-          <section className="form">
-            <h2 className="form-head sign px-4 py-2.5 text-[11.5px] text-ink-soft">
-              {/* What this career calls its own running record. "Case notes"
-                  is what a doctor keeps; a kitchen keeps a service book and a
-                  firm keeps attendance notes. The default is deliberately
-                  plain so a career added later reads sensibly without needing
-                  an entry here. */}
-              {LOG_HEADING[state.careerId] ?? "What has happened"}
-            </h2>
+          {/* Folded like the rows beside the week: a long record that is
+              there when wanted. The newest entry's week is on the closed row. */}
+          <section className="form overflow-hidden">
+            <Fold
+              label={LOG_HEADING[state.careerId] ?? "What has happened"}
+              hint={state.log[0] ? `Week ${state.log[0].week}` : undefined}
+            >
+            <div className="-mx-4 -mb-4">
             {state.log.length === 0 ? (
               <p className="px-4 py-4 text-[14px] text-ink-soft">
                 Nothing has happened yet.
@@ -376,6 +406,8 @@ export function Overview({
                 ))}
               </ol>
             )}
+            </div>
+            </Fold>
           </section>
         </div>
       </div>

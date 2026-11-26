@@ -150,7 +150,10 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`main` = `beta` = v0.9.0-beta.2, released 26 Nov 2026.** Everything
+- **`beta` is ahead of `main`** with v0.9.0-beta.3, not yet released: the
+  new Week screen (session-log entry "the Week screen, built") and the
+  phone-news repeat fix.
+- **`main` = v0.9.0-beta.2, released 26 Nov 2026.** Everything
   below is in `main`:
   - the redesign's design system: Fraunces and Inter, one button system,
     underlined tabs and pill choices, one spacing rhythm, and the 375px
@@ -166,6 +169,10 @@ touched. Run the browser tests when you change a screen.
   - the README with screenshots, and the `LICENSE` (all rights reserved)
 - **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
   (Codex's, unmerged). Every merged branch has been deleted.
+- **`fix/news-repeats`**, merged into local `beta` (fast-forward) on the
+  owner's word and pushed, 26 Nov 2026: the phone's news no longer runs the
+  same filler story week after week, and the Chef's stories have real
+  headlines and bodies. See `WORKING_PLAN.md` section 1b.
 - **What's still open:** WORKING_PLAN section 8 steps 4–5 (prototype the
   iPhone Week screen, then roll screens out one by one), the
   rest of the layout review, real login, payments, the App Store, Solicitor
@@ -796,4 +803,109 @@ The owner said "Release to main".
   Mono); it now describes Fraunces and Inter, the three control shapes and
   `.stack`. The beta badge says v0.9.0-beta.2.
 - Released by a pull request from `beta` into `main`, as with beta.1.
-  Its number and the deploy result are recorded below.
+  The owner said "Merge it" once CI was green.
+- **[PR 9](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/9)**
+  merged 26 Nov 2026 with a merge commit (`c1f0c37`), after all four checks
+  passed: `verify`, `balance`, Vercel and Vercel Preview Comments. Local
+  `main` and `beta` were then brought level with it. Auto-merge was tried
+  first and blocked by the app's permission check, so the merge waited for
+  the owner's word.
+- Production (earn-your-skyline.vercel.app) rebuilds from `main`; this note
+  is on `beta` and reaches `main` with the next release.
+
+### 26 Nov 2026 — Claude (Claude Code): iPhone Week prototype
+
+The owner said "start" after the release: the next step in
+`WORKING_PLAN.md` section 8 is step 4, prototype the iPhone Week screen and
+agree it before touching code.
+
+- **Canvas:** "Skyline iPhone Week",
+  https://claude.ai/artifact/5YjF1qPsLMN98GToyLBdZZ (private to the owner
+  until they share it). One clickable 390×844 phone with its own scrolling,
+  plus a note listing every change and how to try it.
+- **Built from the real screen:** Physician, week 2 of the owner's save in
+  the local game; the eight actions, the alert, the next step, the forecast
+  labels and the folded text are the game's own words. The forecast moves
+  as you plan, using effect values the game shows where it shows them and
+  plain guesses elsewhere; the canvas says the figures are illustrative.
+- **What it proposes** is listed in `WORKING_PLAN.md` section 8, step 4.
+- **No game code changed.** Step 5 (building it) waits for the owner's
+  go-ahead or changes.
+
+### 26 Nov 2026 — Claude (Claude Code): the phone's news repeated itself
+
+Branch `fix/news-repeats`, off `beta`, in its own worktree (another session
+was building the Week screen in the main checkout). The owner said "merge
+it": `beta` was fast-forwarded to it locally, without a checkout, and then
+pushed on the owner's word ("Push beta").
+
+- **The bug:** a Chef save at week 8 showed The Pass's "half the city's
+  kitchens are a sous chef short" at weeks 4, 5 and 6, and each body was the
+  headline again.
+- **Why:** `generateChefWeek` drew a filler story blind from three each week
+  (45%), so a rerun the next week was likely. Its headline was the body cut
+  at 60 characters. The four voice-pack phones (Founder, Politician,
+  Architect, Engineer) drew blind from three too, and the Physician's rival
+  and regulator items could run week after week. The Solicitor's news only
+  reports real events, so it had no filler to fix.
+- **The fix:** `lib/game/phone/freshNews.ts`, used by all three phones. A
+  filler story is skipped while it ran in the last 10 weeks or is still the
+  newest item; if every story is skipped, that week has no filler. It reads
+  the phone's own news list, so there's no new save field, and each phone
+  stream draws the same numbers as before, so nothing else in the week moves.
+  The Chef's stories are now headline-plus-body pairs, six trade stories and
+  two for a famous kitchen.
+- **Left alone on purpose:** stories about real events (critic reviews,
+  rival moves, verdicts, outbreaks) can come back when the event does. The
+  Physician's world news (`lib/game/news.ts`) can re-run its two
+  always-available stories, but each applies a real effect, so changing it
+  would move balance. Noted in `WORKING_PLAN.md` section 1b.
+- **Engine checks:** 9 new (2,101 in all). A 156-week Chef run on three seeds
+  (one kept famous for the food pages) never shows a headline twice in a row
+  or a filler story twice within 10 weeks, and no body repeats its headline.
+  Every other career, two seeds by 120 weeks, holds the same rule. With the
+  old phone code put back, the Chef check fails ("Where to eat after
+  midnight in Lyon" at weeks 1 and 3).
+- **Verified:** type check, lint and `npm run check` pass, and the phone,
+  news and Chef browser tests pass (`npx playwright test -g
+  "phone|news|chef|Chef"`, 65 tests, mobile and desktop, 1.8 minutes).
+  Not run: the full browser suite and the build.
+- **A trap for worktrees:** Turbopack won't start with `node_modules` as a
+  junction to another folder ("Symlink … points out of the filesystem
+  root"). Copy `node_modules` into the worktree instead. Port 3500 was taken
+  by the main checkout's server, so the browser tests ran on 3510 through a
+  temporary, uncommitted Playwright config.
+- **Left:** the next release's "What's new" line (the version bump is the
+  release's), and the Physician world-news question above.
+
+### 26 Nov 2026 — Claude (Claude Code): the Week screen, built
+
+Branch `feature/week-screen`, merged into `beta` and pushed. The owner said
+"Build it" to the iPhone Week prototype.
+
+- **What changed** is listed in `WORKING_PLAN.md` section 8, step 5. In
+  short: week and city in the header, a 150px hero, a Cash/Debt/Goal strip,
+  one "Needs you" card (new `NeedsYou`; `AlertStack` and `NextStep`
+  deleted), folded rows (new `components/ui/Fold.tsx`), and the week as
+  dots on the commit bar and the desktop commit card.
+- **Result:** Physician week 2 on a 375px phone, 3,646px to 2,441px (4.5 to
+  3.0 screens). The prototype promised about 2; the planner itself is
+  about 870px, so shortening it is the next lever.
+- **A bug the tests caught:** the header's longer line pushed the phone
+  button's unread badge 4px off a 375px screen when insolvent. The header
+  button now has `min-w-0` so the text truncates.
+- **Tests changed, not weakened:** `readWeek` reads "Week N" from the
+  header; a new `openFold` helper taps a folded row open before reading
+  Observations or the case log; the alerts keep their "Needs attention"
+  region. That region had gone missing in the first build, which also
+  made "every guidance destination is a screen that exists" pass by
+  returning early. It runs properly again.
+- **Version 0.9.0-beta.3:** a "What's new" entry for the Week screen, the
+  header line, and the phone-news fix from the other session, which had
+  left that line to the next release. `package.json`, the lock file and
+  the README badge match.
+- Merged `origin/beta` (the news fix) into the branch before the final
+  run, so the suite tested both together.
+- **Verified** on the merged code: type check, lint and engine checks
+  pass, and all 404 browser tests pass. In the browser: the Week screen
+  at 375px (no overflow) and at 1280px.

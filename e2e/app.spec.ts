@@ -77,13 +77,32 @@ async function preload(page: Page, fixture: string) {
  * from storage, so these tests fail if the display stops tracking the run.
  */
 async function readWeek(page: Page): Promise<number> {
+  /* The game header's second line, "Week 12 · Lyon", on every screen. The
+     week used to be a cell of the Week screen's status strip; the iPhone
+     Week redesign (Nov 2026) moved it here so it is said once. */
   const label = await page
-    .locator('dd[aria-label^="Week:"]')
+    .locator("header")
+    .filter({ hasText: /Week \d+/ })
     .first()
-    .getAttribute("aria-label");
-  const hit = label?.match(/Week:\s*(\d+)/);
+    .textContent();
+  const hit = label?.match(/Week (\d+)/);
   if (!hit) throw new Error(`could not read the week from "${label}"`);
   return Number(hit[1]);
+}
+
+/**
+ * Open one of the Week screen's folded rows (a native <details>) the way a
+ * player would, by tapping its row — unless it is already open, as
+ * Observations is from 1024px.
+ */
+async function openFold(page: Page, label: RegExp) {
+  const fold = page
+    .getByRole("main")
+    .locator("details", { has: page.locator("summary", { hasText: label }) })
+    .first();
+  if ((await fold.getAttribute("open")) === null) {
+    await fold.locator("summary").click();
+  }
 }
 
 /**
@@ -2585,6 +2604,8 @@ test.describe("teaching and vocabulary", () => {
     await page.goto("/");
     await page.getByRole("button", { name: /continue your run/i }).click();
 
+    /* The stats are in the Observations row, folded on a phone. */
+    await openFold(page, /^Observations/);
     const overview = await page.getByRole("main").innerText();
     expect(overview).toMatch(/active patients/i);
     /* "CPD points" as a bare label is gone; the term survives in the hint. */
@@ -6831,7 +6852,9 @@ test.describe("a solicitor's crisis", () => {
       "a choice already taken is not offered again",
     ).toHaveCount(0);
 
-    /* And the run recorded what happened, in the career's own log. */
+    /* And the run recorded what happened, in the career's own log — a
+       folded row on the Week screen since the iPhone Week redesign. */
+    await openFold(page, /^Attendance notes/);
     await expect(
       page.getByText(/including the things they had not asked for/i).first(),
     ).toBeVisible();
