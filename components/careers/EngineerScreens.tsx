@@ -389,7 +389,7 @@ function BenchScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("recallProduct", p.id)}
-                      className="rounded border border-rule-soft px-2.5 py-1 text-caution hover:border-alarm hover:text-alarm"
+                      className="btn btn-sm btn-quiet btn-danger text-caution"
                     >
                       Recall it · {money(recallCost(w, p))}
                     </button>

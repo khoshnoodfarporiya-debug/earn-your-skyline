@@ -155,7 +155,7 @@ export function PurchaseShelf({
         <div
           role="tablist"
           aria-label={`${title ?? "Purchase"} categories`}
-          className="scroll-thin flex gap-1 overflow-x-auto border-b border-rule px-4 py-2.5"
+          className="tab-row px-3"
         >
           {shown.map((g) => (
             <button
@@ -163,11 +163,7 @@ export function PurchaseShelf({
               role="tab"
               aria-selected={g.id === active.id}
               onClick={() => setTab(g.id)}
-              className={`sign flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-form border px-3.5 text-[11.5px] transition ${
-                g.id === active.id
-                  ? "border-clinical/60 bg-clinical-tint text-clinical"
-                  : "border-rule bg-card text-ink-soft hover:border-clinical/40 hover:text-ink"
-              }`}
+              className={`tab shrink-0 gap-1.5 ${g.id === active.id ? "is-on" : ""}`}
             >
               <MedIcon name={g.icon} className="h-4 w-4" />
               {g.label}

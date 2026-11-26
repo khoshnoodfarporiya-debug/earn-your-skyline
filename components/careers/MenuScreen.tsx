@@ -256,7 +256,7 @@ export function MenuScreen({
                     <button
                       type="button"
                       onClick={() => onCommand("dropDish", entry.recipe)}
-                      className="rounded border border-rule-soft px-2 py-1 text-ink-faint transition hover:border-alarm hover:text-alarm"
+                      className="btn btn-xs btn-quiet btn-danger"
                     >
                       Take it off
                     </button>
@@ -314,7 +314,7 @@ function PriceButton({
     <button
       type="button"
       onClick={onClick}
-      className="rounded border border-rule px-2 py-1 text-ink transition hover:border-chef"
+      className="btn btn-xs btn-secondary"
     >
       <span aria-hidden>{label}</span>
       <span className="sr-only">{title}</span>
@@ -405,7 +405,7 @@ function RecipeRow({
           <button
             type="button"
             onClick={() => onCommand("addDish", recipe.id)}
-            className="rounded border border-rule px-2.5 py-1 text-ink transition hover:border-chef"
+            className="btn btn-sm btn-secondary"
           >
             Put it on
           </button>
@@ -461,7 +461,7 @@ function RenameControl({
         const next = window.prompt("Call this dish:", current);
         if (next !== null) onRename(next);
       }}
-      className="rounded border border-rule-soft px-2.5 py-1 text-ink-faint transition hover:border-chef hover:text-ink"
+      className="btn btn-sm btn-quiet"
     >
       Rename
     </button>

@@ -177,7 +177,7 @@ function PracticePanel({
                   <button
                     type="button"
                     onClick={() => onCommand("takeCase", o.id)}
-                    className="shrink-0 rounded border border-rule px-2.5 py-1 text-ink hover:border-clinical"
+                    className="btn btn-sm btn-secondary shrink-0"
                   >
                     Accept
                   </button>

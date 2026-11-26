@@ -271,7 +271,7 @@ export function BrigadePanel({
                       <button
                         type="button"
                         onClick={() => onCommand("promoteStaff", person.id)}
-                        className="rounded border border-chef/60 px-2.5 py-1 text-chef transition hover:bg-chef-tint"
+                        className="btn btn-sm btn-secondary"
                       >
                         Make them {up.label.toLowerCase()}
                       </button>

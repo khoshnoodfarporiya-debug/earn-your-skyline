@@ -166,8 +166,8 @@ touched. Run the browser tests when you change a screen.
   - the README with screenshots, and the `LICENSE` (all rights reserved)
 - **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
   (Codex's, unmerged). Every merged branch has been deleted.
-- **What's still open:** the rest of the design system (spacing, the status
-  strip, the Life category tabs and about 110 one-off buttons), the
+- **What's still open:** the rest of the design system (a spacing pass, and
+  a look at the ~65 buttons that keep their own shape on purpose), the
   rest of the layout review, real login, payments, the App Store, Solicitor
   and Engineer balance, and the Founder's gap between cities. See
   `WORKING_PLAN.md`.
@@ -739,3 +739,27 @@ to carry on the redesign and make the game easier to understand.
   CRLF (`scripts/commands.ts`, `lib/game/careers/chef.ts`) need that flag;
   stage everything else with a plain `git add`,** and check
   `git diff --cached --stat` before committing.
+
+### 26 Nov 2026 — Claude (Claude Code): buttons and tabs, second pass
+
+Branch `feature/components-2`, merged into `beta` and pushed. The owner said
+to carry on.
+
+- **45 more buttons**, picked by hand from a list of every button not yet
+  on the shared classes: 41 plain actions to `.btn`, 3 toggles to
+  `.choice` (target a bloc, assign staff to a contract, compare a market).
+- **Life category tabs** are now `.tab` with their icons, like the section
+  and glossary tabs.
+- **Status strip:** "Time left" shows the week as dots, lit for each free
+  block.
+- **131 of 196 buttons** use the shared classes. The ~65 left keep their own
+  shape on purpose (whole-card rows, map pins, header icon buttons, the
+  bottom nav, the plan stepper, text links). `WORKING_PLAN.md` section 8,
+  step 3 lists them. Spacing is the one open item there.
+- **Verified:**
+  - a survey of 124 screens (all seven careers, phone and desktop) finds
+    no horizontal overflow; changed screens checked by eye, and the Week
+    and Life screens in the browser at iPhone size
+  - type check, lint and engine checks pass, and all 404 browser tests
+    pass (7.5 minutes)
+- Staged with a plain `git add` (see the line-ending note above).

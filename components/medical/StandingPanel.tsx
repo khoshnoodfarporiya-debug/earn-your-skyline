@@ -136,7 +136,7 @@ export function StandingPanel({
                       <button
                         type="button"
                         onClick={() => onNavigate(row.guide.destination)}
-                        className="min-h-[44px] rounded-form bg-card-high px-3 text-[12.5px] text-clinical transition hover:text-clinical-hover"
+                        className="btn btn-secondary"
                       >
                         Go there
                       </button>

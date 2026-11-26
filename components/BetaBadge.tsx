@@ -93,7 +93,7 @@ export function BetaBadge({
               <button
                 type="button"
                 onClick={() => dialog.current?.close()}
-                className="min-h-[44px] w-full rounded-form border border-rule text-[14px] font-medium transition hover:border-clinical hover:text-clinical"
+                className="btn btn-secondary w-full"
               >
                 Close
               </button>

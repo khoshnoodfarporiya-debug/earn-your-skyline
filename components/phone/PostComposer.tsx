@@ -157,7 +157,7 @@ export function PostComposer<C>({
               onPublish(chosen.id);
               setSelected(null);
             }}
-            className="mt-3 min-h-[46px] w-full rounded-form bg-clinical px-4 text-[14px] font-bold text-on-accent transition hover:brightness-110"
+            className="btn btn-primary mt-3 w-full"
           >
             Publish
           </button>

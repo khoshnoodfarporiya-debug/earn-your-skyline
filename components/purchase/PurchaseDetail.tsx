@@ -322,7 +322,7 @@ export function PurchaseDetail({
                 type="button"
                 onClick={onSell}
                 disabled={busy}
-                className="min-h-[48px] flex-1 rounded-form bg-card-high px-4 text-[14px] font-semibold text-ink-soft transition hover:text-alarm disabled:opacity-60"
+                className="btn btn-lg btn-secondary btn-danger flex-1"
               >
                 Sell for {money(item.sell.refund)}
               </button>
@@ -331,7 +331,7 @@ export function PurchaseDetail({
                 type="button"
                 onClick={onBuy}
                 disabled={!!blocker || busy}
-                className="min-h-[48px] flex-1 rounded-form bg-clinical px-4 text-[15px] font-bold text-on-accent transition hover:bg-clinical-hover disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
+                className="btn btn-lg btn-primary flex-1"
               >
                 {busy ? "Buying…" : `Buy for ${money(item.price)}`}
               </button>
@@ -339,7 +339,7 @@ export function PurchaseDetail({
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[48px] rounded-form border border-rule px-4 text-[13px] text-ink-soft transition hover:text-ink"
+              className="btn btn-lg btn-secondary"
             >
               Not now
             </button>

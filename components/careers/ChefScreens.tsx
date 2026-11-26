@@ -1070,7 +1070,7 @@ function MoneyScreen({
           type="button"
           disabled={pay <= 0}
           onClick={() => onCommand("payLoan", "")}
-          className="mt-3 rounded border border-rule px-3 py-1.5 text-xs text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+          className="btn btn-sm btn-secondary mt-3"
         >
           {state.r.debt <= 0
             ? "Nothing outstanding"

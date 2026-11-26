@@ -52,7 +52,7 @@ export function LessonCard({
         <button
           type="button"
           onClick={onDismiss}
-          className="min-h-[44px] shrink-0 rounded-form bg-card-high px-3.5 text-[12.5px] text-ink-soft transition hover:text-ink"
+          className="btn btn-secondary shrink-0"
         >
           {/* Not "Got it" — the next-step card below already uses that,
               and two identically-labelled buttons on one screen is a

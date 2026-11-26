@@ -65,7 +65,7 @@ export function BeyondScreen({
           <button
             type="button"
             onClick={() => onCommand("dropVenture", "")}
-            className="mt-2.5 rounded border border-rule px-2.5 py-1 text-xs text-ink hover:border-alarm"
+            className="btn btn-sm btn-secondary btn-danger mt-2.5"
           >
             Pull out
           </button>

@@ -81,7 +81,7 @@ export function CapacityPipeline({
           <button
             type="button"
             onClick={() => onNavigate(p.bindingDestination)}
-            className="min-h-[44px] shrink-0 rounded-form bg-clinical px-4 text-[13px] font-semibold text-on-accent transition hover:bg-clinical-hover"
+            className="btn btn-primary shrink-0"
           >
             Deal with it
           </button>

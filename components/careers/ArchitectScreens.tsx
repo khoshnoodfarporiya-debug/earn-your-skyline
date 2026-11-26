@@ -576,7 +576,7 @@ function CompetitionsScreen({
           <button
             type="button"
             onClick={() => onCommand("withdrawCompetition", "")}
-            className="mt-2 rounded border border-rule-soft px-2.5 py-1 text-xs text-ink-faint hover:border-alarm hover:text-alarm"
+            className="btn btn-sm btn-quiet btn-danger mt-2"
           >
             Withdraw
           </button>
@@ -608,7 +608,7 @@ function CompetitionsScreen({
                     type="button"
                     disabled={tooDear}
                     onClick={() => onCommand("enterCompetition", k.id)}
-                    className="shrink-0 rounded border border-rule px-2.5 py-1 text-ink enabled:hover:border-clinical disabled:cursor-not-allowed disabled:opacity-45"
+                    className="btn btn-sm btn-secondary shrink-0"
                   >
                     Enter
                   </button>

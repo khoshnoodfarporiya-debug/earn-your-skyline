@@ -417,10 +417,24 @@ screen at a time:
        a lit stamp with a tick.
      - A survey of 124 screens (all seven careers, phone and desktop) finds
        no horizontal overflow.
-   - [ ] Still to do: about 110 one-off buttons (rows that are whole cards,
-         map pins, link-style text buttons; each needs a look, not a
-         find-and-replace), the Life category tabs, spacing, and the status
-         strip.
+   - [x] **Second pass** (branch `feature/components-2`, 26 Nov 2026)
+     - 45 more buttons moved, each picked by hand from a list of all the
+       rest: 41 plain actions to `.btn` (dialog actions, the purchase
+       sheet's Buy and Sell, week-review and empty-state actions, every
+       career's remaining small buttons) and 3 toggles to `.choice` (target
+       a bloc, assign staff to a contract, compare a market).
+     - The Life category tabs (Homes, Vehicles, …) are `.tab`, with their
+       icons, so all three tab rows in the game now look alike.
+     - `.choice:disabled` added (dim, not-allowed), for "compare" when
+       three markets are already chosen.
+     - Status strip: "Time left" shows the week as a row of dots, lit for
+       each block still free.
+     - 131 of 196 buttons now use the shared classes. **The other ~65 keep
+       their own shape on purpose:** whole-card rows (a market, a case, a
+       staff member), map pins, icon buttons in the header, the bottom nav,
+       the plan stepper, and inline text links. Leave them unless a screen
+       redesign touches them.
+   - [ ] Spacing: one pass over the gaps between panels and inside cards.
 4. [ ] **Prototype one screen** (the iPhone Week screen) in Figma or as an
    artifact, and agree it before touching code.
 5. [ ] **Roll out screen by screen** on `feature/` branches into `beta`,

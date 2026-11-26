@@ -297,6 +297,10 @@ body {
   outline: 2px solid rgb(var(--accent));
   outline-offset: 2px;
 }
+.choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 .choice.is-on {
   background: rgb(var(--accent-tint));
   border-color: rgb(var(--accent) / 0.75);

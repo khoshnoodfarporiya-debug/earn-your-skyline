@@ -262,7 +262,7 @@ function RunwayScreen({
             <button
               type="button"
               onClick={() => onCommand("setPrice", String(v.price + 4))}
-              className="rounded-form border border-rule px-2.5 py-1 text-xs text-ink transition hover:border-clinical hover:text-clinical"
+              className="btn btn-sm btn-secondary"
             >
               Raise to {money(v.price + 4)}
             </button>
@@ -270,7 +270,7 @@ function RunwayScreen({
               type="button"
               disabled={v.price <= 4}
               onClick={() => onCommand("setPrice", String(Math.max(4, v.price - 4)))}
-              className="rounded-form border border-rule px-2.5 py-1 text-xs text-ink transition enabled:hover:border-clinical enabled:hover:text-clinical disabled:cursor-not-allowed disabled:opacity-45"
+              className="btn btn-sm btn-secondary"
             >
               Drop to {money(Math.max(4, v.price - 4))}
             </button>
@@ -329,7 +329,7 @@ function TeamScreen({
                   <button
                     type="button"
                     onClick={() => onCommand("letGo", h.id)}
-                    className="rounded border border-rule-soft px-2 py-0.5 text-ink-faint transition hover:border-alarm hover:text-alarm"
+                    className="btn btn-xs btn-quiet btn-danger"
                   >
                     Let go
                   </button>
@@ -509,7 +509,7 @@ function RaiseInProgress({
       <button
         type="button"
         onClick={() => onCommand("stopRaise", "")}
-        className="mt-2 rounded border border-rule-soft px-2.5 py-1 text-ink-faint transition hover:border-alarm hover:text-alarm"
+        className="btn btn-sm btn-quiet btn-danger mt-2"
       >
         Stop raising
       </button>
@@ -697,7 +697,7 @@ function ProductScreen({
                     type="button"
                     onClick={() => onCommand("runExperiment", def.id)}
                     disabled={blocked}
-                    className="min-h-[40px] shrink-0 rounded-form border border-rule bg-paper px-3 text-[12.5px] font-semibold text-ink transition hover:border-clinical hover:text-clinical disabled:cursor-not-allowed disabled:opacity-40"
+                    className="btn btn-secondary shrink-0"
                   >
                     Run — {money(cost)}
                   </button>

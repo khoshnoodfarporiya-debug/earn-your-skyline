@@ -229,7 +229,7 @@ export function PurchaseCard({
             <button
               type="button"
               onClick={onOpen}
-              className="min-h-[44px] shrink-0 rounded-form border border-rule px-3 text-[12.5px] text-ink-soft transition hover:border-clinical hover:text-clinical"
+              className="btn btn-secondary shrink-0"
             >
               Details
             </button>

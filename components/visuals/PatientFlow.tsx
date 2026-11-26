@@ -196,7 +196,7 @@ export function PatientFlow({
                             <button
                               type="button"
                               onClick={() => onNavigate(d.destination)}
-                              className="mt-2 min-h-[44px] rounded-form bg-clinical px-3.5 text-[12.5px] font-semibold text-on-accent transition hover:bg-clinical-hover"
+                              className="btn btn-primary mt-2"
                             >
                               Go there
                             </button>

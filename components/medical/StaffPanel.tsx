@@ -167,7 +167,7 @@ export function StaffPanel({
                   type="button"
                   onClick={() => dispatch("fire", s.id)}
                   title={`Let go — costs ${money(s.salary * 2)} severance`}
-                  className="min-h-[44px] rounded-form bg-paper px-3 text-[12.5px] text-ink-soft transition hover:text-alarm"
+                  className="btn btn-quiet btn-danger"
                 >
                   Let go
                 </button>

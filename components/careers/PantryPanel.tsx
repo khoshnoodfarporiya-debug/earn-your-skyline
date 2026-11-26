@@ -158,7 +158,7 @@ export function PantryPanel({
             <button
               type="button"
               onClick={() => onCommand("dumpSpoiled", "")}
-              className="mt-2 rounded border border-rule px-2.5 py-1 text-ink transition hover:border-alarm hover:text-alarm"
+              className="btn btn-sm btn-secondary btn-danger mt-2"
             >
               Throw it out
             </button>

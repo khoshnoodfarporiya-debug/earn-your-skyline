@@ -108,7 +108,7 @@ export function Glossary({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[44px] rounded-form px-3 text-[13px] text-ink-soft transition hover:text-ink"
+            className="btn btn-quiet"
           >
             Close
           </button>
@@ -183,7 +183,7 @@ export function Glossary({
                       onNavigate(lesson.screen);
                       onClose();
                     }}
-                    className="min-h-[44px] rounded-form bg-card-high px-3.5 text-[12.5px] text-clinical transition hover:text-clinical-hover"
+                    className="btn btn-secondary"
                   >
                     Show it again
                   </button>

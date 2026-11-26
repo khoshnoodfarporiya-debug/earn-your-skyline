@@ -85,7 +85,21 @@ export function StatusStrip({
             >
               {c.value}
             </dd>
-            <dd aria-hidden className="mt-0.5 text-[12px] leading-none text-ink-faint">
+            <dd aria-hidden className="mt-0.5 flex items-center gap-2 text-[12px] leading-none text-ink-faint">
+              {/* The week as blocks you can see filling, beside the words:
+                  lit for still free, dim for already planned. */}
+              {c.label === "Time left" && budget > 0 && budget <= 12 && (
+                <span className="flex gap-[3px]">
+                  {Array.from({ length: budget }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        i < remaining ? "bg-clinical" : "bg-rule"
+                      }`}
+                    />
+                  ))}
+                </span>
+              )}
               {c.sub}
             </dd>
           </div>

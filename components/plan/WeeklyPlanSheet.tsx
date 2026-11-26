@@ -111,7 +111,7 @@ export function WeeklyPlanSheet({
           </div>
           <button
             onClick={onClose}
-            className="min-h-[44px] rounded-form border border-rule bg-card px-4 text-[13px] font-semibold text-ink transition hover:border-clinical/40"
+            className="btn btn-secondary"
           >
             Close
           </button>
@@ -147,7 +147,7 @@ export function WeeklyPlanSheet({
               onCommit();
             }}
             disabled={spent === 0}
-            className="min-h-[48px] w-full rounded-form bg-clinical px-4 text-[15px] font-bold text-on-accent transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-faint"
+            className="btn btn-primary btn-lg w-full"
           >
             {spent === 0
               ? "Assign your time first"
