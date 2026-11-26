@@ -166,6 +166,10 @@ touched. Run the browser tests when you change a screen.
   - the README with screenshots, and the `LICENSE` (all rights reserved)
 - **Branches on GitHub:** `main`, `beta` and `codex/portfolio-readme`
   (Codex's, unmerged). Every merged branch has been deleted.
+- **`fix/news-repeats`**, merged into local `beta` (fast-forward) on the
+  owner's word and pushed, 26 Nov 2026: the phone's news no longer runs the
+  same filler story week after week, and the Chef's stories have real
+  headlines and bodies. See `WORKING_PLAN.md` section 1b.
 - **What's still open:** WORKING_PLAN section 8 steps 4–5 (prototype the
   iPhone Week screen, then roll screens out one by one), the
   rest of the layout review, real login, payments, the App Store, Solicitor
@@ -824,3 +828,49 @@ agree it before touching code.
 - **What it proposes** is listed in `WORKING_PLAN.md` section 8, step 4.
 - **No game code changed.** Step 5 (building it) waits for the owner's
   go-ahead or changes.
+
+### 26 Nov 2026 — Claude (Claude Code): the phone's news repeated itself
+
+Branch `fix/news-repeats`, off `beta`, in its own worktree (another session
+was building the Week screen in the main checkout). The owner said "merge
+it": `beta` was fast-forwarded to it locally, without a checkout, and then
+pushed on the owner's word ("Push beta").
+
+- **The bug:** a Chef save at week 8 showed The Pass's "half the city's
+  kitchens are a sous chef short" at weeks 4, 5 and 6, and each body was the
+  headline again.
+- **Why:** `generateChefWeek` drew a filler story blind from three each week
+  (45%), so a rerun the next week was likely. Its headline was the body cut
+  at 60 characters. The four voice-pack phones (Founder, Politician,
+  Architect, Engineer) drew blind from three too, and the Physician's rival
+  and regulator items could run week after week. The Solicitor's news only
+  reports real events, so it had no filler to fix.
+- **The fix:** `lib/game/phone/freshNews.ts`, used by all three phones. A
+  filler story is skipped while it ran in the last 10 weeks or is still the
+  newest item; if every story is skipped, that week has no filler. It reads
+  the phone's own news list, so there's no new save field, and each phone
+  stream draws the same numbers as before, so nothing else in the week moves.
+  The Chef's stories are now headline-plus-body pairs, six trade stories and
+  two for a famous kitchen.
+- **Left alone on purpose:** stories about real events (critic reviews,
+  rival moves, verdicts, outbreaks) can come back when the event does. The
+  Physician's world news (`lib/game/news.ts`) can re-run its two
+  always-available stories, but each applies a real effect, so changing it
+  would move balance. Noted in `WORKING_PLAN.md` section 1b.
+- **Engine checks:** 9 new (2,101 in all). A 156-week Chef run on three seeds
+  (one kept famous for the food pages) never shows a headline twice in a row
+  or a filler story twice within 10 weeks, and no body repeats its headline.
+  Every other career, two seeds by 120 weeks, holds the same rule. With the
+  old phone code put back, the Chef check fails ("Where to eat after
+  midnight in Lyon" at weeks 1 and 3).
+- **Verified:** type check, lint and `npm run check` pass, and the phone,
+  news and Chef browser tests pass (`npx playwright test -g
+  "phone|news|chef|Chef"`, 65 tests, mobile and desktop, 1.8 minutes).
+  Not run: the full browser suite and the build.
+- **A trap for worktrees:** Turbopack won't start with `node_modules` as a
+  junction to another folder ("Symlink … points out of the filesystem
+  root"). Copy `node_modules` into the worktree instead. Port 3500 was taken
+  by the main checkout's server, so the browser tests ran on 3510 through a
+  temporary, uncommitted Playwright config.
+- **Left:** the next release's "What's new" line (the version bump is the
+  release's), and the Physician world-news question above.

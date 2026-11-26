@@ -7,6 +7,7 @@ import { botContext, botComments, botFeed } from "./bots";
 import { QUALIFICATION_BY_ID } from "./progression";
 import { INITIAL_SOCIAL } from "./social";
 import type { MedicalState, PhoneState, PostContext } from "./types";
+import { ranRecently } from "../phone/freshNews";
 
 /**
  * THE PHONE
@@ -165,15 +166,18 @@ export function generateWeek(
     logLines.push(`${def.label} is in the news.`);
   }
 
-  if (rng.chance(0.16)) {
-    const rival = rng.pick(RIVALS);
+  /* The next two are filler, so neither is re-run while it ran recently
+     (`freshNews.ts`). The rolls happen either way, so the stream is unchanged. */
+  const rivalStory =
+    rng.chance(0.16) ? `${rng.pick(RIVALS).author} announces expansion` : null;
+  if (rivalStory && !ranRecently(p.news, rivalStory, ctx.week)) {
     p.news = prepend(
       p.news,
       {
         id: `news.rival.${ctx.week}`,
         week: ctx.week,
         outlet: rng.pick(OUTLETS),
-        headline: `${rival.author} announces expansion`,
+        headline: rivalStory,
         body: "A competitor has opened new capacity in the region. Analysts expect pressure on referral volumes.",
         tone: "neutral",
         read: false,
@@ -182,14 +186,15 @@ export function generateWeek(
     );
   }
 
-  if (rng.chance(0.1)) {
+  const regulatorStory = "Regulator tightens documentation standards";
+  if (rng.chance(0.1) && !ranRecently(p.news, regulatorStory, ctx.week)) {
     p.news = prepend(
       p.news,
       {
         id: `news.reg.${ctx.week}`,
         week: ctx.week,
         outlet: OUTLETS[1],
-        headline: "Regulator tightens documentation standards",
+        headline: regulatorStory,
         body: "New guidance requires fuller record-keeping for complex cases. Practices with thin administrative cover are expected to feel it first.",
         tone: "neutral",
         read: false,

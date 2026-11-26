@@ -19,6 +19,7 @@ import {
 import { RECIPE_BY_ID, recipeName } from "./recipes";
 import type { StandingId } from "./standing";
 import { reachFactor, reachWord } from "./buzz";
+import { pickFreshStory } from "../phone/freshNews";
 
 /**
  * THE CHEF'S PHONE
@@ -742,49 +743,104 @@ export function generateChefWeek(
   }
 
   /* -------------------------------------------------------------- the news */
+  /*
+   * Filler: colour from the trade press when the week made no news of its
+   * own. A story that ran in the last few weeks is not run again
+   * (`pickFreshStory`), and the stream draws the same numbers either way.
+   */
   if (rng.chance(0.45)) {
     const city = cityOf(k).name;
     const aboutYou = reputation >= 55 && rng.chance(0.4);
-    const flavours: [string, string, NewsItem["tone"]][] = aboutYou
-      ? [
-          [
-            `The ${city} food pages`,
-            `The kitchen everyone keeps mentioning — a table worth planning a week around.`,
-            "good",
-          ],
-        ]
-      : [
-          [
-            `The ${city} Gazette`,
-            `Market prices firm as the season turns. Traders blame the weather; the weather could not be reached for comment.`,
-            "neutral",
-          ],
-          [
-            `The Pass`,
-            `Trade survey: half the city's kitchens are a sous chef short, and everyone is hiring from everyone else.`,
-            "neutral",
-          ],
-          [
-            `Late Plates`,
-            `Where to eat after midnight in ${city} — an opinionated and mostly reliable list.`,
-            "neutral",
-          ],
-        ];
-    const pick = flavours[Math.floor(rng.next() * flavours.length)];
-    phone.news = push(
+    const pick = pickFreshStory(
+      aboutYou ? chefPressStories(city) : chefTradeStories(city),
       phone.news,
-      {
-        id: `news-${week}`,
-        week,
-        outlet: pick[0],
-        headline: pick[1].split(" — ")[0].slice(0, 60),
-        body: pick[1],
-        tone: pick[2],
-        read: false,
-      },
-      MAX_NEWS,
+      week,
+      rng.next(),
     );
+    if (pick) {
+      phone.news = push(
+        phone.news,
+        {
+          id: `news-${week}`,
+          week,
+          outlet: pick.outlet,
+          headline: pick.headline,
+          body: pick.body,
+          tone: pick.tone,
+          read: false,
+        },
+        MAX_NEWS,
+      );
+    }
   }
+}
+
+/** A filler story: a short headline and a body that adds to it. */
+export interface ChefStory {
+  outlet: string;
+  headline: string;
+  body: string;
+  tone: NewsItem["tone"];
+}
+
+/** The trade press, about the city's food scene in general. */
+export function chefTradeStories(city: string): ChefStory[] {
+  return [
+    {
+      outlet: `The ${city} Gazette`,
+      headline: "Market prices firm as the season turns",
+      body: "Traders blame the weather. The weather could not be reached for comment.",
+      tone: "neutral",
+    },
+    {
+      outlet: CHEF_VOICES.tradePress.name,
+      headline: "Half the city's kitchens are a sous chef short",
+      body: "A trade survey finds the same few names on every shortlist. Everyone is hiring from everyone else, and wages are doing what wages do.",
+      tone: "neutral",
+    },
+    {
+      outlet: "Late Plates",
+      headline: `Where to eat after midnight in ${city}`,
+      body: "An opinionated and mostly reliable list. Three of the entries close at eleven.",
+      tone: "neutral",
+    },
+    {
+      outlet: CHEF_VOICES.tradePress.name,
+      headline: "Energy bills overtake rent for small kitchens",
+      body: "Ovens, extraction and cold rooms run all day whether the room is full or not. Owners are switching things off between services and hoping nobody asks why.",
+      tone: "neutral",
+    },
+    {
+      outlet: `The ${city} Gazette`,
+      headline: "Two openings and three closures on one street",
+      body: "The landlords call it churn. The chefs call it Tuesday. Most of the new places are run by people who used to cook at the old ones.",
+      tone: "neutral",
+    },
+    {
+      outlet: CHEF_VOICES.market.name,
+      headline: "The first asparagus arrives, priced like jewellery",
+      body: "The early crates go to whoever will put them on a menu at a loss. In three weeks they will be half the price and on every menu in town.",
+      tone: "neutral",
+    },
+  ];
+}
+
+/** The food pages, once your name is one they use. */
+export function chefPressStories(city: string): ChefStory[] {
+  return [
+    {
+      outlet: `The ${city} food pages`,
+      headline: "The kitchen everyone keeps mentioning",
+      body: "A table worth planning a week around, according to people who plan their weeks around tables.",
+      tone: "good",
+    },
+    {
+      outlet: `The ${city} food pages`,
+      headline: "Getting a table is becoming a sport",
+      body: "Regulars book a month ahead and ring on the day for cancellations. Nobody is complaining, which in this city counts as a rave.",
+      tone: "good",
+    },
+  ];
 }
 
 /* ====================================================== customers, posting */
