@@ -796,4 +796,12 @@ The owner said "Release to main".
   Mono); it now describes Fraunces and Inter, the three control shapes and
   `.stack`. The beta badge says v0.9.0-beta.2.
 - Released by a pull request from `beta` into `main`, as with beta.1.
-  Its number and the deploy result are recorded below.
+  The owner said "Merge it" once CI was green.
+- **[PR 9](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/9)**
+  merged 26 Nov 2026 with a merge commit (`c1f0c37`), after all four checks
+  passed: `verify`, `balance`, Vercel and Vercel Preview Comments. Local
+  `main` and `beta` were then brought level with it. Auto-merge was tried
+  first and blocked by the app's permission check, so the merge waited for
+  the owner's word.
+- Production (earn-your-skyline.vercel.app) rebuilds from `main`; this note
+  is on `beta` and reaches `main` with the next release.
