@@ -17,6 +17,8 @@ import { OverviewHero } from "./OverviewHero";
 import { QuickPlan } from "./QuickPlan";
 import { CommitBar } from "./CommitBar";
 import { TrendCard } from "./TrendCard";
+import Image from "next/image";
+import { mentorFor } from "@/lib/ui/mentors";
 
 /**
  * The screen that answers "what do I do this week?".
@@ -88,6 +90,7 @@ export function Overview({
     ? `${meterDef.label} ${Math.round(state.r[meterDef.id] ?? 0)}`
     : undefined;
   const m = state.careerId === "doctor" ? med(state) : null;
+  const mentor = mentorFor(state.careerId);
   /**
    * One figure for the sticky bar. A warning outranks everything — if the
    * forecast says something is about to go wrong, that is what should be
@@ -262,6 +265,27 @@ export function Overview({
                 <TrendCard history={state.history} treatedShare={treatedShare} bare />
               </div>
             </Fold>
+
+            {/* The mentor's three cards, all at once, to reread whenever.
+                Opening it changes nothing about the plan. */}
+            {mentor && (
+              <Fold label={`Advice from ${mentor.name}`}>
+                <div className="flex gap-3.5">
+                  <Image
+                    src={mentor.portrait}
+                    alt=""
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 shrink-0 rounded-full border border-rule object-cover"
+                  />
+                  <ol className="min-w-0 space-y-2 text-[14px] leading-relaxed text-ink">
+                    {mentor.lines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ol>
+                </div>
+              </Fold>
+            )}
           </section>
         </div>
 
@@ -295,7 +319,7 @@ export function Overview({
                     {Array.from({ length: budget }, (_, i) => (
                       <span
                         key={i}
-                        className={`h-2 w-2 rounded-full ${i < budget - spent ? "bg-clinical" : "bg-rule"}`}
+                        className={`time-dot h-2 w-2 rounded-full ${i < budget - spent ? "bg-clinical" : "bg-rule"}`}
                       />
                     ))}
                   </span>

@@ -20,7 +20,7 @@ const TEST_PLAYER_ID = "e2etester";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(
-    ([playersKey, activeKey, id]) => {
+    ([playersKey, activeKey, id, taughtKey]) => {
       window.localStorage.setItem(
         playersKey,
         JSON.stringify([
@@ -33,11 +33,27 @@ test.beforeEach(async ({ page }) => {
         ]),
       );
       window.localStorage.setItem(activeKey, id);
+      /* Every mentor already met, unless a test says otherwise. The mentor
+         meets a new run before the week's lesson, and most of these tests
+         are about the lesson or what follows it. Only when the key is absent,
+         so a lesson closed during a test stays closed across a reload. The
+         mentor itself is tested with this key set to an empty list. */
+      if (window.localStorage.getItem(taughtKey) === null) {
+        window.localStorage.setItem(
+          taughtKey,
+          JSON.stringify(
+            ["doctor", "chef", "lawyer", "founder", "politician", "architect", "engineer"].map(
+              (c) => `mentor:${c}`,
+            ),
+          ),
+        );
+      }
     },
     [
       "career-tycoon:players:v1",
       "career-tycoon:activePlayer:v1",
       TEST_PLAYER_ID,
+      `career-tycoon:p.${TEST_PLAYER_ID}:taught:v1`,
     ] as const,
   );
 });
@@ -3132,17 +3148,24 @@ async function scrollThrough(page: Page) {
  * throwing "images below the fold never finished" with no name attached.
  */
 async function imagesSettled(page: Page) {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() =>
-          [...document.querySelectorAll<HTMLImageElement>("main img")].every(
-            (i) => i.complete,
-          ),
-        ),
-      { timeout: 10_000, message: "images below the fold never finished" },
-    )
-    .toBe(true);
+  /*
+   * Polled by hand rather than with `expect.poll`, because this must not
+   * assert (above), and an `expect.poll` with a 10-second budget did: CI's
+   * image cache is always cold, and the four tests that scroll a full shop
+   * failed there on every release (PRs 10 and 11) while passing locally.
+   * Sixty seconds fits inside those tests' `test.slow()` budget; warm, it
+   * returns on the first check.
+   */
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const done = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLImageElement>("main img")].every(
+        (i) => i.complete,
+      ),
+    );
+    if (done) return;
+    await page.waitForTimeout(250);
+  }
 }
 
 /** Cash as an integer, from the status strip. */
@@ -6687,6 +6710,60 @@ test.describe("guidance in every career", () => {
       expect(problems).toEqual([]);
     });
   }
+
+  /**
+   * The mentor meets a new run before its first lesson, three cards long, and
+   * steps aside for good once finished. Every other test starts with all the
+   * mentors met (see `beforeEach`); this one clears that.
+   */
+  test("a new run meets its mentor first, once, and can reread them", async ({
+    page,
+  }) => {
+    const problems = watchConsole(page);
+    await page.goto("/");
+    await page.evaluate((key) => {
+      window.localStorage.clear();
+      window.localStorage.setItem(key, "[]");
+    }, `career-tycoon:p.${TEST_PLAYER_ID}:taught:v1`);
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*chef/i }).first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in Lyon$/ }).click();
+
+    const mentor = page.getByRole("region", { name: "Luc Moreau" });
+    await expect(mentor).toBeVisible();
+    await expect(mentor.getByText(/1 of 3/)).toBeVisible();
+    await expect(mentor.getByText(/oldest usable stock first/i)).toBeVisible();
+    /* One teaching card at a time: the week's lesson waits its turn. */
+    const lesson = page.getByRole("heading", {
+      name: /A week is six blocks, and the food is already ageing/i,
+    });
+    await expect(lesson).toHaveCount(0);
+
+    await mentor.getByRole("button", { name: /^Continue$/ }).click();
+    await expect(mentor.getByText(/2 of 3/)).toBeVisible();
+    await mentor.getByRole("button", { name: /^Continue$/ }).click();
+    await expect(mentor.getByText(/3 of 3/)).toBeVisible();
+    await expect(mentor.getByRole("button", { name: /^Skip$/ })).toHaveCount(0);
+    await mentor.getByRole("button", { name: /^Start planning$/ }).click();
+
+    await expect(mentor).toHaveCount(0);
+    await expect(lesson).toBeVisible();
+
+    /* Met is met: a reload does not bring the cards back. */
+    await page.reload();
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await expect(page.getByRole("region", { name: "Luc Moreau" })).toHaveCount(0);
+
+    /* Still there to reread, all three lines at once. */
+    await openFold(page, /^Advice from Luc Moreau/);
+    await expect(
+      page.getByRole("main").getByText(/diners turned away/i),
+    ).toBeVisible();
+
+    expect(problems).toEqual([]);
+  });
 
   /**
    * A badge is a claim that something needs attention, so it is asserted in a

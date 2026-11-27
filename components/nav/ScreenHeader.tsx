@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { RunState } from "@/lib/game/types";
 import type { ScreenId } from "@/lib/ui/navigation";
 import { TONE_WORD, orient, type StatusTone } from "@/lib/ui/orientation";
+import { ScreenTitle } from "./ScreenTitle";
 
 /**
  * WHERE YOU ARE, AND WHAT IS TRUE HERE
@@ -57,51 +58,42 @@ export function ScreenHeader({
 
   return (
     <header className="mb-4">
+      {/* 1–3: where am I, what is this, what is it for. The same title
+          every other career's screens use (Nov 2026); the section in small
+          capitals replaces the old "Work / Build" breadcrumb. */}
       {!compact && (
-        <>
-          {/* 1 — where am I */}
-          <p className="t-label text-ink-faint">
-            <span>{o.section}</span>
-            <span aria-hidden className="mx-1.5 text-rule">
-              /
-            </span>
-            <span className="text-ink-soft">{o.screen}</span>
-          </p>
-
-          {/* 2 — what is this */}
-          <h2 className="t-section mt-1 text-ink">{o.screen}</h2>
-
-          {/* 3 — what is it for */}
-          <p className="mt-0.5 text-[13.5px] leading-snug text-ink-soft">
-            {o.purpose}
-          </p>
-        </>
+        <ScreenTitle kicker={o.section} title={o.screen} purpose={o.purpose} />
       )}
 
       {/* 4 and 5 — what is happening, and what to do about it */}
       {o.status && (
         <div
-          className={`${compact ? "" : "mt-3"} rounded-form px-4 py-3 ${TONE_SKIN[o.tone]}`}
+          className={`${compact ? "" : "mt-4"} form border px-4 py-3 ${TONE_SKIN[o.tone]}`}
           /* Announced when it changes, so a screen reader user is told the
              situation on arrival rather than having to hunt for it. */
           role="status"
         >
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-            <div className="min-w-0">
-              <p className={`t-label ${TONE_TEXT[o.tone]}`}>
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden
+              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-bold ${TONE_RING[o.tone]} ${TONE_TEXT[o.tone]}`}
+            >
+              {TONE_GLYPH[o.tone]}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className={`sign text-[11px] ${TONE_TEXT[o.tone]}`}>
                 {TONE_WORD[o.tone]}
               </p>
-              <p className="mt-0.5 text-[14px] leading-snug text-ink">
+              <p className="mt-0.5 text-[14.5px] leading-snug text-ink">
                 {o.status}
               </p>
-            </div>
 
-            <div className="flex shrink-0 flex-wrap gap-2">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {o.primary && (
                 <button
                   type="button"
                   onClick={() => onNavigate(o.primary!.destination)}
-                  className="btn btn-primary"
+                  className="btn btn-secondary"
                 >
                   {o.primary.label}
                 </button>
@@ -114,17 +106,21 @@ export function ScreenHeader({
                   /* A real labelled control rather than a hover-only tooltip:
                      hover does not exist on a phone and is not reachable by
                      keyboard. */
-                  className="btn btn-secondary"
+                  className="btn btn-quiet"
                 >
                   {/* The label does not change when it opens. `aria-expanded`
                       already announces the state, and a control that renames
                       itself is a control the player has to re-find. */}
                   Help
-                  <span aria-hidden className="ml-1.5 text-ink-faint">
-                    {helpOpen ? "−" : "+"}
+                  <span
+                    aria-hidden
+                    className={`ml-1 inline-block text-[15px] leading-none text-ink-faint transition-transform duration-150 motion-reduce:transition-none ${helpOpen ? "rotate-180" : ""}`}
+                  >
+                    ▾
                   </span>
                 </button>
               )}
+            </div>
             </div>
           </div>
 
@@ -160,11 +156,28 @@ export function ScreenHeader({
   );
 }
 
+/* A card like every other, edged in the tone when it matters: the old
+   filled amber and red panels outshouted everything below them. */
 const TONE_SKIN: Record<StatusTone, string> = {
-  critical: "bg-alarm-tint",
-  warning: "bg-caution-tint",
-  good: "bg-card",
-  neutral: "bg-card",
+  critical: "border-alarm/45",
+  warning: "border-caution/40",
+  good: "border-transparent",
+  neutral: "border-transparent",
+};
+
+const TONE_RING: Record<StatusTone, string> = {
+  critical: "border-alarm/60",
+  warning: "border-caution/60",
+  good: "border-good/60",
+  neutral: "border-rule",
+};
+
+/* The glyph says the severity again without colour, as "Needs you" does. */
+const TONE_GLYPH: Record<StatusTone, string> = {
+  critical: "!",
+  warning: "▲",
+  good: "✓",
+  neutral: "i",
 };
 
 const TONE_TEXT: Record<StatusTone, string> = {

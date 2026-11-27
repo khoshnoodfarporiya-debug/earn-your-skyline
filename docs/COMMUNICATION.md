@@ -150,11 +150,14 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`beta` is ahead of `main`** with v0.9.0-beta.3, not yet released: the
-  new Week screen (session-log entry "the Week screen, built") and the
-  phone-news repeat fix.
-- **`main` = v0.9.0-beta.2, released 26 Nov 2026.** Everything
+- **`beta` is ahead of `main`** with v0.9.0-beta.4, not yet released: the
+  mentor intro, the motion and polish pass, and one screen header for every
+  career (session-log entries "the mentors", "motion and polish" and "one
+  screen header").
+- **`main` = v0.9.0-beta.3, released 26 Nov 2026.** Everything
   below is in `main`:
+  - the new Week screen (session-log entry "the Week screen, built") and
+    the phone-news repeat fix (release 0.9.0-beta.3)
   - the redesign's design system: Fraunces and Inter, one button system,
     underlined tabs and pill choices, one spacing rhythm, and the 375px
     header fix (session-log entries "type and buttons" to "release
@@ -909,3 +912,136 @@ Branch `feature/week-screen`, merged into `beta` and pushed. The owner said
 - **Verified** on the merged code: type check, lint and engine checks
   pass, and all 404 browser tests pass. In the browser: the Week screen
   at 375px (no overflow) and at 1280px.
+
+### 26 Nov 2026 — Claude (Claude Code): release 0.9.0-beta.3
+
+The owner said "Release to main", then "Check and merge" once CI had run.
+
+- **[PR 10](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/10)**
+  merged 26 Nov 2026 with a merge commit (`68ca730`), after all four checks
+  passed: `verify` (14 min), `balance`, Vercel and Vercel Preview Comments.
+- It carries the Week screen and the Chef phone-news fix; the version was
+  already 0.9.0-beta.3 on `beta`, so nothing was bumped for the release.
+- Local `main` and `beta` were fast-forwarded to the merge commit. The
+  production deploy of `68ca730` was building at the time of this note.
+- This note is on `beta` and reaches `main` with the next release.
+
+### 27 Nov 2026 — Claude (Claude Code): the mentors
+
+Branch `feature/mentor-intro`, merged into `beta` and pushed. The owner
+shared a design pack made in ChatGPT (outside the repo) and asked for an
+opinion; after the review they chose "Mentor intro first".
+
+- **What it is:** each career has a mentor (`lib/ui/mentors.ts`), and a
+  new run's first Week opens with their three cards: the rule that binds
+  the career, a first move, what to read in the first review. Skip or
+  finish, and it is filed as met in the taught list (`loadTaught`), so it
+  is per player and per career, not per run, and needs no save change.
+  All three lines stay under "More this week" as "Advice from <name>".
+- **Not a modal,** like the lessons: it sits on the Week screen with the
+  plan live underneath. The week's own lesson waits until the mentor is
+  done, so two teaching cards never stack.
+- **The text** is the pack's, checked against the engine: every action it
+  names exists, and the Chef's "schedule a service" (there is no such
+  action) became "give prep enough time to supply the week's service".
+- **Portraits** from the pack: masters in
+  `art-source/visuals/characters/mentors/`, 256px webp (6–10 KB) in
+  `public/visuals/characters/mentors/`.
+- **Tests:** `beforeEach` now marks every mentor met when the taught key
+  is absent, so the existing lesson tests are unchanged; a new test clears
+  it and walks the Chef through all three cards, the reload and the reread.
+- **Version 0.9.0-beta.4** with a "What's new" line.
+- **Checked in the browser** at 375px: no overflow; the mentor label was
+  shortened to "Your mentor" because it wrapped. The pane was signed in to
+  the owner's own local profile with a run in progress; its storage was
+  backed up, a test Chef run played, and the profile restored exactly.
+
+### 27 Nov 2026 — Claude (Claude Code): motion and polish
+
+Branch `feature/motion-polish`, merged into `beta` and pushed. The owner
+said the buttons and layout did not feel polished or clear, asked for
+motion, and for everything to sit in its right place.
+
+- **Motion,** one vocabulary in `app/globals.css` (the "MOTION" block),
+  from the design pack's numbers: press 1px/120ms; a screen you switch to
+  arrives with a 180ms fade and 5px rise (`Game.tsx` re-keys a wrapper
+  inside `<main>`, so focus is untouched); folded rows ease open; the
+  mentor's cards swap; the plan sheet and dialogs rise from below on a
+  phone and lift in on desktop; the week's dots fade between lit and
+  dim; and a number that changes glows once in the career's colour
+  (`components/ui/Tick.tsx`: cash, debt, goal, the forecast headline and
+  the stepper counts, on change only, never on arrival). Every one is off
+  under "reduce motion".
+- **What the survey found and what changed** (124 screens, 7 careers,
+  375px and 1280px; no overflow before or after):
+  - The desktop plan rail squeezed action names to one word a line
+    ("Grow / the / panel"). `ActionBoard` has a `dense` form for the rail:
+    no icon, the price under the name, a 36px stepper, and no second
+    header repeating the blocks left.
+  - Architect, Engineer, Founder and Politician showed an empty circle as
+    their career icon: their icons had never been drawn. Now a pair of
+    dividers, a gear, a rocket and a lectern.
+  - Tab rows cut words at the screen edge ("Assig", "The f"). The row now
+    fades on any side with more tabs, and scrolls the current one into
+    view (`SectionNav`).
+  - "Help +" read as "add". It is a disclosure, so it has a chevron.
+  - The "Week plan" bar on every other screen did not look like a button.
+    It now reads "Plan the week" with the week's dots and a chevron.
+  - The Physician's header line was "Dr · MD · Week 4 · L…": on a phone the
+    title gives way so the week and city fit.
+  - The hero line for every career but the Physician ran to five figures.
+    It is now the headline figure, named, plus one clause ("Worth −$5,100
+    · 0 on the boards"); the cash is in the strip below.
+  - Quiet buttons ("Got it", "Skip") have a faint ground so they read as
+    buttons.
+- **Still open:** the Physician's screens use a different header style
+  from the other careers (breadcrumb and a "Worth a look" card with a
+  filled button). Logged in `WORKING_PLAN.md` section 8, step 6.
+
+### 27 Nov 2026 — Claude (Claude Code): one screen header
+
+Branch `feature/unify-headers`, merged into `beta` and pushed. The owner
+said "Unify Physician headers", the open item from the polish survey.
+
+- **Before:** the Physician's screens opened with a "Work / Build"
+  breadcrumb, a bold title, and a filled amber or red status panel with a
+  filled button; five of them (Staff, Caseload, Career, Life, Growth) put
+  the title inside a picture instead. The other six careers opened with a
+  plain serif title and a small grey line.
+- **Now, one component,** `components/nav/ScreenTitle.tsx`: the section in
+  small capitals (the same kicker the Week hero uses), the serif title,
+  one line of purpose. All seven careers' screens use it; the six career
+  screen files call it with `sectionOf(screen, careerId).label`.
+- **The Physician's status** (`ScreenHeader`) is now a card in the "Needs
+  you" style: a glyph and the severity in words, the sentence, then the
+  action as a secondary button and Help as a quiet one. The filled
+  button on a screen is for committing the week. Still `role="status"`,
+  still 44px buttons.
+- **The five pictures** (`SectionBanner`) sit under the title as a
+  captioned picture, like the other careers' scene banners, with the live
+  figure as the caption ("1 on the payroll · $2,663/wk in fixed costs").
+  The `BANNERED` set and the header's compact mode in `Game.tsx` are gone.
+- Checked: the 124-screen survey (no overflow), the Staff screen in the
+  browser at 375px (pictures load, 16px gap below), and the browser suite.
+
+### 27 Nov 2026 — Claude (Claude Code): CI image wait
+
+Branch `fix/ci-image-wait`, merged into `beta` and pushed on the owner's
+"Yes, push the fix". CI's `verify` had failed on the 0.9.0-beta.4
+release (PR 11), so it was not merged.
+
+- **The failure:** four tests that scroll a full shop or department list
+  ("every purchasable item shows its own artwork", "no source PNG reaches
+  the browser", "all twelve departments show their own interior", "the
+  twelve machines use the re-shot scenes") failed with "images below the
+  fold never finished". The same four failed on `main` after the PR 10
+  merge, so it was not new; they pass locally, where the image cache is
+  warm. CI's is always cold.
+- **The cause:** `imagesSettled` in `e2e/app.spec.ts` is documented as "it
+  does not assert", but it asserted after a 10-second `expect.poll`.
+- **The fix:** it polls by hand for up to 60 seconds and returns without
+  throwing; the tests' own checks name any missing image. They are
+  `test.slow()`, so 60 seconds fits their budget.
+- Checked: the four tests on phone and desktop with the image cache
+  deleted first, 8 of 8 passed.
+

@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>A career sim for your phone. Start with almost nothing, and earn your place in the city one week at a time.</strong><br>
-  <em>In beta (v0.9.0-beta.3) · iPhone first, Android later</em>
+  <em>In beta (v0.9.0-beta.4) · iPhone first, Android later</em>
 </p>
 
 ## Quick tour

@@ -24,6 +24,8 @@ import {
 import { lessonFor, lessonStatus } from "@/lib/ui/onboarding";
 import { glossaryFor } from "@/lib/ui/glossary";
 import { LessonCard } from "./onboarding/LessonCard";
+import { MentorIntro } from "./onboarding/MentorIntro";
+import { mentorFor, mentorLessonId } from "@/lib/ui/mentors";
 import { Glossary } from "./onboarding/Glossary";
 import { money } from "@/lib/game/format";
 import { SectionBanner } from "./visuals/SectionBanner";
@@ -39,13 +41,6 @@ import { ScreenHeader } from "./nav/ScreenHeader";
 import { whatChanged, type WeekChanges } from "@/lib/ui/whatChanged";
 
 /** Screens whose illustrated banner already states section, title and purpose. */
-const BANNERED = new Set<ScreenId>([
-  "staff",
-  "caseload",
-  "career",
-  "life",
-  "growth",
-]);
 import { Overview } from "./overview/Overview";
 import { WeeklyPlanRail } from "./plan/WeeklyPlanRail";
 import {
@@ -231,6 +226,20 @@ export function Game({
     () => lessonFor(screen, state, teachCtx, taught),
     [screen, state, teachCtx, taught],
   );
+  /*
+   * The mentor meets a new run at the top of its first Week, before the
+   * week's lesson. Filed in the same taught list as the lessons, so it is a
+   * property of the player: met once per career, not once per run. A run
+   * that has already played a week never shows it; the Week screen keeps it
+   * to reread under "More this week".
+   */
+  const mentor = mentorFor(state.careerId);
+  const mentorId = mentorLessonId(state.careerId);
+  const showMentor =
+    screen === "overview" &&
+    mentor !== null &&
+    state.history.length === 0 &&
+    !taught.includes(mentorId);
   const step = useMemo(() => {
     const s = nextStep(state, alloc, spent, budget, state.history.length > 0);
     return s && !dismissed.includes(s.id) ? s : null;
@@ -381,7 +390,7 @@ export function Game({
                 hero used to repeat both; this is now the one place they live,
                 and it is on every screen, not only the Week. */}
             <span className="num block truncate text-[12px] text-ink-soft">
-              {m && <span className="text-clinical">{titleFor(m)} · </span>}
+              {m && <span className="hidden text-clinical sm:inline">{titleFor(m)} · </span>}
               Week {state.week}
               {homeCityName ? ` · ${homeCityName}` : ""}
             </span>
@@ -457,6 +466,10 @@ export function Game({
         }
       >
       <main ref={mainRef} tabIndex={-1} className="min-w-0 outline-none">
+        {/* Re-keyed on the screen, so each one arrives (180ms fade and a 5px
+            rise) rather than cutting in. Inside <main>, so focus and the
+            ref that the review returns focus to are untouched. */}
+        <div key={screen} className="screen-in">
         {/*
          * A crisis outranks the screen you happen to be on.
          *
@@ -485,7 +498,20 @@ export function Game({
          * what a time block is while their licence is suspended has a more
          * pressing problem than vocabulary.
          */}
-        {lesson && (
+        {/* The mentor first, the lesson after: two teaching cards stacked
+            on one screen would be a wall before the plan. */}
+        {showMentor && mentor && (
+          <div className="mb-4">
+            <MentorIntro
+              mentor={mentor}
+              onDone={() => {
+                teach(mentorId);
+                mainRef.current?.focus();
+              }}
+            />
+          </div>
+        )}
+        {lesson && !showMentor && (
           <div className="mb-4">
             <LessonCard
               lesson={lesson}
@@ -557,7 +583,22 @@ export function Game({
         {m && (
           <>
             {/*
-             * One banner at the entrance to a screen, never per subsection.
+             * Where you are, what is true here, and the one thing worth doing
+             * about it. Computed per screen from the actual run — see
+             * `lib/ui/orientation.ts`.
+             */}
+            {screen !== "overview" && (
+              <ScreenHeader
+                state={state}
+                screen={screen}
+                onNavigate={setScreen}
+              />
+            )}
+
+            {/*
+             * One picture under the title, never per subsection, the way every
+             * other career's screens show theirs (Nov 2026: it used to carry
+             * the title itself, and the header below it went compact).
              * Only screens with registered artwork get one; the rest keep
              * their existing headers, which is why this is a lookup and not a
              * wrapper around every panel.
@@ -603,20 +644,6 @@ export function Game({
               />
             )}
 
-            {/*
-             * Where you are, what is true here, and the one thing worth doing
-             * about it. Computed per screen from the actual run — see
-             * `lib/ui/orientation.ts`. The five bannered screens above already
-             * carry a title and purpose, so those get the status alone.
-             */}
-            {screen !== "overview" && (
-              <ScreenHeader
-                state={state}
-                screen={screen}
-                onNavigate={setScreen}
-                compact={BANNERED.has(screen)}
-              />
-            )}
 
             {screen === "build" && (
               <BuildPanel state={state} dispatch={dispatch} />
@@ -694,6 +721,7 @@ export function Game({
             )}
           </>
         )}
+        </div>
       </main>
 
       {screen !== "overview" && screen !== "cities" && (

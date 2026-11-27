@@ -1,5 +1,6 @@
 "use client";
 
+import { Tick } from "./ui/Tick";
 import { useEffect, useId, useState } from "react";
 import type { CareerDef, RunState } from "@/lib/game/types";
 import type { Allocation } from "@/lib/game/engine";
@@ -43,6 +44,7 @@ export function ActionBoard({
   spent,
   onChange,
   bare = false,
+  dense = false,
 }: {
   career: CareerDef;
   state: RunState;
@@ -52,6 +54,13 @@ export function ActionBoard({
   onChange: (updater: (prev: Allocation) => Allocation) => void;
   /** Drop the panel chrome when the caller already provides it. */
   bare?: boolean;
+  /**
+   * The narrow form, for the 320px desktop rail. Its own card already says
+   * how many blocks are free, so the header keeps only the details toggle;
+   * each row drops its icon, puts the price under the name and uses a
+   * 36px stepper. At full width, the names were squeezed to one word a line.
+   */
+  dense?: boolean;
 }) {
   const remaining = budget - spent;
   const baseId = useId();
@@ -101,8 +110,14 @@ export function ActionBoard({
 
   return (
     <div className={bare ? "" : "form"}>
-      <div className="form-head flex items-center justify-between px-5 py-2.5">
-        <h3 className="t-card text-ink">Your week</h3>
+      <div
+        className={
+          dense
+            ? "flex items-center justify-end border-b border-rule-soft px-3 py-1"
+            : "form-head flex items-center justify-between px-5 py-2.5"
+        }
+      >
+        {!dense && <h3 className="t-card text-ink">Your week</h3>}
         <div className="flex items-center gap-2.5">
           <button
             type="button"
@@ -113,6 +128,7 @@ export function ActionBoard({
             {allDetails ? "Hide details" : "Show details"}
           </button>
           {/* Blocks read as a rota strip: filled sessions against the week. */}
+          {!dense && (
           <div className="flex gap-0.5" aria-hidden>
             {Array.from({ length: budget }).map((_, i) => (
               <span
@@ -125,9 +141,12 @@ export function ActionBoard({
               />
             ))}
           </div>
+          )}
+          {!dense && (
           <span className="num text-[12px] text-ink-soft">
             {remaining} left
           </span>
+          )}
         </div>
       </div>
 
@@ -145,19 +164,21 @@ export function ActionBoard({
             return (
               <div
                 key={action.id}
-                className={`spine px-4 py-2 transition ${
+                className={`spine ${dense ? "px-3" : "px-4"} py-2 transition ${
                   units > 0 ? "bg-clinical-tint" : "bg-card"
                 }`}
                 style={{
                   ["--dept" as string]: units > 0 ? "rgb(var(--accent))" : "transparent",
                 }}
               >
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center ${dense ? "gap-2" : "gap-3"}`}>
+                  {!dense && (
                   <span
                     className={units > 0 ? "text-clinical" : "text-ink-faint"}
                   >
                     <ActionIcon name={action.id} />
                   </span>
+                  )}
 
                   {/* The whole label area is the disclosure: a big target on a
                       phone, and the stepper beside it stays its own control. */}
@@ -172,7 +193,7 @@ export function ActionBoard({
                       <span className="text-[14px] font-semibold text-ink">
                         {action.label}
                       </span>
-                      {action.cashCost > 0 && (
+                      {action.cashCost > 0 && !dense && (
                         <span className="num shrink-0 text-[12px] text-ink-faint">
                           {money(action.cashCost)}/block
                         </span>
@@ -186,6 +207,11 @@ export function ActionBoard({
                         ▾
                       </span>
                     </span>
+                    {dense && action.cashCost > 0 && (
+                      <span className="num block text-[12px] text-ink-faint">
+                        {money(action.cashCost)}/block
+                      </span>
+                    )}
                     {lines[0] && !expanded && (
                       <span className="num line-clamp-2 block text-[12.5px] leading-snug text-ink-soft">
                         {lines[0]}
@@ -198,18 +224,18 @@ export function ActionBoard({
                       onClick={() => set(action.id, -1)}
                       disabled={units === 0}
                       aria-label={`Fewer blocks on ${action.label}`}
-                      className="flex h-11 w-11 items-center justify-center rounded-l-[12px] border border-rule bg-card-high text-[20px] leading-none text-ink transition hover:border-clinical/70 hover:text-clinical-hover active:translate-y-px disabled:text-ink-faint disabled:opacity-40"
+                      className={`flex ${dense ? "h-9 w-9" : "h-11 w-11"} items-center justify-center rounded-l-[12px] border border-rule bg-card-high text-[20px] leading-none text-ink transition hover:border-clinical/70 hover:text-clinical-hover active:translate-y-px disabled:text-ink-faint disabled:opacity-40`}
                     >
                       −
                     </button>
-                    <span className="num flex h-11 w-10 items-center justify-center border-y border-rule bg-paper text-[16px] font-semibold text-ink">
-                      {units}
+                    <span className={`num flex ${dense ? "h-9 w-8" : "h-11 w-10"} items-center justify-center border-y border-rule bg-paper text-[16px] font-semibold text-ink`}>
+                      <Tick value={units} />
                     </span>
                     <button
                       onClick={() => set(action.id, +1)}
                       disabled={!canAdd}
                       aria-label={`More blocks on ${action.label}`}
-                      className="flex h-11 w-11 items-center justify-center rounded-r-[12px] border border-rule bg-card-high text-[20px] leading-none text-ink transition hover:border-clinical/70 hover:text-clinical-hover active:translate-y-px disabled:text-ink-faint disabled:opacity-40"
+                      className={`flex ${dense ? "h-9 w-9" : "h-11 w-11"} items-center justify-center rounded-r-[12px] border border-rule bg-card-high text-[20px] leading-none text-ink transition hover:border-clinical/70 hover:text-clinical-hover active:translate-y-px disabled:text-ink-faint disabled:opacity-40`}
                     >
                       +
                     </button>

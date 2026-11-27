@@ -9,7 +9,7 @@
  * Numbering: each beta update bumps the last number — 0.9.0-beta.1,
  * 0.9.0-beta.2, and so on — until the owner calls a release, which is 1.0.0.
  */
-export const APP_VERSION = "0.9.0-beta.3";
+export const APP_VERSION = "0.9.0-beta.4";
 
 export interface ChangelogEntry {
   version: string;
@@ -19,6 +19,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.0-beta.4",
+    date: "2026-11-27",
+    changes: [
+      "Every career now has a mentor who meets you at the start of your first week: three short tips you can skip, and reread any time under \"More this week\".",
+      "Smoother screens: switching screens, opening a row and changing your plan now move gently, and a number that changes glows once so you can see what moved. Turn on Reduce Motion to switch it off.",
+      "Clearer controls: every career has its own icon, tabs that run off the edge fade instead of cutting words, and the plan bar on every screen says \"Plan the week\".",
+      "On a computer, the planner beside each screen no longer squeezes action names onto one word a line.",
+      "Every career's screens now open the same way: the section, the title and one line on what the screen is for. The Physician's warnings are calmer cards, like \"Needs you\" on the Week screen.",
+    ],
+  },
   {
     version: "0.9.0-beta.3",
     date: "2026-11-26",
