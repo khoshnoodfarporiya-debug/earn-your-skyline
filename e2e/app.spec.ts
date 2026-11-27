@@ -3148,17 +3148,24 @@ async function scrollThrough(page: Page) {
  * throwing "images below the fold never finished" with no name attached.
  */
 async function imagesSettled(page: Page) {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() =>
-          [...document.querySelectorAll<HTMLImageElement>("main img")].every(
-            (i) => i.complete,
-          ),
-        ),
-      { timeout: 10_000, message: "images below the fold never finished" },
-    )
-    .toBe(true);
+  /*
+   * Polled by hand rather than with `expect.poll`, because this must not
+   * assert (above), and an `expect.poll` with a 10-second budget did: CI's
+   * image cache is always cold, and the four tests that scroll a full shop
+   * failed there on every release (PRs 10 and 11) while passing locally.
+   * Sixty seconds fits inside those tests' `test.slow()` budget; warm, it
+   * returns on the first check.
+   */
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const done = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLImageElement>("main img")].every(
+        (i) => i.complete,
+      ),
+    );
+    if (done) return;
+    await page.waitForTimeout(250);
+  }
 }
 
 /** Cash as an integer, from the status strip. */
