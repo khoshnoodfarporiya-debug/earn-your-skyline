@@ -150,7 +150,9 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`main` = `beta` = v0.9.0-beta.3, released 26 Nov 2026.** Everything
+- **`beta` is ahead of `main`** with v0.9.0-beta.4, not yet released: the
+  mentor intro (session-log entry "the mentors").
+- **`main` = v0.9.0-beta.3, released 26 Nov 2026.** Everything
   below is in `main`:
   - the new Week screen (session-log entry "the Week screen, built") and
     the phone-news repeat fix (release 0.9.0-beta.3)
@@ -921,3 +923,33 @@ The owner said "Release to main", then "Check and merge" once CI had run.
 - Local `main` and `beta` were fast-forwarded to the merge commit. The
   production deploy of `68ca730` was building at the time of this note.
 - This note is on `beta` and reaches `main` with the next release.
+
+### 27 Nov 2026 — Claude (Claude Code): the mentors
+
+Branch `feature/mentor-intro`, merged into `beta` and pushed. The owner
+shared a design pack made in ChatGPT (outside the repo) and asked for an
+opinion; after the review they chose "Mentor intro first".
+
+- **What it is:** each career has a mentor (`lib/ui/mentors.ts`), and a
+  new run's first Week opens with their three cards: the rule that binds
+  the career, a first move, what to read in the first review. Skip or
+  finish, and it is filed as met in the taught list (`loadTaught`), so it
+  is per player and per career, not per run, and needs no save change.
+  All three lines stay under "More this week" as "Advice from <name>".
+- **Not a modal,** like the lessons: it sits on the Week screen with the
+  plan live underneath. The week's own lesson waits until the mentor is
+  done, so two teaching cards never stack.
+- **The text** is the pack's, checked against the engine: every action it
+  names exists, and the Chef's "schedule a service" (there is no such
+  action) became "give prep enough time to supply the week's service".
+- **Portraits** from the pack: masters in
+  `art-source/visuals/characters/mentors/`, 256px webp (6–10 KB) in
+  `public/visuals/characters/mentors/`.
+- **Tests:** `beforeEach` now marks every mentor met when the taught key
+  is absent, so the existing lesson tests are unchanged; a new test clears
+  it and walks the Chef through all three cards, the reload and the reread.
+- **Version 0.9.0-beta.4** with a "What's new" line.
+- **Checked in the browser** at 375px: no overflow; the mentor label was
+  shortened to "Your mentor" because it wrapped. The pane was signed in to
+  the owner's own local profile with a run in progress; its storage was
+  backed up, a test Chef run played, and the profile restored exactly.
