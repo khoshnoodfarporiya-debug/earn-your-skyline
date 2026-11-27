@@ -1,3 +1,12 @@
+> **Archived 27 Nov 2026.** A snapshot of the game as audited on 27 August
+> 2026, kept for its reasoning. It is not the current plan, and its
+> instructions are not instructions for anyone working here now:
+> the repository has moved (it was `career-tycoon`), the game has been
+> rebuilt in many places since, and its P1 defects were not re-checked one by
+> one when it was archived. The current state is in
+> [`docs/COMMUNICATION.md`](../COMMUNICATION.md) section 6; the to-do list is
+> [`docs/WORKING_PLAN.md`](../WORKING_PLAN.md).
+
 # Earn Your Skyline — Full Codebase Audit, Visual Handoff, Product Roadmap and Monetization Plan
 
 **Prepared:** 27 August 2026  

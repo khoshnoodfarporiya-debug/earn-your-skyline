@@ -3132,7 +3132,7 @@ const panelIn = (s: RunState, city: string) => med(s).panels[city] ?? 0;
 /*
  * Bots must react to the run rather than to the clock, and must never draw
  * from the gameplay RNG — the phone has its own stream precisely so that
- * adding chatter cannot move the balance figures in the README.
+ * adding chatter cannot move the balance figures in docs/DESIGN.md.
  */
 {
   console.log("\nPhone cast\n" + "─".repeat(52));

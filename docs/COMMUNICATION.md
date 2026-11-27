@@ -1059,3 +1059,34 @@ The owner said "Release to main", then "Check and merge" once CI had run.
 - Local `main` and `beta` were fast-forwarded to the merge commit. The
   production deploy of `c2a498b` was building at the time of this note.
 - This note is on `beta` and reaches `main` with the next release.
+
+### 27 Nov 2026 — Claude (Claude Code): repo gaps from the project review
+
+Branch `chore/repo-gaps`, merged into `beta` and pushed; the tags are on
+`origin`. The owner shared a project review (a Claude doc, outside the repo)
+and said "Fix the repo gaps".
+
+- **Release tags.** The review said releases were tagged; none were. Each
+  release merge on `main` now has an annotated tag: `v0.9.0-beta.1` (PR 8,
+  `06a7d1a`), `beta.2` (PR 9, `c1f0c37`), `beta.3` (PR 10, `68ca730`),
+  `beta.4` (PR 11, `c2a498b`). **From now on, tag the merge commit of
+  every release** (`git tag -a v<version> <merge commit>`, then
+  `git push origin v<version>`).
+- **The README** was 96 KB. It is now a 9 KB front page (tour, screenshots,
+  how it works, getting started, layout, docs, where it stands, licence).
+  The design record, everything from "The design" down, moved whole and
+  unedited to `docs/DESIGN.md`, with its two relative links fixed and a note
+  that its figures date from when each section was written. Two code
+  comments that cited "the README" for balance figures now cite
+  `docs/DESIGN.md`.
+- **The old audit** (`CLAUDE_FULL_GAME_AUDIT_AND_ROADMAP.md`, August 2026,
+  naming the old `career-tycoon` path) moved to
+  `docs/archive/2026-08-full-game-audit.md` with a note that it is a
+  snapshot whose instructions are not current. Its P1s were not re-checked.
+- **A playtest kit,** `docs/PLAYTEST.md`, for the review's biggest gap: no
+  outside player yet. Set-up, a script to read, what to watch for, seven
+  after-play questions and a notes sheet. The filled-in sheets stay out of
+  the repository.
+- Not done here: the review's other points are about Deep-Pulse-V2, a
+  different repository.
+

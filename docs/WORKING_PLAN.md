@@ -145,10 +145,19 @@ Balance snapshot (4 seeds, 120 weeks, so treat this as a signal, not a verdict):
 ### 2. Human playtest
 - [ ] Play one full run of each career to week 52, with notes on boring or confusing weeks
 - [ ] Get 3–5 outside players for a first session, and record where they get stuck
+  - [x] The kit: `docs/PLAYTEST.md` (set-up, what to say, what to watch, the
+        after-play questions and a notes sheet), 27 Nov 2026
+  - [ ] The sessions themselves: the owner's to run
 
 ### 3. Repo hygiene
-- [ ] Move `CLAUDE_FULL_GAME_AUDIT_AND_ROADMAP.md` into `docs/` and mark the fixed P1s (it still names the old `career-tycoon` path)
-- [ ] Split the 1,800-line README into a short README plus `docs/design/*.md`
+- [x] Move `CLAUDE_FULL_GAME_AUDIT_AND_ROADMAP.md` into `docs/`: now
+      `docs/archive/2026-08-full-game-audit.md`, with a note that it is a
+      snapshot (27 Nov 2026)
+  - [ ] Mark which of its P1s are fixed (not re-checked when archived)
+- [x] Split the 1,800-line README: a 9 KB front page, and the design
+      record moved whole to `docs/DESIGN.md` (27 Nov 2026)
+- [x] Tag each release on `main` (`v0.9.0-beta.1` to `v0.9.0-beta.4`), and tag
+      every release from now on
 - [ ] Split `scripts/commands.ts` (17k lines) by domain, e.g. `scripts/checks/<career>.ts`
 - [ ] Split `e2e/app.spec.ts` (7.3k lines) into one spec per career
 - [ ] Self-host fonts so an offline build works
