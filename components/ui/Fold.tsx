@@ -51,7 +51,7 @@ export function Fold({
           ›
         </span>
       </summary>
-      <div className="px-4 pb-4">{children}</div>
+      <div className="fold-body px-4 pb-4">{children}</div>
     </details>
   );
 }

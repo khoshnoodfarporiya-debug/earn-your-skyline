@@ -89,7 +89,7 @@ export function Glossary({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-void/80 p-0 sm:items-center sm:p-4"
+      className="fade fixed inset-0 z-50 flex items-end justify-center bg-void/80 p-0 sm:items-center sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -99,7 +99,7 @@ export function Glossary({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        className="stamp-in form scroll-thin max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-b-none shadow-lift sm:max-h-[88vh] sm:rounded-form"
+        className="sheet-in form scroll-thin max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-b-none shadow-lift sm:max-h-[88vh] sm:rounded-form"
       >
         <div className="form-head sticky top-0 z-10 flex items-center justify-between gap-2 px-5 py-3">
           <h2 id={headingId} className="sign text-[12px] text-clinical">

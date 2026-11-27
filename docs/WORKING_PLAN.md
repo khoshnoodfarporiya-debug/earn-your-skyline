@@ -543,6 +543,14 @@ screen at a time:
      painted banner beside a current photo at 375px before replacing any.
    - [ ] The Week review remembering people, and "Ask <mentor>" on the
      career's own screen.
+   - [x] **Motion and a polish pass** (branch `feature/motion-polish`,
+     27 Nov 2026): one motion vocabulary in `globals.css` (press, arrive,
+     swap, unfold, sheet, tick), all off under reduced motion; and the
+     fixes a 124-screen survey found. Details in COMMUNICATION.md's
+     session log, "motion and polish".
+   - [ ] Still open from that survey: the Physician's screens use their
+     own header style (breadcrumb, "Worth a look" card with a filled
+     button) while the other careers use a plain heading; make them one.
    - [ ] The Life system (friends, dating, family, home). A new part of the
      game with its own save data: plan it on its own first.
 

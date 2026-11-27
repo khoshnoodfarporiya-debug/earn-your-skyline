@@ -3,6 +3,7 @@
 import type { RunState } from "@/lib/game/types";
 import { money } from "@/lib/game/format";
 import { cashTone, weeklyBurnFor } from "@/lib/ui/constraint";
+import { Tick } from "../ui/Tick";
 
 /**
  * The three numbers a player should never have to hunt for: what is in the
@@ -70,7 +71,7 @@ export function StatusStrip({
               aria-label={`${c.label}: ${c.value} ${c.sub}`}
               className={`num mt-0.5 truncate text-[18px] font-semibold leading-tight tracking-tight sm:text-[22px] ${toneClass[c.tone]}`}
             >
-              {c.value}
+              <Tick value={c.value} />
             </dd>
             <dd aria-hidden className="mt-0.5 truncate text-[12px] leading-none text-ink-faint">
               {c.sub}
@@ -83,7 +84,7 @@ export function StatusStrip({
             aria-label={`Goal: ${pct}% of the way`}
             className="num mt-0.5 text-[18px] font-semibold leading-tight tracking-tight text-clinical sm:text-[22px]"
           >
-            {pct}%
+            <Tick value={pct}>{pct}%</Tick>
           </dd>
           <dd aria-hidden className="mt-1.5 h-1 overflow-hidden rounded-full bg-rule">
             <span

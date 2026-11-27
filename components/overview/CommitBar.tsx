@@ -1,5 +1,7 @@
 "use client";
 
+import { Tick } from "../ui/Tick";
+
 /**
  * The primary action, pinned within thumb reach on mobile.
  *
@@ -45,7 +47,7 @@ export function CommitBar({
                 {Array.from({ length: budget }, (_, i) => (
                   <span
                     key={i}
-                    className={`h-2 w-2 rounded-full ${i < remaining ? "bg-clinical" : "bg-rule"}`}
+                    className={`time-dot h-2 w-2 rounded-full ${i < remaining ? "bg-clinical" : "bg-rule"}`}
                   />
                 ))}
               </span>
@@ -64,7 +66,7 @@ export function CommitBar({
                     : "text-ink"
               }`}
             >
-              {headline.value}
+              <Tick value={headline.value} />
               <span className="ml-1.5 text-[12px] font-normal text-ink-faint">
                 {headline.label.toLowerCase()}
               </span>

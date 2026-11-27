@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { sectionOf, type ScreenId } from "@/lib/ui/navigation";
 
 /**
@@ -25,6 +26,33 @@ export function SectionNav({
   onNavigate: (screen: ScreenId) => void;
 }) {
   const section = sectionOf(active, careerId);
+  const rowRef = useRef<HTMLDivElement>(null);
+  /* Which edges have more tabs past them. The row fades on that side, so a
+     tab cut by the screen edge reads as "more this way", not a broken word. */
+  const [more, setMore] = useState({ left: false, right: false });
+  const measure = () => {
+    const el = rowRef.current;
+    if (!el) return;
+    setMore({
+      left: el.scrollLeft > 2,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+    });
+  };
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    /* The current tab in view, without moving the page. */
+    const on = el.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (on) {
+      const left = on.offsetLeft - el.offsetLeft;
+      if (left < el.scrollLeft || left + on.offsetWidth > el.scrollLeft + el.clientWidth) {
+        el.scrollLeft = Math.max(0, left - 24);
+      }
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [active]);
   if (section.screens.length <= 1) return null;
 
   return (
@@ -33,6 +61,10 @@ export function SectionNav({
         <div
           role="tablist"
           aria-label={`${section.label} screens`}
+          ref={rowRef}
+          onScroll={measure}
+          data-more-left={more.left || undefined}
+          data-more-right={more.right || undefined}
           className="tab-row -mx-1 px-1"
         >
           {section.screens.map((screen) => {

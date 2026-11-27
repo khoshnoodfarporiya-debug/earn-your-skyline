@@ -319,7 +319,7 @@ export function Overview({
                     {Array.from({ length: budget }, (_, i) => (
                       <span
                         key={i}
-                        className={`h-2 w-2 rounded-full ${i < budget - spent ? "bg-clinical" : "bg-rule"}`}
+                        className={`time-dot h-2 w-2 rounded-full ${i < budget - spent ? "bg-clinical" : "bg-rule"}`}
                       />
                     ))}
                   </span>

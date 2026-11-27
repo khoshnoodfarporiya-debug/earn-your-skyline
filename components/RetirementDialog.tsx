@@ -85,7 +85,7 @@ export function RetirementDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        className="stamp-in form scroll-thin max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-b-none shadow-lift sm:max-h-[88vh] sm:rounded-form"
+        className="sheet-in form scroll-thin max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-b-none shadow-lift sm:max-h-[88vh] sm:rounded-form"
       >
         <div className="form-head sticky top-0 z-10 flex items-baseline justify-between px-5 py-3">
           <h2 id={headingId} className="sign text-[12px] text-clinical">

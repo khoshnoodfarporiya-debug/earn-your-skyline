@@ -39,6 +39,43 @@ export function CareerIcon({
           <path d="M5 7 2 14h6L5 7zM19 7l-3 7h6l-3-7z" />
         </svg>
       );
+    /* Architect: a pair of dividers over the drawing. */
+    case "compass":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="4.5" r="1.5" />
+          <path d="M11.3 5.8 6 20M12.7 5.8 18 20" />
+          <path d="M8 14.5h8" />
+        </svg>
+      );
+    /* Engineer: a gear. */
+    case "gear":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+          <circle cx="12" cy="12" r="6.5" />
+        </svg>
+      );
+    /* Founder: a rocket leaving the ground. */
+    case "rocket":
+      return (
+        <svg {...common}>
+          <path d="M12 2.5c3 2.2 4.5 5.6 4.5 9.5v4h-9v-4c0-3.9 1.5-7.3 4.5-9.5z" />
+          <circle cx="12" cy="10" r="1.6" />
+          <path d="M7.5 13.5 5 16v3l2.5-1.5M16.5 13.5 19 16v3l-2.5-1.5" />
+          <path d="M10.5 18.5 12 21.5l1.5-3" />
+        </svg>
+      );
+    /* Politician: a lectern. */
+    case "podium":
+      return (
+        <svg {...common}>
+          <path d="M5 8h14l-1.5 3h-11z" />
+          <path d="M8 11v10M16 11v10M6 21h12" />
+          <path d="M12 8V4.5M10.5 4.5h3" />
+        </svg>
+      );
     default:
       return (
         <svg {...common}>

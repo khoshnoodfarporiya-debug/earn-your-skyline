@@ -183,6 +183,7 @@ body {
 }
 .btn:active:not(:disabled) {
   transform: translateY(1px);
+  transition-duration: 120ms;
 }
 .btn:focus-visible {
   outline: 2px solid rgb(var(--accent));
@@ -240,8 +241,10 @@ body {
   color: #71829b;
 }
 .btn-quiet {
-  background: transparent;
-  color: #a7b4c8;
+  /* A faint ground, so "Got it" and "Skip" still read as buttons rather
+     than as loose text beside the real one. */
+  background: rgb(255 255 255 / 0.035);
+  color: #c3cddb;
 }
 .btn-quiet:hover:not(:disabled) {
   background: #182a43;
@@ -364,6 +367,22 @@ body {
   overflow-x: auto;
   border-bottom: 1px solid #1d304a;
   scrollbar-width: none;
+}
+/* Set by SectionNav when there are more tabs past an edge. */
+.tab-row[data-more-right] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+.tab-row[data-more-left] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent);
+}
+.tab-row[data-more-left][data-more-right] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 40px,
+    #000 calc(100% - 40px),
+    transparent
+  );
 }
 }
 
@@ -556,6 +575,105 @@ body {
   }
 }
 
+/*
+ * MOTION
+ *
+ * One small vocabulary, used the same way everywhere (design pack, Nov 2026):
+ *
+ *   press      1px down, 120ms              .btn:active
+ *   arrive     fade and a 5px rise, 180ms   .screen-in  a screen you switch to
+ *   swap       fade and a 4px rise, 180ms   .swap-in    the same place, new content
+ *   unfold     fade and a 4px drop, 200ms   Fold's body when it opens
+ *   sheet      rise from below, 220ms       .sheet-in   phone sheets and dialogs
+ *   change     a short glow, 420ms          .tick       a number that just moved
+ *
+ * Nothing moves further than a few pixels or for longer than half a second,
+ * and every one of them is switched off by "reduce motion" (below), where
+ * the result is simply shown in its final state.
+ */
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.screen-in {
+  animation: arrive 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.swap-in {
+  animation: arrive 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+details[open] > .fold-body {
+  animation: unfold 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0.6;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* From below on a phone, where the sheet is anchored to the bottom edge;
+   a centred lift on a wider screen, where it is a dialog. */
+.sheet-in {
+  animation: sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (min-width: 640px) {
+  .sheet-in {
+    animation-name: dialog-in;
+  }
+}
+
+/* A number that has just changed glows once in the career's accent and
+   settles back, so the eye finds what moved. Re-keyed on the value. */
+@keyframes tick {
+  0% {
+    color: rgb(var(--accent));
+    text-shadow: 0 0 14px rgb(var(--accent) / 0.45);
+  }
+  100% {
+    text-shadow: 0 0 0 transparent;
+  }
+}
+.tick {
+  animation: tick 420ms ease-out both;
+}
+
+/* The week's time, one dot per block: it lights and dims rather than
+   blinking between states. */
+.time-dot {
+  transition: background-color 200ms ease;
+}
+
 /* The phone slides up from the bottom edge on mobile, like a device waking. */
 @keyframes phone-in {
   from {
@@ -628,6 +746,11 @@ body {
   .fade,
   .stamp-in,
   .phone-in,
+  .screen-in,
+  .swap-in,
+  .sheet-in,
+  .tick,
+  details[open] > .fold-body,
   .route-draw,
   .route-flow,
   .node-pulse {
@@ -646,7 +769,8 @@ body {
   button:not(:disabled):active {
     transform: none;
   }
-  .gauge::before {
+  .gauge::before,
+  .time-dot {
     transition: none;
   }
   /*
