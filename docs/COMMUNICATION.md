@@ -150,12 +150,11 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`beta` is ahead of `main`** with v0.9.0-beta.4, not yet released: the
-  mentor intro, the motion and polish pass, and one screen header for every
-  career (session-log entries "the mentors", "motion and polish" and "one
-  screen header").
-- **`main` = v0.9.0-beta.3, released 26 Nov 2026.** Everything
+- **`main` = `beta` = v0.9.0-beta.4, released 27 Nov 2026.** Everything
   below is in `main`:
+  - the mentor intro, the motion and polish pass, one screen header for
+    every career, and the CI image-wait fix (session-log entries "the
+    mentors" to "release 0.9.0-beta.4")
   - the new Week screen (session-log entry "the Week screen, built") and
     the phone-news repeat fix (release 0.9.0-beta.3)
   - the redesign's design system: Fraunces and Inter, one button system,
@@ -1045,3 +1044,18 @@ release (PR 11), so it was not merged.
 - Checked: the four tests on phone and desktop with the image cache
   deleted first, 8 of 8 passed.
 
+### 27 Nov 2026 — Claude (Claude Code): release 0.9.0-beta.4
+
+The owner said "Release to main", then "Check and merge" once CI had run.
+
+- **[PR 11](https://github.com/khoshnoodfarporiya-debug/earn-your-skyline/pull/11)**
+  merged 27 Nov 2026 with a merge commit (`c2a498b`), after all four checks
+  passed on the second CI run: `verify` (13m46s), `balance`, Vercel and
+  Vercel Preview Comments.
+- The first run failed four image tests on a cold cache. That was fixed
+  before merging (session-log entry "CI image wait"), not merged over.
+- It carries the mentors, motion and the polish fixes, and one screen
+  header for every career; the version was already 0.9.0-beta.4 on `beta`.
+- Local `main` and `beta` were fast-forwarded to the merge commit. The
+  production deploy of `c2a498b` was building at the time of this note.
+- This note is on `beta` and reaches `main` with the next release.
