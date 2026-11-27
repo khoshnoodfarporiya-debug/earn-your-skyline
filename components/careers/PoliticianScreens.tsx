@@ -2,7 +2,8 @@
 
 import type { RunState } from "@/lib/game/types";
 import { money } from "@/lib/game/format";
-import { screenOf, type ScreenId } from "@/lib/ui/navigation";
+import { screenOf, sectionOf, type ScreenId } from "@/lib/ui/navigation";
+import { ScreenTitle } from "../nav/ScreenTitle";
 import { campaign } from "@/lib/game/careers/politician";
 import {
   BLOC_BY_ID,
@@ -76,10 +77,11 @@ export function PoliticianScreens({
   const def = screenOf(screen);
   return (
     <div className="stack">
-      <div>
-        <h1 className="display text-[19px] leading-tight text-ink">{def.label}</h1>
-        <p className="mt-0.5 text-xs text-ink-faint">{def.purpose}</p>
-      </div>
+      <ScreenTitle
+        kicker={sectionOf(screen, state.careerId).label}
+        title={def.label}
+        purpose={def.purpose}
+      />
       <CareerSceneBanner career="politician" screen={screen} />
       {screen !== "polling" && <PollStrip state={state} />}
       {body}

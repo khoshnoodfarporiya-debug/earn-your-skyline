@@ -2,7 +2,8 @@
 
 import type { RunState } from "@/lib/game/types";
 import { money } from "@/lib/game/format";
-import { screenOf, type ScreenId } from "@/lib/ui/navigation";
+import { screenOf, sectionOf, type ScreenId } from "@/lib/ui/navigation";
+import { ScreenTitle } from "../nav/ScreenTitle";
 import { Shelf, Stat } from "./Shelf";
 import {
   BOOKING_POLICIES,
@@ -119,10 +120,11 @@ export function ChefScreens({
       {/* The Physician's ScreenHeader reads medical state, so the Chef states
           where it is itself rather than borrowing a component that would be
           null for it. */}
-      <div>
-        <h1 className="display text-[19px] leading-tight text-ink">{def.label}</h1>
-        <p className="mt-0.5 text-xs text-ink-faint">{def.purpose}</p>
-      </div>
+      <ScreenTitle
+        kicker={sectionOf(screen, state.careerId).label}
+        title={def.label}
+        purpose={def.purpose}
+      />
       {body}
     </div>
   );
