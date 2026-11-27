@@ -24,6 +24,8 @@ import {
 import { lessonFor, lessonStatus } from "@/lib/ui/onboarding";
 import { glossaryFor } from "@/lib/ui/glossary";
 import { LessonCard } from "./onboarding/LessonCard";
+import { MentorIntro } from "./onboarding/MentorIntro";
+import { mentorFor, mentorLessonId } from "@/lib/ui/mentors";
 import { Glossary } from "./onboarding/Glossary";
 import { money } from "@/lib/game/format";
 import { SectionBanner } from "./visuals/SectionBanner";
@@ -231,6 +233,20 @@ export function Game({
     () => lessonFor(screen, state, teachCtx, taught),
     [screen, state, teachCtx, taught],
   );
+  /*
+   * The mentor meets a new run at the top of its first Week, before the
+   * week's lesson. Filed in the same taught list as the lessons, so it is a
+   * property of the player: met once per career, not once per run. A run
+   * that has already played a week never shows it; the Week screen keeps it
+   * to reread under "More this week".
+   */
+  const mentor = mentorFor(state.careerId);
+  const mentorId = mentorLessonId(state.careerId);
+  const showMentor =
+    screen === "overview" &&
+    mentor !== null &&
+    state.history.length === 0 &&
+    !taught.includes(mentorId);
   const step = useMemo(() => {
     const s = nextStep(state, alloc, spent, budget, state.history.length > 0);
     return s && !dismissed.includes(s.id) ? s : null;
@@ -485,7 +501,20 @@ export function Game({
          * what a time block is while their licence is suspended has a more
          * pressing problem than vocabulary.
          */}
-        {lesson && (
+        {/* The mentor first, the lesson after: two teaching cards stacked
+            on one screen would be a wall before the plan. */}
+        {showMentor && mentor && (
+          <div className="mb-4">
+            <MentorIntro
+              mentor={mentor}
+              onDone={() => {
+                teach(mentorId);
+                mainRef.current?.focus();
+              }}
+            />
+          </div>
+        )}
+        {lesson && !showMentor && (
           <div className="mb-4">
             <LessonCard
               lesson={lesson}

@@ -530,6 +530,21 @@ screen at a time:
        2" was optimistic: the eight-action planner alone is about 870px.
        Making the planner shorter is the next lever.
    - [ ] The other screens, one at a time.
+6. **From the design pack** (ChatGPT, "Earn Your Skyline - Design Pack",
+   reviewed 27 Nov 2026). Take the art and the new ideas; keep our Week
+   screen, type and tabs, which the pack predates.
+   - [x] **Mentor intro** (branch `feature/mentor-intro`, 27 Nov 2026):
+     one mentor per career (`lib/ui/mentors.ts`), three skippable cards at
+     the top of a new run's first Week (`MentorIntro`), rereadable under
+     "More this week". Portraits from the pack, 256px webp in
+     `public/visuals/characters/mentors/`, masters in
+     `art-source/visuals/characters/mentors/`.
+   - [ ] Painted art: try the portraits and Life scenes first, then a
+     painted banner beside a current photo at 375px before replacing any.
+   - [ ] The Week review remembering people, and "Ask <mentor>" on the
+     career's own screen.
+   - [ ] The Life system (friends, dating, family, home). A new part of the
+     game with its own save data: plan it on its own first.
 
 ## Dropped
 
