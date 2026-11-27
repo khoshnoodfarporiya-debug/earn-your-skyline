@@ -29,7 +29,7 @@ import { SETBACK_LABEL } from "../lib/game/setbacks";
  *
  * The game no longer ends, so a run has to be *stopped* to be measured. 156
  * weeks is the old week limit, chosen deliberately: every balance figure in
- * the README was produced under it, so the numbers stay comparable across the
+ * docs/DESIGN.md was produced under it, so the numbers stay comparable across the
  * change that removed it.
  */
 const HORIZON = 156;
