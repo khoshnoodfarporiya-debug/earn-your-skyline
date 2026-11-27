@@ -27,6 +27,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Smoother screens: switching screens, opening a row and changing your plan now move gently, and a number that changes glows once so you can see what moved. Turn on Reduce Motion to switch it off.",
       "Clearer controls: every career has its own icon, tabs that run off the edge fade instead of cutting words, and the plan bar on every screen says \"Plan the week\".",
       "On a computer, the planner beside each screen no longer squeezes action names onto one word a line.",
+      "Every career's screens now open the same way: the section, the title and one line on what the screen is for. The Physician's warnings are calmer cards, like \"Needs you\" on the Week screen.",
     ],
   },
   {

@@ -151,8 +151,9 @@ touched. Run the browser tests when you change a screen.
 ## 6. Where the work stands (26 Nov 2026)
 
 - **`beta` is ahead of `main`** with v0.9.0-beta.4, not yet released: the
-  mentor intro and the motion and polish pass (session-log entries "the
-  mentors" and "motion and polish").
+  mentor intro, the motion and polish pass, and one screen header for every
+  career (session-log entries "the mentors", "motion and polish" and "one
+  screen header").
 - **`main` = v0.9.0-beta.3, released 26 Nov 2026.** Everything
   below is in `main`:
   - the new Week screen (session-log entry "the Week screen, built") and
@@ -996,3 +997,29 @@ motion, and for everything to sit in its right place.
 - **Still open:** the Physician's screens use a different header style
   from the other careers (breadcrumb and a "Worth a look" card with a
   filled button). Logged in `WORKING_PLAN.md` section 8, step 6.
+
+### 27 Nov 2026 — Claude (Claude Code): one screen header
+
+Branch `feature/unify-headers`, merged into `beta` and pushed. The owner
+said "Unify Physician headers", the open item from the polish survey.
+
+- **Before:** the Physician's screens opened with a "Work / Build"
+  breadcrumb, a bold title, and a filled amber or red status panel with a
+  filled button; five of them (Staff, Caseload, Career, Life, Growth) put
+  the title inside a picture instead. The other six careers opened with a
+  plain serif title and a small grey line.
+- **Now, one component,** `components/nav/ScreenTitle.tsx`: the section in
+  small capitals (the same kicker the Week hero uses), the serif title,
+  one line of purpose. All seven careers' screens use it; the six career
+  screen files call it with `sectionOf(screen, careerId).label`.
+- **The Physician's status** (`ScreenHeader`) is now a card in the "Needs
+  you" style: a glyph and the severity in words, the sentence, then the
+  action as a secondary button and Help as a quiet one. The filled
+  button on a screen is for committing the week. Still `role="status"`,
+  still 44px buttons.
+- **The five pictures** (`SectionBanner`) sit under the title as a
+  captioned picture, like the other careers' scene banners, with the live
+  figure as the caption ("1 on the payroll · $2,663/wk in fixed costs").
+  The `BANNERED` set and the header's compact mode in `Game.tsx` are gone.
+- Checked: the 124-screen survey (no overflow), the Staff screen in the
+  browser at 375px (pictures load, 16px gap below), and the browser suite.

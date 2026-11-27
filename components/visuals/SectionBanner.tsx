@@ -21,15 +21,13 @@ import { ArtFrame } from "./ArtFrame";
  */
 export function SectionBanner({
   section,
-  title,
-  kicker,
   status,
   priority = false,
   children,
 }: {
   section: string;
-  title: string;
-  /** Small label above the title — what this screen is for. */
+  /** Kept for the callers' readability; the title is drawn by ScreenTitle. */
+  title?: string;
   kicker?: string;
   /** One short live sentence or figure, shown under the title. */
   status?: ReactNode;
@@ -40,42 +38,33 @@ export function SectionBanner({
 }) {
   const visual = sectionVisual(section);
 
+  /*
+   * The picture under a screen's title, captioned with one live figure, the
+   * way the other careers' screens show theirs (CareerSceneBanner). It used
+   * to carry the title too; that moved into the shared ScreenTitle (Nov 2026)
+   * so every career's screens open the same way.
+   */
   return (
-    <section
-      aria-labelledby={`section-${section}-title`}
-      className="form overflow-hidden"
+    <ArtFrame
+      visual={visual}
+      ratio="aspect-[21/7]"
+      scrim={visual?.scrim ?? "bottom"}
+      sizes="(min-width: 1152px) 1104px, 100vw"
+      priority={priority}
+      /* mb-4: the panels below it are not in a .stack, so the gap is
+         the banner's own, matching the header's above. */
+      className="mb-4 rounded-lg border border-rule"
     >
-      <ArtFrame
-        visual={visual}
-        /* Shallower on a phone than on a desktop: the same image, but the
-           mobile viewport cannot spare 40% of its height to scenery. */
-        ratio="aspect-[16/7] sm:aspect-[21/6]"
-        scrim={visual?.scrim ?? "bottom"}
-        sizes="(min-width: 1152px) 1104px, 100vw"
-        priority={priority}
-      >
-        <div className="absolute inset-0 flex items-end justify-between gap-3 p-3.5 sm:p-5">
-          <div className="min-w-0">
-            {kicker && (
-              <p className="sign text-[11.5px] text-clinical drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
-                {kicker}
-              </p>
-            )}
-            <h2
-              id={`section-${section}-title`}
-              className="display mt-0.5 text-2xl leading-none text-ink drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] sm:text-3xl"
-            >
-              {title}
-            </h2>
-            {status && (
-              <p className="mt-1.5 max-w-prose text-[13.5px] leading-snug text-ink-soft drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
-                {status}
-              </p>
-            )}
-          </div>
-          {children}
-        </div>
-      </ArtFrame>
-    </section>
+      <div className="absolute inset-x-4 bottom-3 flex items-end justify-between gap-3">
+        {status && (
+          <p
+            className="sign min-w-0 text-[11px] text-ink drop-shadow-[0_1px_5px_rgba(0,0,0,0.95)]"
+          >
+            {status}
+          </p>
+        )}
+        {children}
+      </div>
+    </ArtFrame>
   );
 }

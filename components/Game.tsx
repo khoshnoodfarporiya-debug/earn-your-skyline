@@ -41,13 +41,6 @@ import { ScreenHeader } from "./nav/ScreenHeader";
 import { whatChanged, type WeekChanges } from "@/lib/ui/whatChanged";
 
 /** Screens whose illustrated banner already states section, title and purpose. */
-const BANNERED = new Set<ScreenId>([
-  "staff",
-  "caseload",
-  "career",
-  "life",
-  "growth",
-]);
 import { Overview } from "./overview/Overview";
 import { WeeklyPlanRail } from "./plan/WeeklyPlanRail";
 import {
@@ -590,7 +583,22 @@ export function Game({
         {m && (
           <>
             {/*
-             * One banner at the entrance to a screen, never per subsection.
+             * Where you are, what is true here, and the one thing worth doing
+             * about it. Computed per screen from the actual run — see
+             * `lib/ui/orientation.ts`.
+             */}
+            {screen !== "overview" && (
+              <ScreenHeader
+                state={state}
+                screen={screen}
+                onNavigate={setScreen}
+              />
+            )}
+
+            {/*
+             * One picture under the title, never per subsection, the way every
+             * other career's screens show theirs (Nov 2026: it used to carry
+             * the title itself, and the header below it went compact).
              * Only screens with registered artwork get one; the rest keep
              * their existing headers, which is why this is a lookup and not a
              * wrapper around every panel.
@@ -636,20 +644,6 @@ export function Game({
               />
             )}
 
-            {/*
-             * Where you are, what is true here, and the one thing worth doing
-             * about it. Computed per screen from the actual run — see
-             * `lib/ui/orientation.ts`. The five bannered screens above already
-             * carry a title and purpose, so those get the status alone.
-             */}
-            {screen !== "overview" && (
-              <ScreenHeader
-                state={state}
-                screen={screen}
-                onNavigate={setScreen}
-                compact={BANNERED.has(screen)}
-              />
-            )}
 
             {screen === "build" && (
               <BuildPanel state={state} dispatch={dispatch} />
