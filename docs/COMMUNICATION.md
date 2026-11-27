@@ -1023,3 +1023,25 @@ said "Unify Physician headers", the open item from the polish survey.
   The `BANNERED` set and the header's compact mode in `Game.tsx` are gone.
 - Checked: the 124-screen survey (no overflow), the Staff screen in the
   browser at 375px (pictures load, 16px gap below), and the browser suite.
+
+### 27 Nov 2026 — Claude (Claude Code): CI image wait
+
+Branch `fix/ci-image-wait`, merged into `beta` and pushed on the owner's
+"Yes, push the fix". CI's `verify` had failed on the 0.9.0-beta.4
+release (PR 11), so it was not merged.
+
+- **The failure:** four tests that scroll a full shop or department list
+  ("every purchasable item shows its own artwork", "no source PNG reaches
+  the browser", "all twelve departments show their own interior", "the
+  twelve machines use the re-shot scenes") failed with "images below the
+  fold never finished". The same four failed on `main` after the PR 10
+  merge, so it was not new; they pass locally, where the image cache is
+  warm. CI's is always cold.
+- **The cause:** `imagesSettled` in `e2e/app.spec.ts` is documented as "it
+  does not assert", but it asserted after a 10-second `expect.poll`.
+- **The fix:** it polls by hand for up to 60 seconds and returns without
+  throwing; the tests' own checks name any missing image. They are
+  `test.slow()`, so 60 seconds fits their budget.
+- Checked: the four tests on phone and desktop with the image cache
+  deleted first, 8 of 8 passed.
+
