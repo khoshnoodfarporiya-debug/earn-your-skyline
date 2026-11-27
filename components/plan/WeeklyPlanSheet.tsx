@@ -98,7 +98,7 @@ export function WeeklyPlanSheet({
         role="dialog"
         aria-modal="true"
         aria-label="Weekly plan"
-        className="flex h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[20px] border-t border-rule bg-paper"
+        className="sheet-in flex h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[20px] border-t border-rule bg-paper"
       >
         <div className="form-head flex items-center justify-between gap-3 px-4 py-3">
           <div>
@@ -191,8 +191,20 @@ export function WeeklyPlanTrigger({
         onClick={onOpen}
         className="mx-auto flex min-h-[44px] w-full max-w-6xl items-center justify-between gap-3 rounded-form border border-rule bg-card px-4 text-left transition hover:border-clinical/40"
       >
-        <span className="sign text-[12px] text-ink">Week plan</span>
-        <span className="num flex items-baseline gap-2 text-[12px] text-ink-faint">
+        <span className="flex min-w-0 items-center gap-2.5">
+          {budget > 0 && budget <= 12 && (
+            <span aria-hidden className="flex shrink-0 gap-[4px]">
+              {Array.from({ length: budget }, (_, i) => (
+                <span
+                  key={i}
+                  className={`time-dot h-2 w-2 rounded-full ${i < remaining ? "bg-clinical" : "bg-rule"}`}
+                />
+              ))}
+            </span>
+          )}
+          <span className="truncate text-[14px] font-semibold text-ink">Plan the week</span>
+        </span>
+        <span className="num flex shrink-0 items-center gap-2 text-[12px] text-ink-faint">
           <span
             className={
               tone === "alarm"
@@ -209,6 +221,7 @@ export function WeeklyPlanTrigger({
               ? "fully planned"
               : `${remaining} free`}
           </span>
+          <span aria-hidden className="text-[18px] leading-none text-ink-soft">›</span>
         </span>
       </button>
     </div>

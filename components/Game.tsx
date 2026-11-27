@@ -397,7 +397,7 @@ export function Game({
                 hero used to repeat both; this is now the one place they live,
                 and it is on every screen, not only the Week. */}
             <span className="num block truncate text-[12px] text-ink-soft">
-              {m && <span className="text-clinical">{titleFor(m)} · </span>}
+              {m && <span className="hidden text-clinical sm:inline">{titleFor(m)} · </span>}
               Week {state.week}
               {homeCityName ? ` · ${homeCityName}` : ""}
             </span>
@@ -473,6 +473,10 @@ export function Game({
         }
       >
       <main ref={mainRef} tabIndex={-1} className="min-w-0 outline-none">
+        {/* Re-keyed on the screen, so each one arrives (180ms fade and a 5px
+            rise) rather than cutting in. Inside <main>, so focus and the
+            ref that the review returns focus to are untouched. */}
+        <div key={screen} className="screen-in">
         {/*
          * A crisis outranks the screen you happen to be on.
          *
@@ -723,6 +727,7 @@ export function Game({
             )}
           </>
         )}
+        </div>
       </main>
 
       {screen !== "overview" && screen !== "cities" && (

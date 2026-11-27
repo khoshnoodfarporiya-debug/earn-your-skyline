@@ -50,8 +50,9 @@ export function MentorIntro({
       {/* Polite, so a screen reader hears the next card when Continue is
           pressed without the focus having to move off the button. */}
       <p
+        key={i}
         aria-live="polite"
-        className="display px-4 pt-3.5 text-[17px] leading-snug text-ink sm:px-5"
+        className="swap-in display px-4 pt-3.5 text-[17px] leading-snug text-ink sm:px-5"
       >
         “{mentor.lines[i]}”
       </p>

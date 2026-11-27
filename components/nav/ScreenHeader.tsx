@@ -120,8 +120,11 @@ export function ScreenHeader({
                       already announces the state, and a control that renames
                       itself is a control the player has to re-find. */}
                   Help
-                  <span aria-hidden className="ml-1.5 text-ink-faint">
-                    {helpOpen ? "−" : "+"}
+                  <span
+                    aria-hidden
+                    className={`ml-1 inline-block text-[15px] leading-none text-ink-faint transition-transform duration-150 motion-reduce:transition-none ${helpOpen ? "rotate-180" : ""}`}
+                  >
+                    ▾
                   </span>
                 </button>
               )}

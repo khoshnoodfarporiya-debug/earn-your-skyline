@@ -151,7 +151,8 @@ touched. Run the browser tests when you change a screen.
 ## 6. Where the work stands (26 Nov 2026)
 
 - **`beta` is ahead of `main`** with v0.9.0-beta.4, not yet released: the
-  mentor intro (session-log entry "the mentors").
+  mentor intro and the motion and polish pass (session-log entries "the
+  mentors" and "motion and polish").
 - **`main` = v0.9.0-beta.3, released 26 Nov 2026.** Everything
   below is in `main`:
   - the new Week screen (session-log entry "the Week screen, built") and
@@ -953,3 +954,45 @@ opinion; after the review they chose "Mentor intro first".
   shortened to "Your mentor" because it wrapped. The pane was signed in to
   the owner's own local profile with a run in progress; its storage was
   backed up, a test Chef run played, and the profile restored exactly.
+
+### 27 Nov 2026 — Claude (Claude Code): motion and polish
+
+Branch `feature/motion-polish`, merged into `beta` and pushed. The owner
+said the buttons and layout did not feel polished or clear, asked for
+motion, and for everything to sit in its right place.
+
+- **Motion,** one vocabulary in `app/globals.css` (the "MOTION" block),
+  from the design pack's numbers: press 1px/120ms; a screen you switch to
+  arrives with a 180ms fade and 5px rise (`Game.tsx` re-keys a wrapper
+  inside `<main>`, so focus is untouched); folded rows ease open; the
+  mentor's cards swap; the plan sheet and dialogs rise from below on a
+  phone and lift in on desktop; the week's dots fade between lit and
+  dim; and a number that changes glows once in the career's colour
+  (`components/ui/Tick.tsx`: cash, debt, goal, the forecast headline and
+  the stepper counts, on change only, never on arrival). Every one is off
+  under "reduce motion".
+- **What the survey found and what changed** (124 screens, 7 careers,
+  375px and 1280px; no overflow before or after):
+  - The desktop plan rail squeezed action names to one word a line
+    ("Grow / the / panel"). `ActionBoard` has a `dense` form for the rail:
+    no icon, the price under the name, a 36px stepper, and no second
+    header repeating the blocks left.
+  - Architect, Engineer, Founder and Politician showed an empty circle as
+    their career icon: their icons had never been drawn. Now a pair of
+    dividers, a gear, a rocket and a lectern.
+  - Tab rows cut words at the screen edge ("Assig", "The f"). The row now
+    fades on any side with more tabs, and scrolls the current one into
+    view (`SectionNav`).
+  - "Help +" read as "add". It is a disclosure, so it has a chevron.
+  - The "Week plan" bar on every other screen did not look like a button.
+    It now reads "Plan the week" with the week's dots and a chevron.
+  - The Physician's header line was "Dr · MD · Week 4 · L…": on a phone the
+    title gives way so the week and city fit.
+  - The hero line for every career but the Physician ran to five figures.
+    It is now the headline figure, named, plus one clause ("Worth −$5,100
+    · 0 on the boards"); the cash is in the strip below.
+  - Quiet buttons ("Got it", "Skip") have a faint ground so they read as
+    buttons.
+- **Still open:** the Physician's screens use a different header style
+  from the other careers (breadcrumb and a "Worth a look" card with a
+  filled button). Logged in `WORKING_PLAN.md` section 8, step 6.

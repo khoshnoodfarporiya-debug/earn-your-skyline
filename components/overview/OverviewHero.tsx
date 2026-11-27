@@ -61,8 +61,16 @@ export function OverviewHero({
      * has a scoreboard, so fall through to the one it defines for itself.
      */
     if (!m) {
+      /* One fact and what it is worth, not the whole scoreboard: the full
+         sub-line ran to five figures on a phone ("−$37,000 · $14,000 cash ·
+         0 live · $0 billed · $0 unbilled"), and the cash is in the strip
+         right below. So: the headline figure, named, plus its first clause
+         that is not the cash. */
       const sb = career.scoreboard(state);
-      return `${sb.value} · ${sb.sub}`;
+      const isMoney = /^-?\$/.test(sb.value);
+      const head = isMoney ? `Worth ${sb.value.replace(/^-/, "−")}` : sb.value;
+      const clause = sb.sub.split(" · ").find((x) => !/\bcash$/i.test(x));
+      return clause ? `${head} · ${clause}` : head;
     }
     return `${Math.round(state.r.panel).toLocaleString("en-US")} patients on your list.`;
   })();

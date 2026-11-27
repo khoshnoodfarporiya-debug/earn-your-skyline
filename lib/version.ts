@@ -24,6 +24,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-11-27",
     changes: [
       "Every career now has a mentor who meets you at the start of your first week: three short tips you can skip, and reread any time under \"More this week\".",
+      "Smoother screens: switching screens, opening a row and changing your plan now move gently, and a number that changes glows once so you can see what moved. Turn on Reduce Motion to switch it off.",
+      "Clearer controls: every career has its own icon, tabs that run off the edge fade instead of cutting words, and the plan bar on every screen says \"Plan the week\".",
+      "On a computer, the planner beside each screen no longer squeezes action names onto one word a line.",
     ],
   },
   {

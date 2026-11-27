@@ -130,6 +130,7 @@ export function WeeklyPlanRail({
           spent={spent}
           onChange={onAllocate}
           bare
+          dense
         />
       </div>
 
