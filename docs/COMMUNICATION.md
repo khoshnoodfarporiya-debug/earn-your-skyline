@@ -150,7 +150,10 @@ touched. Run the browser tests when you change a screen.
 
 ## 6. Where the work stands (26 Nov 2026)
 
-- **`main` = `beta` = v0.9.0-beta.4, released 27 Nov 2026.** Everything
+- **`beta` is ahead of `main`** with v0.9.0-beta.5, not yet released:
+  plan it for me, the first-run tour, and the commit-bar fix (session-log
+  entry "easier to play"). Also on `beta` only: the repo-gaps work.
+- **`main` = v0.9.0-beta.4, released 27 Nov 2026.** Everything
   below is in `main`:
   - the mentor intro, the motion and polish pass, one screen header for
     every career, and the CI image-wait fix (session-log entries "the
@@ -1090,3 +1093,51 @@ and said "Fix the repo gaps".
 - Not done here: the review's other points are about Deep-Pulse-V2, a
   different repository.
 
+### 28 Nov 2026 — Claude (Claude Code): easier to play
+
+Branch `feature/easy-planning`, merged into `beta` and pushed. The owner
+said planning a week took too many taps ("some players are just not gonna
+do it"), and asked for the game to show a new player where to go instead of
+writing it all down. They chose "Plan it for me" and "planning and the tour
+first"; the phone and icon redesign is next.
+
+- **Plan it for me** (`lib/ui/recommend.ts`). Four plans per career: Steady
+  week, Push for money (the Politician's is "Campaign hard"), Invest in
+  growth, Rest up. The weights come from the balance harness's bots, so
+  Steady is a week shown to work. The recommendation: rest at burnout 65 and
+  over, money when cash covers under three weeks of fixed costs, otherwise
+  Steady, each with one sentence saying why. The Chef's plans never book a
+  service into an empty larder; they say to buy produce instead.
+- **The week arrives planned** (`Game.tsx`): the recommended plan is filled
+  in once per week, on arrival. While the player has not changed it, it
+  follows the run (a Chef who buys a crate gets services); once they change
+  it, it is theirs. A stored `career-tycoon:autoplan:v1` of "0" turns it off.
+- **The Week screen** (`components/overview/PlanPicker.tsx`) leads with the
+  plan: its name, a Recommended badge, the blocks in one line, the reason,
+  then the plans as one-tap choices (and Repeat last week). The steppers
+  are behind "Change it yourself", remembered open or closed
+  (`career-tycoon:planner-open:v1`). The phone's plan sheet uses the same card.
+  The old `QuickPlan` buttons are gone; its helpers stay.
+- **The first-run tour** (`components/onboarding/GuidedTour.tsx`) replaces
+  the mentor's three text cards. The screen dims except one thing, with the
+  mentor's portrait and one line beside it: the career's rule; your money;
+  the plan; the other plans; the commit button (that step waits for the
+  commit); then the career's work tab. Skip at any step, or Escape. The
+  page stays live under it. Filed under the mentor's id in the taught list,
+  so it runs once per career per player. Targets are `data-tour`
+  attributes. The week's lesson card waits until the tour is over.
+- **A bug the tour found, and it was live in 0.9.0-beta.4:** the
+  screen-change animation used a transform, and in Chrome that made the
+  screen's wrapper the containing block for the Week screen's fixed commit
+  bar. On a phone the bar sat at the end of the page instead of the bottom
+  of the screen. The screen change is now a pure fade (`.screen-in` in
+  `globals.css`), and a test checks the bar is on screen.
+- **Tests:** `beforeEach` seeds the autoplan off and the planner open, so
+  older tests keep their empty week; new tests cover the tour, skipping it,
+  the planned week and the commit bar. `dismissReview` skips the tour
+  bubble, which is a dialog too. The quick-plan tests use the new plan
+  names.
+- **Version 0.9.0-beta.5** with three "What's new" lines.
+- Checked at 375px with a headless browser, every step of the tour through a
+  committed week, and the plans for all seven careers printed from the
+  engine.

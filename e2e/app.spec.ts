@@ -33,11 +33,20 @@ test.beforeEach(async ({ page }) => {
         ]),
       );
       window.localStorage.setItem(activeKey, id);
-      /* Every mentor already met, unless a test says otherwise. The mentor
-         meets a new run before the week's lesson, and most of these tests
-         are about the lesson or what follows it. Only when the key is absent,
+      /* Every mentor already met (their first-run tour already taken),
+         unless a test says otherwise. The tour comes before the week's
+         lesson, and most of these tests are about the lesson or after it. Only when the key is absent,
          so a lesson closed during a test stays closed across a reload. The
          mentor itself is tested with this key set to an empty list. */
+      /* The week arrives planned for a real player (`lib/ui/recommend.ts`);
+         these tests were written against an empty week and the steppers in
+         view, so they start that way. The defaults are tested on their own. */
+      if (window.localStorage.getItem("career-tycoon:autoplan:v1") === null) {
+        window.localStorage.setItem("career-tycoon:autoplan:v1", "0");
+      }
+      if (window.localStorage.getItem("career-tycoon:planner-open:v1") === null) {
+        window.localStorage.setItem("career-tycoon:planner-open:v1", "1");
+      }
       if (window.localStorage.getItem(taughtKey) === null) {
         window.localStorage.setItem(
           taughtKey,
@@ -127,7 +136,8 @@ async function openFold(page: Page, label: RegExp) {
  * reliable path and Escape is the fallback.
  */
 async function dismissReview(page: Page) {
-  const review = page.getByRole("dialog");
+  /* Not the first-run tour's bubble, which is a (non-modal) dialog too. */
+  const review = page.locator('[role="dialog"]:not(.tour-bubble)');
   if (!(await review.isVisible().catch(() => false))) return;
 
   const cont = review.getByRole("button", { name: /^Continue$/ });
@@ -1298,18 +1308,18 @@ test.describe("filling the week in one tap", () => {
 
     // One press fills the week, so the commit control arms without the six
     // separate stepper presses the board would otherwise need.
-    await page.getByRole("button", { name: /^Balanced/ }).click();
+    await page.getByRole("button", { name: /^Steady week/ }).click();
     await expect(commit).toBeEnabled();
     await expect(commit).toHaveText(/Commit week/);
 
     // This fixture sits at burnout 81, so the plans that assign no rest carry
     // a warning — a one-tap button must not be able to quietly end the run.
     await expect(
-      page.getByRole("button", { name: /Balanced.*no rest in it/i }),
+      page.getByRole("button", { name: /Steady week.*no rest in it/i }),
       "a restless plan is marked while burnout is high",
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /^Recovery/ }),
+      page.getByRole("button", { name: /^Rest up/ }),
       "the plan that does rest carries no warning",
     ).toBeVisible();
 
@@ -1335,7 +1345,7 @@ test.describe("filling the week in one tap", () => {
 
     // Recover, not Grow: this fixture is at burnout 81, and a week with no
     // rest in it ends the run outright — which would leave nothing to resume.
-    await page.getByRole("button", { name: /^Recovery/ }).click();
+    await page.getByRole("button", { name: /^Rest up/ }).click();
     await commitButton(page).click();
     await dismissReview(page);
 
@@ -2410,7 +2420,7 @@ test.describe("player journeys", () => {
     ).toHaveCount(0);
 
     /* Plan and commit without guessing. */
-    await page.getByRole("button", { name: /^balanced$/i }).click();
+    await page.getByRole("button", { name: /^Steady week/i }).click();
     await expect(commitButton(page)).toBeEnabled();
     await playWeek(page);
     await dismissReview(page);
@@ -6712,18 +6722,19 @@ test.describe("guidance in every career", () => {
   }
 
   /**
-   * The mentor meets a new run before its first lesson, three cards long, and
-   * steps aside for good once finished. Every other test starts with all the
-   * mentors met (see `beforeEach`); this one clears that.
+   * The first-run tour: the mentor points at the money, the plan, the other
+   * plans, the commit button and the career's screens, one at a time. The
+   * commit step waits for the commit itself. Every other test starts with
+   * the tours taken (see `beforeEach`); this one clears that.
    */
-  test("a new run meets its mentor first, once, and can reread them", async ({
-    page,
-  }) => {
+  test("a new run is shown around by its mentor, once", async ({ page }) => {
     const problems = watchConsole(page);
     await page.goto("/");
+    /* As a real player arrives: no tour taken, and the week planned. */
     await page.evaluate((key) => {
       window.localStorage.clear();
       window.localStorage.setItem(key, "[]");
+      window.localStorage.setItem("career-tycoon:autoplan:v1", "1");
     }, `career-tycoon:p.${TEST_PLAYER_ID}:taught:v1`);
     await page.reload();
     const card = page.getByRole("button", { name: /^open\s*chef/i }).first();
@@ -6731,38 +6742,122 @@ test.describe("guidance in every career", () => {
     await card.click();
     await page.getByRole("button", { name: /^Begin in Lyon$/ }).click();
 
-    const mentor = page.getByRole("region", { name: "Luc Moreau" });
-    await expect(mentor).toBeVisible();
-    await expect(mentor.getByText(/1 of 3/)).toBeVisible();
-    await expect(mentor.getByText(/oldest usable stock first/i)).toBeVisible();
-    /* One teaching card at a time: the week's lesson waits its turn. */
+    const bubble = page.locator(".tour-bubble");
+    await expect(bubble).toContainText("Luc Moreau");
+    await expect(bubble).toContainText(/oldest usable stock first/i);
+    await expect(bubble).toContainText("1 of 6");
+    /* One teaching voice at a time: the week's lesson waits. */
     const lesson = page.getByRole("heading", {
       name: /A week is six blocks, and the food is already ageing/i,
     });
     await expect(lesson).toHaveCount(0);
 
-    await mentor.getByRole("button", { name: /^Continue$/ }).click();
-    await expect(mentor.getByText(/2 of 3/)).toBeVisible();
-    await mentor.getByRole("button", { name: /^Continue$/ }).click();
-    await expect(mentor.getByText(/3 of 3/)).toBeVisible();
-    await expect(mentor.getByRole("button", { name: /^Skip$/ })).toHaveCount(0);
-    await mentor.getByRole("button", { name: /^Start planning$/ }).click();
+    const next = bubble.getByRole("button", { name: /^Next$/ });
+    for (const n of [2, 3, 4, 5]) {
+      await next.click();
+      await expect(bubble).toContainText(`${n} of 6`);
+    }
+    /* The commit step has no Next: it waits for the commit. */
+    await expect(bubble.getByRole("button", { name: /^Next$/ })).toHaveCount(0);
+    await commitButton(page).click();
+    await dismissReview(page);
+    await expect(bubble).toContainText("6 of 6");
+    await bubble.getByRole("button", { name: /^Done$/ }).click();
+    await expect(bubble).toHaveCount(0);
+    /* The "a week is six blocks" lesson does not come back afterwards: the
+       player has now committed a week, which is what it teaches. */
+    await expect(lesson).toHaveCount(0);
 
-    await expect(mentor).toHaveCount(0);
-    await expect(lesson).toBeVisible();
-
-    /* Met is met: a reload does not bring the cards back. */
+    /* Taken is taken: a reload does not start it again. */
     await page.reload();
     await page.getByRole("button", { name: /continue your run/i }).click();
-    await expect(page.getByRole("region", { name: "Luc Moreau" })).toHaveCount(0);
+    await expect(page.locator(".tour-bubble")).toHaveCount(0);
 
-    /* Still there to reread, all three lines at once. */
+    /* The mentor's lines are still there to reread. */
     await openFold(page, /^Advice from Luc Moreau/);
-    await expect(
-      page.getByRole("main").getByText(/diners turned away/i),
-    ).toBeVisible();
+    await expect(page.getByRole("main").getByText(/diners turned away/i)).toBeVisible();
 
     expect(problems).toEqual([]);
+  });
+
+  test("the tour can be skipped at any step", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate((key) => {
+      window.localStorage.clear();
+      window.localStorage.setItem(key, "[]");
+    }, `career-tycoon:p.${TEST_PLAYER_ID}:taught:v1`);
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*solicitor/i }).first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in / }).first().click();
+    const bubble = page.locator(".tour-bubble");
+    await bubble.getByRole("button", { name: /^Next$/ }).click();
+    await bubble.getByRole("button", { name: /^Skip tour$/ }).click();
+    await expect(bubble).toHaveCount(0);
+    await page.reload();
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await expect(page.locator(".tour-bubble")).toHaveCount(0);
+  });
+
+  /**
+   * PLAN IT FOR ME. A real player's week arrives planned with the
+   * recommendation, so one press of Commit plays it. Clearing it gives an
+   * empty week rather than a refill.
+   */
+  test("the week arrives planned, and can be committed as it is", async ({ page }) => {
+    const problems = watchConsole(page);
+    await page.goto("/");
+    await page.evaluate(() => {
+      window.localStorage.clear();
+      window.localStorage.setItem("career-tycoon:autoplan:v1", "1");
+      window.localStorage.setItem("career-tycoon:planner-open:v1", "0");
+    });
+    await page.reload();
+    const card = page.getByRole("button", { name: /^open\s*architect/i }).first();
+    await card.click();
+    await card.click();
+    await page.getByRole("button", { name: /^Begin in / }).first().click();
+
+    const week = page.getByRole("region", { name: "Your week" });
+    await expect(week).toContainText("Steady week");
+    await expect(week).toContainText(/Recommended/i);
+    await expect(week).toContainText(/At the board ×4/);
+    /* The steppers are one tap away, not in the way. */
+    await expect(page.getByRole("button", { name: /More blocks on/ })).toHaveCount(0);
+
+    /* Another plan is one tap. */
+    await week.getByRole("button", { name: /^Rest up/ }).click();
+    await expect(week.getByRole("button", { name: /^Rest up/ })).toHaveAttribute("aria-pressed", "true");
+
+    const commit = commitButton(page);
+    await expect(commit).toBeEnabled();
+    await commit.click();
+    await dismissReview(page);
+    expect(await readWeek(page)).toBe(2);
+    /* Week two arrives planned too. */
+    await expect(commitButton(page)).toBeEnabled();
+
+    expect(problems).toEqual([]);
+  });
+
+  /**
+   * The commit bar is pinned to the bottom of a phone's screen. A transform
+   * on the screen's wrapper (the 0.9.0-beta.4 screen-change animation) once
+   * made it the bar's containing block, so the bar sat at the end of the
+   * page, below the fold.
+   */
+  test("the commit bar stays at the bottom of a phone screen", async ({ page }, info) => {
+    test.skip(info.project.name !== "mobile", "the bar is the phone layout's");
+    await preload(page, "midrun");
+    await page.goto("/");
+    await page.getByRole("button", { name: /continue your run/i }).click();
+    await page.waitForTimeout(400);
+    const box = await commitButton(page).boundingBox();
+    const height = page.viewportSize()!.height;
+    expect(box, "the commit button is on screen").not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+    expect(box!.y).toBeGreaterThan(height / 2);
   });
 
   /**

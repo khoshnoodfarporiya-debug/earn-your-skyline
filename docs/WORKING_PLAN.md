@@ -565,6 +565,16 @@ screen at a time:
      pictures sit under the title, captioned, like the other careers'.
    - [ ] The Life system (friends, dating, family, home). A new part of the
      game with its own save data: plan it on its own first.
+7. **Easier to play** (owner's brief, 28 Nov 2026: planning a week was too
+   many taps, and the game should show a new player where to go rather than
+   explain in text). Order agreed: planning and the tour, then the phone and
+   the icons.
+   - [x] **Plan it for me** (branch `feature/easy-planning`): each week arrives
+     with a recommended plan and a reason; four plans per career in one tap;
+     the steppers behind "Change it yourself".
+   - [x] **The first-run tour:** the mentor points at the money, the plan,
+     the other plans, the commit button and the career's screens.
+   - [ ] **Redesign the phone and the icons,** for all seven careers.
 
 ## Dropped
 

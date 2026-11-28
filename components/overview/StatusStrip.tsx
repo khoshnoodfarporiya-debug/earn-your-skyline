@@ -60,7 +60,7 @@ export function StatusStrip({
   ] as const;
 
   return (
-    <div className="form sticky top-[calc(env(safe-area-inset-top)+0.5rem)] z-30 overflow-hidden">
+    <div data-tour="status" className="form sticky top-[calc(env(safe-area-inset-top)+0.5rem)] z-30 overflow-hidden">
       {/* A definition list, because that is what these are: labelled values.
           It gives each number an accessible name of its own. */}
       <dl className="grid grid-cols-3 gap-px bg-rule-soft">
