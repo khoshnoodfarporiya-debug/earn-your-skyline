@@ -75,6 +75,7 @@ export function CommitBar({
         </div>
         <button
           onClick={onCommit}
+          data-tour="commit"
           disabled={!ready}
           className="btn btn-primary btn-lg shrink-0"
         >

@@ -581,7 +581,7 @@ body {
  * One small vocabulary, used the same way everywhere (design pack, Nov 2026):
  *
  *   press      1px down, 120ms              .btn:active
- *   arrive     fade and a 5px rise, 180ms   .screen-in  a screen you switch to
+ *   arrive     a 180ms fade                 .screen-in  a screen you switch to
  *   swap       fade and a 4px rise, 180ms   .swap-in    the same place, new content
  *   unfold     fade and a 4px drop, 200ms   Fold's body when it opens
  *   sheet      rise from below, 220ms       .sheet-in   phone sheets and dialogs
@@ -601,8 +601,24 @@ body {
     transform: none;
   }
 }
+/*
+ * A fade only, never a transform. The screen wrapper holds the Week
+ * screen's fixed commit bar, and in Chrome an element with a transform
+ * animation (even one that has finished and is "filling" at none) becomes
+ * the containing block for its fixed descendants: the commit bar was laid
+ * out at the end of the page instead of the bottom of the screen
+ * (0.9.0-beta.4, found by the first-run tour, Nov 2026).
+ */
+@keyframes arrive-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 .screen-in {
-  animation: arrive 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: arrive-fade 180ms ease-out backwards;
 }
 .swap-in {
   animation: arrive 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -672,6 +688,24 @@ details[open] > .fold-body {
    blinking between states. */
 .time-dot {
   transition: background-color 200ms ease;
+}
+
+/* The tour's spotlight: the page dimmed everywhere but the target. */
+.tour-spot {
+  box-shadow:
+    0 0 0 9999px rgb(4 8 15 / 0.72),
+    0 0 0 2px rgb(var(--accent)),
+    0 0 24px 2px rgb(var(--accent) / 0.35);
+  transition:
+    top 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    left 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tour-bubble {
+  transition:
+    top 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    left 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* The phone slides up from the bottom edge on mobile, like a device waking. */
@@ -770,7 +804,9 @@ details[open] > .fold-body {
     transform: none;
   }
   .gauge::before,
-  .time-dot {
+  .time-dot,
+  .tour-spot,
+  .tour-bubble {
     transition: none;
   }
   /*

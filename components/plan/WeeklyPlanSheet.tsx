@@ -5,8 +5,7 @@ import type { CareerDef, RunState } from "@/lib/game/types";
 import type { Allocation } from "@/lib/game/engine";
 import { money } from "@/lib/game/format";
 import { cashTone } from "@/lib/ui/constraint";
-import { ActionBoard } from "../ActionBoard";
-import { QuickPlan } from "../overview/QuickPlan";
+import { PlanPicker } from "../overview/PlanPicker";
 
 /**
  * THE WEEK, ONE TAP AWAY ON A PHONE (Phase 4).
@@ -118,22 +117,15 @@ export function WeeklyPlanSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <QuickPlan
-            career={career}
-            state={state}
-            budget={budget}
-            spent={spent}
-            lastWeek={lastWeek}
-            onApply={(next) => onAllocate(() => next)}
-          />
-          <ActionBoard
+          {/* The same plan card the Week screen leads with. */}
+          <PlanPicker
             career={career}
             state={state}
             alloc={alloc}
             budget={budget}
             spent={spent}
-            onChange={onAllocate}
-            bare
+            lastWeek={lastWeek}
+            onAllocate={onAllocate}
           />
         </div>
 

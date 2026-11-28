@@ -7,14 +7,13 @@ import type { Step } from "@/lib/ui/guidance";
 import type { ScreenId } from "@/lib/ui/navigation";
 import { money } from "@/lib/game/format";
 import { med } from "@/lib/game/careers/doctor";
-import { ActionBoard } from "../ActionBoard";
 import { Meters } from "../Meters";
 import { topAlerts } from "@/lib/ui/alerts";
 import { NeedsYou } from "./NeedsYou";
 import { Fold } from "../ui/Fold";
 import { StatusStrip } from "./StatusStrip";
 import { OverviewHero } from "./OverviewHero";
-import { QuickPlan } from "./QuickPlan";
+import { PlanPicker } from "./PlanPicker";
 import { CommitBar } from "./CommitBar";
 import { TrendCard } from "./TrendCard";
 import Image from "next/image";
@@ -146,23 +145,16 @@ export function Overview({
           />
 
           {/* ------------------------------------------------- the week */}
-          <section className="form overflow-hidden">
-            <QuickPlan
-              career={career}
-              state={state}
-              budget={budget}
-              spent={spent}
-              lastWeek={lastWeek}
-              onApply={(next) => onAllocate(() => next)}
-            />
-            <ActionBoard
+          {/* The week arrives planned; the steppers are one tap further. */}
+          <section aria-label="Your week" data-tour="plan" className="form overflow-hidden">
+            <PlanPicker
               career={career}
               state={state}
               alloc={alloc}
               budget={budget}
               spent={spent}
-              onChange={onAllocate}
-              bare
+              lastWeek={lastWeek}
+              onAllocate={onAllocate}
             />
           </section>
 
@@ -345,6 +337,7 @@ export function Overview({
             </div>
             <button
               onClick={onCommit}
+              data-tour="commit"
               disabled={spent === 0}
               className="btn btn-primary btn-lg w-full"
             >

@@ -24,7 +24,9 @@ import {
 import { lessonFor, lessonStatus } from "@/lib/ui/onboarding";
 import { glossaryFor } from "@/lib/ui/glossary";
 import { LessonCard } from "./onboarding/LessonCard";
-import { MentorIntro } from "./onboarding/MentorIntro";
+import { GuidedTour, type TourStep } from "./onboarding/GuidedTour";
+import { sectionsFor } from "@/lib/ui/navigation";
+import { planChoices, samePlan } from "@/lib/ui/recommend";
 import { mentorFor, mentorLessonId } from "@/lib/ui/mentors";
 import { Glossary } from "./onboarding/Glossary";
 import { money } from "@/lib/game/format";
@@ -159,6 +161,25 @@ export function Game({
     setLastWeek(loadLastPlan(career.id));
   }, [career.id]);
   const [pending, setPending] = useState<PendingWeek | null>(null);
+  /*
+   * PLAN IT FOR ME. Each week arrives with the recommended plan filled in
+   * (`lib/ui/recommend.ts`), so a player can simply commit. Once per week:
+   * a player who clears the plan gets an empty week, not a refill. A stored
+   * "0" turns it off; null until read, so nothing is filled on the server
+   * render or before the preference is known.
+   */
+  const [autoplan, setAutoplan] = useState<boolean | null>(null);
+  useEffect(() => {
+    try {
+      setAutoplan(window.localStorage.getItem("career-tycoon:autoplan:v1") !== "0");
+    } catch {
+      setAutoplan(true);
+    }
+  }, []);
+  const filledWeek = useRef<number | null>(null);
+  /* The plan the game filled in, so it can keep it current (a Chef who buys
+     produce gets services) until the player changes it themselves. */
+  const autoFilled = useRef<Allocation | null>(null);
   const [screen, setScreen] = useState<ScreenId>("overview");
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [phoneOpen, setPhoneOpen] = useState(false);
@@ -184,7 +205,13 @@ export function Game({
    * the server and client markup disagree and hydration fails.
    */
   const [taught, setTaught] = useState<string[]>([]);
-  useEffect(() => setTaught(loadTaught()), []);
+  /* Whether the taught list has been read yet: the tour must not start
+     before it is known whether this player has already had it. */
+  const [taughtReady, setTaughtReady] = useState(false);
+  useEffect(() => {
+    setTaught(loadTaught());
+    setTaughtReady(true);
+  }, []);
   const teach = (id: string) => {
     const next = [...new Set([...taught, id])];
     setTaught(next);
@@ -212,6 +239,32 @@ export function Game({
 
   const budget = career.timeBudget(state);
   const spent = timeSpent(career, alloc);
+  useEffect(() => {
+    if (autoplan !== true || state.outcome) return;
+    if (filledWeek.current === state.week) return;
+    filledWeek.current = state.week;
+    if (spent > 0) return;
+    const best = planChoices(career, state, budget)[0];
+    if (best) {
+      setAlloc(best.alloc);
+      autoFilled.current = best.alloc;
+    }
+    // Once per week, on arrival: deliberately not on every change of state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoplan, state.week]);
+  /* Between arrival and commit the run can change (a purchase, a hire). While
+     the week is still exactly the plan the game filled in, follow the new
+     recommendation; once the player has changed it, it is theirs. */
+  useEffect(() => {
+    const was = autoFilled.current;
+    if (autoplan !== true || !was || !samePlan(alloc, was)) return;
+    const best = planChoices(career, state, budget)[0];
+    if (best && !samePlan(best.alloc, alloc)) {
+      setAlloc(best.alloc);
+      autoFilled.current = best.alloc;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, budget]);
   const briefing = useMemo(
     () => career.briefing(state, alloc),
     [career, state, alloc],
@@ -227,19 +280,69 @@ export function Game({
     [screen, state, teachCtx, taught],
   );
   /*
-   * The mentor meets a new run at the top of its first Week, before the
-   * week's lesson. Filed in the same taught list as the lessons, so it is a
-   * property of the player: met once per career, not once per run. A run
-   * that has already played a week never shows it; the Week screen keeps it
-   * to reread under "More this week".
+   * THE FIRST-RUN TOUR. The mentor walks a new run's first week by pointing:
+   * where the money is, the plan, how to change it, the commit button, and
+   * where the career's own screens are (`GuidedTour`). Filed in the taught
+   * list under the mentor's id, so it runs once per career for this player
+   * and needs nothing in the save. A run that has already played a week
+   * never starts it; the mentor's lines stay under "More this week".
    */
   const mentor = mentorFor(state.careerId);
   const mentorId = mentorLessonId(state.careerId);
-  const showMentor =
-    screen === "overview" &&
-    mentor !== null &&
-    state.history.length === 0 &&
-    !taught.includes(mentorId);
+  const [tourStep, setTourStep] = useState<number | null>(null);
+  const tourWeek = useRef<number | null>(null);
+  useEffect(() => {
+    if (!taughtReady || tourWeek.current !== null) return;
+    if (mentor && state.history.length === 0 && !taught.includes(mentorId)) {
+      tourWeek.current = state.week;
+      setTourStep(0);
+    } else {
+      tourWeek.current = -1;
+    }
+    // Decided once, when the taught list is known.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taughtReady]);
+  const endTour = () => {
+    setTourStep(null);
+    teach(mentorId);
+  };
+  const workSection = sectionsFor(state.careerId)[1];
+  const tourSteps: TourStep[] = mentor
+    ? [
+        { text: `I'm ${mentor.name}. ${mentor.lines[0]}` },
+        { target: "status", text: "Your cash, what you still owe, and how close you are to your goal." },
+        { target: "plan", text: `A week is ${budget} blocks of time. I've planned this one for you.` },
+        { target: "choices", text: "Want a different week? Tap another plan, or change it yourself below." },
+        {
+          target: "commit",
+          text: "Happy with it? Commit the week and see what happens.",
+          waitFor: "Tap Commit week",
+        },
+        ...(workSection
+          ? [
+              {
+                target: `nav-${workSection.id}`,
+                text: `Between weeks, ${workSection.label} is where you buy, hire and build. Then come back to Week and plan the next one.`,
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const COMMIT_STEP = 4;
+  /* The commit step waits for the commit itself: the week moving on. */
+  useEffect(() => {
+    if (tourStep === COMMIT_STEP && tourWeek.current !== null && state.week > tourWeek.current) {
+      if (tourSteps.length > COMMIT_STEP + 1) setTourStep(COMMIT_STEP + 1);
+      else endTour();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.week]);
+  /* The last step points at the career's screens: going there finishes it. */
+  useEffect(() => {
+    if (tourStep !== null && tourStep > COMMIT_STEP && screen !== "overview") endTour();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
+  const showMentor = tourStep !== null;
   const step = useMemo(() => {
     const s = nextStep(state, alloc, spent, budget, state.history.length > 0);
     return s && !dismissed.includes(s.id) ? s : null;
@@ -362,6 +465,25 @@ export function Game({
         screen === "cities" ? "max-w-[1680px]" : "max-w-6xl"
       } ${screen === "overview" ? "pb-36" : "pb-24"}`}
     >
+      {tourStep !== null &&
+        mentor &&
+        !pending &&
+        !retireSummary &&
+        !phoneOpen &&
+        !glossaryOpen &&
+        !planOpen &&
+        (screen === "overview" || tourStep > COMMIT_STEP) && (
+          <GuidedTour
+            mentor={mentor}
+            steps={tourSteps}
+            step={tourStep}
+            onNext={() =>
+              tourStep + 1 < tourSteps.length ? setTourStep(tourStep + 1) : endTour()
+            }
+            onSkip={endTour}
+          />
+        )}
+
       {retireSummary && (
         <RetirementDialog
           summary={retireSummary}
@@ -498,19 +620,8 @@ export function Game({
          * what a time block is while their licence is suspended has a more
          * pressing problem than vocabulary.
          */}
-        {/* The mentor first, the lesson after: two teaching cards stacked
-            on one screen would be a wall before the plan. */}
-        {showMentor && mentor && (
-          <div className="mb-4">
-            <MentorIntro
-              mentor={mentor}
-              onDone={() => {
-                teach(mentorId);
-                mainRef.current?.focus();
-              }}
-            />
-          </div>
-        )}
+        {/* The tour first, the lesson after: the week's lesson card waits
+            until the mentor has shown the player around. */}
         {lesson && !showMentor && (
           <div className="mb-4">
             <LessonCard
